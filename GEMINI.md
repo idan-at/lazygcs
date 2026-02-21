@@ -34,17 +34,20 @@ Before committing any code, MUST run:
 4.  `go test -v ./...` (Verify tests pass)
 
 ## Current Status
-*   **Phase:** Navigation Implementation.
+*   **Phase:** Feature Implementation.
 *   **Completed:**
+    *   Multi-column Miller Layout (Buckets | Objects).
+    *   Folder/Prefix navigation (Drill down/up) with `h`/`l` and `Enter`.
+    *   Relative path display for nested objects.
     *   Refactored `ListObjects` to return `ObjectList` struct.
     *   Simplified configuration (CLI args, TOML file).
     *   Async TUI initialization (Loading buckets).
-    *   Basic bucket list navigation (`j`/`k`).
+    *   Basic bucket list navigation (`j`/`k`) with cycle support.
 *   **Next Steps:**
-    1.  Implement entering a bucket (`Enter` or `l`) to list objects.
-    2.  Implement prefix-based navigation (drill down into "folders").
-    3.  Implement backward navigation (`h` or `backspace`).
-    4.  Add Miller Columns layout (view parent/current/preview).
+    1.  Refactor `View` logic into smaller components (e.g., `bucketsView`, `objectsView`).
+    2.  Add File Preview pane (3rd column).
+    3.  Implement Download (`d`) and Delete (`x`) actions.
+    4.  Add Search functionality (`/`).
 
 ## Key Files
 *   `DESIGN.md`: The architectural blueprint.
