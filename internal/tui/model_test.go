@@ -66,23 +66,43 @@ func TestModel_Update_CursorNavigation(t *testing.T) {
 	m = updatedM.(tui.Model)
 	assert.Assert(t, strings.Contains(m.View(), "> b3"))
 
-	// 4. Press 'down' at bottom -> stay at b3
-	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = updatedM.(tui.Model)
-	assert.Assert(t, strings.Contains(m.View(), "> b3"))
-
-	// 5. Press 'k' (up) -> b2
+	// 4. Press 'up' (k) -> back to b2
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 	m = updatedM.(tui.Model)
 	assert.Assert(t, strings.Contains(m.View(), "> b2"))
 
-	// 6. Press 'up' arrow -> b1
+	// 5. Press 'up' (up arrow) -> back to b1
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = updatedM.(tui.Model)
 	assert.Assert(t, strings.Contains(m.View(), "> b1"))
+}
 
-	// 7. Press 'up' at top -> stay at b1
+func TestModel_Update_CursorCycle(t *testing.T) {
+	client := mockGCSClient{buckets: []string{"b1", "b2", "b3"}}
+	m := tui.NewModel([]string{"p1"}, client)
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2", "b3"}})
+	m = updatedM.(tui.Model)
+
+	// 1. Initial state: cursor at b1 (top)
+	assert.Assert(t, strings.Contains(m.View(), "> b1"))
+
+	// 2. Press 'up' -> wrap to b3 (bottom)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b3"))
+
+	// 3. Press 'down' -> wrap to b1 (top)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b1"))
+
+	// 4. Test 'k' (up)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b3"))
+
+	// 5. Test 'j' (down)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	m = updatedM.(tui.Model)
 	assert.Assert(t, strings.Contains(m.View(), "> b1"))
 }
