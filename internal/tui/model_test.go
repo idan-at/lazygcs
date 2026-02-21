@@ -205,3 +205,38 @@ func TestModel_Resize(t *testing.T) {
 	// Ideally we'd check if the rendered width matches 20, but ANSI codes make len() unreliable for display width.
 	// We are satisfied here that the Resize message is handled.
 }
+
+func TestModel_EnterPrefix(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: &gcs.ObjectList{
+			Objects:  []string{"file1"},
+			Prefixes: []string{"folder1/"},
+		},
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	m = updatedM.(tui.Model)
+	
+	// 1. Enter b1
+	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// 2. Cursor should be on "folder1/" (first item)
+	// View logic puts prefixes before objects
+	if !strings.Contains(m.View(), "> folder1/") {
+		t.Fatalf("Expected view to contain '> folder1/', but got:\n%q", m.View())
+	}
+
+	// 3. Press Enter on folder1/
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// 4. Assert loading state and correct command
+	assert.Assert(t, cmd != nil)
+	assert.Assert(t, strings.Contains(m.View(), "Loading"))
+}

@@ -54,6 +54,7 @@ type Model struct {
 
 	// Objects View
 	currentBucket string
+	currentPrefix string
 	objects       []string
 	prefixes      []string
 
@@ -85,9 +86,17 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) fetchObjects() tea.Cmd {
 	return func() tea.Msg {
-		list, err := m.client.ListObjects(context.Background(), m.currentBucket, "")
+		list, err := m.client.ListObjects(context.Background(), m.currentBucket, m.currentPrefix)
 		return ObjectsMsg{List: list, Err: err}
 	}
+}
+
+func parentPrefix(p string) string {
+	p = strings.TrimSuffix(p, "/")
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		return p[:i+1]
+	}
+	return ""
 }
 
 // Update processes terminal messages (key presses, window resizes) and async responses.
@@ -139,15 +148,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "l", "enter":
 			if m.state == viewBuckets && len(m.buckets) > 0 {
 				m.currentBucket = m.buckets[m.cursor]
+				m.currentPrefix = "" // Reset prefix when entering bucket
 				m.state = viewObjects
 				m.loading = true
 				return m, m.fetchObjects()
+			} else if m.state == viewObjects {
+				// Check if selected item is a prefix
+				if m.cursor < len(m.prefixes) {
+					m.currentPrefix = m.prefixes[m.cursor]
+					m.loading = true
+					return m, m.fetchObjects()
+				}
 			}
 		case "h":
 			if m.state == viewObjects {
-				m.state = viewBuckets
-				m.cursor = 0 // for now, reset cursor when going back
-				return m, nil
+				if m.currentPrefix == "" {
+					m.state = viewBuckets
+					m.cursor = 0 // for now, reset cursor when going back
+					return m, nil
+				}
+				// Go up one level
+				m.currentPrefix = parentPrefix(m.currentPrefix)
+				m.loading = true
+				return m, m.fetchObjects()
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
