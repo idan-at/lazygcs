@@ -6,9 +6,13 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
+	"lazygcs/internal/config"
 )
 
 func main() {
@@ -20,25 +24,50 @@ func main() {
 	}
 	defer client.Close()
 
-	if err := Run(ctx, client, os.Stdout); err != nil {
+	// Determine config path: ~/.config/lazygcs/config.toml
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".config", "lazygcs", "config.toml")
+
+	cfg, err := config.Load(os.Args[1:], configPath, getGCloudProject)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	if len(cfg.Projects) == 0 {
+		log.Fatal("No project IDs found. Please provide them as arguments, via LAZYGCS_PROJECTS, or ensure gcloud is configured.")
+	}
+
+	if err := Run(ctx, cfg.Projects, client, os.Stdout); err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 }
 
-// Run executes the core application logic, listing buckets from the provided client.
-func Run(ctx context.Context, client *storage.Client, w io.Writer) error {
-	// For now, we list buckets without a specific project filter.
-	// In the emulator, this returns all buckets.
-	it := client.Buckets(ctx, "")
-	for {
-		bucketAttrs, err := it.Next()
-		if err == iterator.Done {
-			break
+func getGCloudProject() string {
+	cmd := exec.Command("gcloud", "config", "get-value", "project")
+	out, err := cmd.Output()
+	if err == nil {
+		p := strings.TrimSpace(string(out))
+		if p != "" && !strings.Contains(p, "unset") {
+			return p
 		}
-		if err != nil {
-			return fmt.Errorf("failed to list buckets: %w", err)
+	}
+	return ""
+}
+
+// Run executes the core application logic, listing buckets from the provided client for each project.
+func Run(ctx context.Context, projectIDs []string, client *storage.Client, w io.Writer) error {
+	for _, pID := range projectIDs {
+		it := client.Buckets(ctx, pID)
+		for {
+			bucketAttrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("failed to list buckets for project %q: %w", pID, err)
+			}
+			fmt.Fprintln(w, bucketAttrs.Name)
 		}
-		fmt.Fprintln(w, bucketAttrs.Name)
 	}
 	return nil
 }

@@ -43,8 +43,7 @@ func TestRun_ListsBuckets(t *testing.T) {
 	var stdout bytes.Buffer
 
 	// 4. Run Application Logic
-	// We inject the client and the writer
-	err = Run(context.Background(), client, &stdout)
+	err = Run(context.Background(), []string{"test-project-1"}, client, &stdout)
 	assert.NilError(t, err)
 
 	// 5. Assertions

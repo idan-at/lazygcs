@@ -40,7 +40,7 @@ func TestListBuckets(t *testing.T) {
 	defer server.Stop()
 
 	// 3. Run App
-	cmd := exec.Command(bin)
+	cmd := exec.Command(bin, "test-project-1")
 	// STORAGE_EMULATOR_HOST must be host:port without scheme
 	emulatorHost := strings.TrimPrefix(server.URL(), "http://")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("STORAGE_EMULATOR_HOST=%s", emulatorHost))

@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	cloud.google.com/go/storage v1.60.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/fsouza/fake-gcs-server v1.54.0
 	google.golang.org/api v0.266.0
 	gotest.tools/v3 v3.5.2
