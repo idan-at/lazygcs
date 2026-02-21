@@ -186,47 +186,25 @@ func (m Model) fullPath() string {
 	return fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
 }
 
-// View renders the current state of the application as a string.
-func (m Model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
-	}
-
-	header := lipgloss.NewStyle().
+func (m Model) headerView() string {
+	return lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Padding(0, 1).
 		Render(m.fullPath())
+}
 
-	var leftCol, rightCol string
+func (m Model) footerView() string {
+	return "\n\n(q: quit, h: back, l/enter: select)"
+}
 
-	// Calculate column widths
-	leftWidth := int(float64(m.width) * 0.3)
-	rightWidth := m.width - leftWidth - 4 // account for padding/border
-
-	// Left Column: Buckets
-	var lb strings.Builder
-	lb.WriteString(lipgloss.NewStyle().Bold(true).Render("Buckets") + "\n\n")
-	if m.state == viewBuckets && m.loading {
-		lb.WriteString("Loading...")
-	} else {
-		for i, bucket := range m.buckets {
-			cursor := " "
-			if m.state == viewBuckets && m.cursor == i {
-				cursor = ">"
-			}
-			lb.WriteString(fmt.Sprintf("%s %s\n", cursor, bucket))
-		}
-	}
-	leftCol = lb.String()
-
-	// Right Column: Objects
-	var rb strings.Builder
+func (m Model) objectsView() string {
+	var s strings.Builder
 	if m.state == viewObjects {
-		rb.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Objects in %s", m.currentBucket)) + "\n\n")
+		s.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Objects in %s", m.currentBucket)) + "\n\n")
 		if m.loading {
-			rb.WriteString("Loading...")
+			s.WriteString("Loading...")
 		} else {
 			allItems := append(m.prefixes, m.objects...)
 			for i, item := range allItems {
@@ -236,17 +214,47 @@ func (m Model) View() string {
 				}
 				// Display relative path
 				displayItem := strings.TrimPrefix(item, m.currentPrefix)
-				rb.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
+				s.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
 			}
 			if len(allItems) == 0 {
-				rb.WriteString("(empty)")
+				s.WriteString("(empty)")
 			}
 		}
 	}
-	rightCol = rb.String()
+	return s.String()
+}
 
-	return header + "\n\n" + lipgloss.JoinHorizontal(lipgloss.Top,
-		lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(leftCol),
-		lipgloss.NewStyle().Width(rightWidth).Render(rightCol),
-	) + "\n\n(q: quit, h: back, l/enter: select)"
+func (m Model) bucketsView() string {
+	var s strings.Builder
+	s.WriteString(lipgloss.NewStyle().Bold(true).Render("Buckets") + "\n\n")
+	if m.state == viewBuckets && m.loading {
+		s.WriteString("Loading...")
+	} else {
+		for i, bucket := range m.buckets {
+			cursor := " "
+			if m.state == viewBuckets && m.cursor == i {
+				cursor = ">"
+			}
+			s.WriteString(fmt.Sprintf("%s %s\n", cursor, bucket))
+		}
+	}
+	return s.String()
+}
+
+// View renders the current state of the application as a string.
+func (m Model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
+	}
+
+	// Calculate column widths
+	leftWidth := int(float64(m.width) * 0.3)
+	rightWidth := m.width - leftWidth - 4 // account for padding/border
+
+	leftCol := lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(m.bucketsView())
+	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(m.objectsView())
+
+	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+
+	return m.headerView() + "\n\n" + mainContent + m.footerView()
 }
