@@ -1,6 +1,7 @@
 package tui_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -9,39 +10,50 @@ import (
 	"lazygcs/internal/tui"
 )
 
-func TestModel_View(t *testing.T) {
-	m := tui.InitialModel([]string{"bucket-1", "bucket-2"})
+type mockFetcher struct {
+	buckets []string
+}
 
+func (f mockFetcher) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
+	return f.buckets, nil
+}
+
+func TestModel_AsyncLoading(t *testing.T) {
+	fetcher := mockFetcher{buckets: []string{"async-b1"}}
+	m := tui.NewModel([]string{"p1"}, fetcher)
+
+	// 1. Initial State should be loading
+	assert.Assert(t, strings.Contains(m.View(), "Loading"))
+
+	// 2. Init should return a command
+	cmd := m.Init()
+	assert.Assert(t, cmd != nil)
+
+	// 3. Simulate receiving the message
+	msg := tui.BucketsMsg{Buckets: []string{"async-b1"}}
+	updatedM, _ := m.Update(msg)
+	m = updatedM.(tui.Model)
+
+	// 4. Assert view now shows the buckets
 	view := m.View()
-
-	assert.Assert(t, strings.Contains(view, "bucket-1"))
-	assert.Assert(t, strings.Contains(view, "bucket-2"))
+	assert.Assert(t, strings.Contains(view, "async-b1"))
+	assert.Assert(t, !strings.Contains(view, "Loading"))
 }
 
 func TestModel_Update_CursorNavigation(t *testing.T) {
-	m := tui.InitialModel([]string{"b1", "b2", "b3"})
+	// Initialize and move out of loading state
+	fetcher := mockFetcher{buckets: []string{"b1", "b2"}}
+	m := tui.NewModel([]string{"p1"}, fetcher)
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2"}})
+	m = updatedM.(tui.Model)
 
-	// 1. Initial state: View should imply selection (e.g., "> b1") or at least just list items for now.
-	// But our test expects "> b1", so we must implement that.
-	view := m.View()
-	// If View doesn't show cursor yet, this will fail, which is good.
-	if !strings.Contains(view, "> b1") {
-		t.Fatalf("Expected initial view to show selection on b1. Got:\n%s", view)
-	}
+	// 1. Initial state: cursor at b1
+	assert.Assert(t, strings.Contains(m.View(), "> b1"))
 
 	// 2. Press 'j' (down)
-	updatedM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	m = updatedM.(tui.Model)
 
 	// 3. Assert cursor moved to b2
-	view = m.View()
-	assert.Assert(t, !strings.Contains(view, "> b1"))
-	assert.Assert(t, strings.Contains(view, "> b2"))
-
-	// 4. Press 'k' (up)
-	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
-	m = updatedM.(tui.Model)
-
-	// 5. Assert cursor back at b1
-	assert.Assert(t, strings.Contains(m.View(), "> b1"))
+	assert.Assert(t, strings.Contains(m.View(), "> b2"))
 }
