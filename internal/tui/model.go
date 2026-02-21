@@ -186,6 +186,23 @@ func (m Model) fullPath() string {
 	return fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
 }
 
+func (m Model) previewView() string {
+	var s strings.Builder
+	if m.state == viewObjects && m.cursor >= len(m.prefixes) && len(m.objects) > 0 {
+		// Selected item is an object (not a prefix)
+		idx := m.cursor - len(m.prefixes)
+		if idx < len(m.objects) {
+			obj := m.objects[idx]
+			s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
+			s.WriteString(fmt.Sprintf("Name: %s\n", obj.Name))
+			s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
+			s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
+			s.WriteString(fmt.Sprintf("Updated: %s\n", obj.Updated.Format("2006-01-02 15:04:05")))
+		}
+	}
+	return s.String()
+}
+
 func (m Model) headerView() string {
 	return lipgloss.NewStyle().
 		Bold(true).
@@ -259,13 +276,16 @@ func (m Model) View() string {
 	}
 
 	// Calculate column widths
+	// 30% | 35% | 35%
 	leftWidth := int(float64(m.width) * 0.3)
-	rightWidth := m.width - leftWidth - 4 // account for padding/border
+	midWidth := int(float64(m.width) * 0.35)
+	rightWidth := m.width - leftWidth - midWidth - 6 // account for borders/padding
 
 	leftCol := lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(m.bucketsView())
-	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(m.objectsView())
+	midCol := lipgloss.NewStyle().Width(midWidth).PaddingRight(2).Render(m.objectsView())
+	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(m.previewView())
 
-	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
 	return m.headerView() + "\n\n" + mainContent + m.footerView()
 }

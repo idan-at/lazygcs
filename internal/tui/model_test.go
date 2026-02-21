@@ -223,3 +223,35 @@ func TestModel_EnterPrefix(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "sub/"))
 	assert.Assert(t, !strings.Contains(view, "folder1/sub/"))
 }
+
+func TestModel_SelectObject(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: &gcs.ObjectList{
+			Objects: []gcs.ObjectMetadata{{
+				Name:        "file1.txt",
+				Size:        1024,
+				ContentType: "text/plain",
+			}},
+		},
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Cursor on file1.txt
+	view := m.View()
+	if !strings.Contains(view, "1024") {
+		t.Fatalf("View should show file size. Got:\n%q", view)
+	}
+	assert.Assert(t, strings.Contains(view, "text/plain"), "View should show content type")
+}
