@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strings"
 
@@ -57,6 +58,9 @@ func trimProjects(raw []string) []string {
 	for _, p := range raw {
 		trimmed := strings.TrimSpace(p)
 		if trimmed != "" {
+			if trimmed != p {
+				log.Printf("Warning: project ID %q was trimmed to %q", p, trimmed)
+			}
 			clean = append(clean, trimmed)
 		}
 	}
