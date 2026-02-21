@@ -255,3 +255,39 @@ func TestModel_SelectObject(t *testing.T) {
 	}
 	assert.Assert(t, strings.Contains(view, "text/plain"), "View should show content type")
 }
+
+func TestModel_CursorBug_SingleItem(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b"},
+		objects: &gcs.ObjectList{
+			Prefixes: []string{"folder1/"},
+			Objects:  []gcs.ObjectMetadata{{Name: "file1"}},
+		},
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// 1. Enter bucket
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// 2. Enter folder1/
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// 3. State is Loading. Objects/Prefixes are STALE.
+	// Press 'j' (down).
+	// Current stale list: folder1/ (0), file1 (1).
+	// Cursor moves to 1.
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// 4. Assert Bug: Preview pane shows "file1" (stale)
+	if strings.Contains(m.View(), "file1") {
+		t.Fatalf("Preview pane shows stale data 'file1' during loading!\nView:\n%q", m.View())
+	}
+}

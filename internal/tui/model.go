@@ -91,6 +91,13 @@ func (m Model) fetchObjects() tea.Cmd {
 	}
 }
 
+func (m *Model) resetObjectsState() {
+	m.objects = nil
+	m.prefixes = nil
+	m.cursor = 0
+	m.loading = true
+}
+
 func parentPrefix(p string) string {
 	p = strings.TrimSuffix(p, "/")
 	if i := strings.LastIndex(p, "/"); i >= 0 {
@@ -150,13 +157,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentBucket = m.buckets[m.cursor]
 				m.currentPrefix = "" // Reset prefix when entering bucket
 				m.state = viewObjects
-				m.loading = true
+				m.resetObjectsState()
 				return m, m.fetchObjects()
 			} else if m.state == viewObjects {
 				// Check if selected item is a prefix
 				if m.cursor < len(m.prefixes) {
 					m.currentPrefix = m.prefixes[m.cursor]
-					m.loading = true
+					m.resetObjectsState()
 					return m, m.fetchObjects()
 				}
 			}
@@ -169,7 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				// Go up one level
 				m.currentPrefix = parentPrefix(m.currentPrefix)
-				m.loading = true
+				m.resetObjectsState()
 				return m, m.fetchObjects()
 			}
 		case "q", "ctrl+c":
