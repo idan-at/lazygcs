@@ -179,11 +179,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) fullPath() string {
+	if m.currentBucket == "" {
+		return "gs://"
+	}
+	return fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
+}
+
 // View renders the current state of the application as a string.
 func (m Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
 	}
+
+	header := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Padding(0, 1).
+		Render(m.fullPath())
 
 	var leftCol, rightCol string
 
@@ -231,7 +245,7 @@ func (m Model) View() string {
 	}
 	rightCol = rb.String()
 
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	return header + "\n\n" + lipgloss.JoinHorizontal(lipgloss.Top,
 		lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(leftCol),
 		lipgloss.NewStyle().Width(rightWidth).Render(rightCol),
 	) + "\n\n(q: quit, h: back, l/enter: select)"

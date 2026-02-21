@@ -248,8 +248,12 @@ func TestModel_EnterPrefix(t *testing.T) {
 
 	// 5. Assert View shows RELATIVE names
 	view := m.View()
+	// Path header should be present
+	assert.Assert(t, strings.Contains(view, "gs://b1/folder1/"))
+
 	// Should show "file2.txt", NOT "folder1/file2.txt"
 	assert.Assert(t, strings.Contains(view, "file2.txt"))
+
 	assert.Assert(t, !strings.Contains(view, "folder1/file2.txt"))
 
 	// Should show "sub/", NOT "folder1/sub/"
