@@ -60,13 +60,10 @@ Inspired by `ranger` and `yazi`.
 ## 6. Configuration Strategy
 Project IDs are resolved in the following precedence order:
 1.  **CLI Arguments:** `lazygcs project-a project-b` (Takes precedence).
-2.  **Environment Variable:** `LAZYGCS_PROJECTS` (Comma-separated list).
-3.  **Environment Variable:** `GOOGLE_CLOUD_PROJECT` (Standard fallback).
-4.  **Config File:** `~/.config/lazygcs/config.toml`
+2.  **Config File:** `~/.config/lazygcs/config.toml`
     ```toml
     projects = ["project-a", "project-b"]
     ```
-5.  **Fallback:** Active `gcloud` project (`gcloud config get-value project`).
 
 ## 7. Testing Strategy
 *   **E2E Tests (`e2e_test.go`):** Verify the entire binary lifecycle.

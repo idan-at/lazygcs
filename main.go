@@ -6,9 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -28,30 +26,18 @@ func main() {
 	home, _ := os.UserHomeDir()
 	configPath := filepath.Join(home, ".config", "lazygcs", "config.toml")
 
-	cfg, err := config.Load(os.Args[1:], configPath, getGCloudProject)
+	cfg, err := config.Load(os.Args[1:], configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	if len(cfg.Projects) == 0 {
-		log.Fatal("No project IDs found. Please provide them as arguments, via LAZYGCS_PROJECTS, or ensure gcloud is configured.")
+		log.Fatal("No project IDs found. Please provide them as arguments or configure them in ~/.config/lazygcs/config.toml")
 	}
 
 	if err := Run(ctx, cfg.Projects, client, os.Stdout); err != nil {
 		log.Fatalf("Error: %v", err)
 	}
-}
-
-func getGCloudProject() string {
-	cmd := exec.Command("gcloud", "config", "get-value", "project")
-	out, err := cmd.Output()
-	if err == nil {
-		p := strings.TrimSpace(string(out))
-		if p != "" && !strings.Contains(p, "unset") {
-			return p
-		}
-	}
-	return ""
 }
 
 // Run executes the core application logic, listing buckets from the provided client for each project.

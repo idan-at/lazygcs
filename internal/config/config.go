@@ -17,32 +17,16 @@ type tomlConfig struct {
 	Projects []string `toml:"projects"`
 }
 
-// FallbackFunc is a function that returns a fallback project ID.
-type FallbackFunc func() string
-
 // Load resolves the configuration based on the precedence hierarchy:
 // 1. CLI Arguments
-// 2. LAZYGCS_PROJECTS env var
-// 3. GOOGLE_CLOUD_PROJECT env var
-// 4. Config File (TOML)
-// 5. Fallback Provider
-func Load(args []string, configPath string, fallback FallbackFunc) (*Config, error) {
+// 2. Config File (TOML)
+func Load(args []string, configPath string) (*Config, error) {
 	// 1. CLI Arguments
 	if len(args) > 0 {
 		return &Config{Projects: trimProjects(args)}, nil
 	}
 
-	// 2. LAZYGCS_PROJECTS env var
-	if p := os.Getenv("LAZYGCS_PROJECTS"); p != "" {
-		return &Config{Projects: trimProjects(strings.Split(p, ","))}, nil
-	}
-
-	// 3. GOOGLE_CLOUD_PROJECT env var
-	if p := os.Getenv("GOOGLE_CLOUD_PROJECT"); p != "" {
-		return &Config{Projects: []string{p}}, nil
-	}
-
-	// 4. Config File
+	// 2. Config File
 	if configPath != "" {
 		if _, err := os.Stat(configPath); err == nil {
 			var tc tomlConfig
@@ -51,13 +35,6 @@ func Load(args []string, configPath string, fallback FallbackFunc) (*Config, err
 					return &Config{Projects: trimProjects(tc.Projects)}, nil
 				}
 			}
-		}
-	}
-
-	// 5. Fallback
-	if fallback != nil {
-		if p := fallback(); p != "" {
-			return &Config{Projects: []string{p}}, nil
 		}
 	}
 
