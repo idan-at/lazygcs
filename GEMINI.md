@@ -26,6 +26,13 @@
     *   Follow `DESIGN.md`.
     *   Use `main.go` for the entry point, but keep logic in packages (e.g., `tui`, `gcs`, `models`).
 
+## Pre-Commit Checklist
+Before committing any code, MUST run:
+1.  `go fmt ./...` (Format code)
+2.  `go vet ./...` (Static analysis)
+3.  `go mod tidy` (Clean dependencies)
+4.  `go test -v ./...` (Verify tests pass)
+
 ## Current Status
 *   **Phase:** Initialization.
 *   **Next Steps:**

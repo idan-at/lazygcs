@@ -57,7 +57,20 @@ Inspired by `ranger` and `yazi`.
     *   `?`: Toggle Help.
     *   `q`: Quit.
 
-## 6. Development Philosophy
+## 6. Testing Strategy
+*   **E2E Tests (`e2e_test.go`):** Verify the entire binary lifecycle.
+    *   Build the binary.
+    *   Run against a `fakestorage` server via env vars (`STORAGE_EMULATOR_HOST`).
+    *   Assert output contains expected data.
+*   **Integration Tests (`integration_test.go`):** Verify core logic functions (e.g., `Run`).
+    *   Inject `storage.Client` (connected to `fakestorage`) directly into functions.
+    *   Verify logic correctness without process overhead.
+*   **Unit Tests:** Verify pure logic and UI state.
+    *   Test `Update` function transitions.
+    *   Test View rendering logic.
+    *   No GCS calls involved.
+
+## 7. Development Philosophy
 *   **TDD First:** All features must be implemented test-first.
     *   **Fail First:** Create a reproduction test case or feature test that fails *for the right reason*.
     *   **Fake it:** Use `fakestorage` to simulate GCS state (buckets, objects, versions).
