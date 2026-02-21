@@ -55,7 +55,7 @@ type Model struct {
 	// Objects View
 	currentBucket string
 	currentPrefix string
-	objects       []string
+	objects       []gcs.ObjectMetadata
 	prefixes      []string
 
 	loading bool
@@ -206,17 +206,28 @@ func (m Model) objectsView() string {
 		if m.loading {
 			s.WriteString("Loading...")
 		} else {
-			allItems := append(m.prefixes, m.objects...)
-			for i, item := range allItems {
+			// Combine prefixes (strings) and objects (structs) for display
+			// We iterate through them separately or build a unified list of display strings
+			totalItems := len(m.prefixes) + len(m.objects)
+
+			for i := 0; i < totalItems; i++ {
 				cursor := " "
 				if m.cursor == i {
 					cursor = ">"
 				}
+
+				var displayItem string
+				if i < len(m.prefixes) {
+					displayItem = m.prefixes[i]
+				} else {
+					displayItem = m.objects[i-len(m.prefixes)].Name
+				}
+
 				// Display relative path
-				displayItem := strings.TrimPrefix(item, m.currentPrefix)
+				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
 				s.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
 			}
-			if len(allItems) == 0 {
+			if totalItems == 0 {
 				s.WriteString("(empty)")
 			}
 		}

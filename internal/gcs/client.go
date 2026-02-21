@@ -3,6 +3,7 @@ package gcs
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -14,9 +15,17 @@ type Client struct {
 	storageClient *storage.Client
 }
 
+// ObjectMetadata holds metadata for a GCS object.
+type ObjectMetadata struct {
+	Name        string
+	Size        int64
+	ContentType string
+	Updated     time.Time
+}
+
 // ObjectList holds the list of objects and prefixes (folders) returned by ListObjects.
 type ObjectList struct {
-	Objects  []string
+	Objects  []ObjectMetadata
 	Prefixes []string
 }
 
@@ -83,7 +92,12 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*O
 		if attrs.Prefix != "" {
 			list.Prefixes = append(list.Prefixes, attrs.Prefix)
 		} else {
-			list.Objects = append(list.Objects, attrs.Name)
+			list.Objects = append(list.Objects, ObjectMetadata{
+				Name:        attrs.Name,
+				Size:        attrs.Size,
+				ContentType: attrs.ContentType,
+				Updated:     attrs.Updated,
+			})
 		}
 	}
 

@@ -30,7 +30,7 @@ func TestClient_ListBuckets(t *testing.T) {
 func TestClient_ListObjects(t *testing.T) {
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"}},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt", Size: 100}},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file2.txt"}},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/subfolder/file3.txt"}},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder2/file4.txt"}},
@@ -49,12 +49,15 @@ func TestClient_ListObjects(t *testing.T) {
 		assert.NilError(t, err)
 
 		// Should have file1.txt as object
-		assert.Assert(t, contains(list.Objects, "file1.txt"))
+		assert.Assert(t, containsObject(list.Objects, "file1.txt"))
+		assert.Assert(t, list.Objects[0].Size == 100)
+
 		// Should have folder1/ and folder2/ as prefixes
 		assert.Assert(t, contains(list.Prefixes, "folder1/"))
 		assert.Assert(t, contains(list.Prefixes, "folder2/"))
+
 		// Should NOT have objects from subfolders
-		assert.Assert(t, !contains(list.Objects, "file2.txt"))
+		assert.Assert(t, !containsObject(list.Objects, "file2.txt"))
 	})
 
 	t.Run("Inside folder1", func(t *testing.T) {
@@ -62,7 +65,7 @@ func TestClient_ListObjects(t *testing.T) {
 		assert.NilError(t, err)
 
 		// Should have folder1/file2.txt
-		assert.Assert(t, contains(list.Objects, "folder1/file2.txt"))
+		assert.Assert(t, containsObject(list.Objects, "folder1/file2.txt"))
 		assert.Assert(t, contains(list.Prefixes, "folder1/subfolder/"))
 
 		// Should NOT contain the current prefix "folder1/" itself
@@ -73,6 +76,15 @@ func TestClient_ListObjects(t *testing.T) {
 func contains(slice []string, val string) bool {
 	for _, s := range slice {
 		if s == val {
+			return true
+		}
+	}
+	return false
+}
+
+func containsObject(slice []gcs.ObjectMetadata, name string) bool {
+	for _, o := range slice {
+		if o.Name == name {
 			return true
 		}
 	}
