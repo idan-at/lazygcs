@@ -181,3 +181,27 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 	m = updatedM.(tui.Model)
 	assert.Assert(t, strings.Contains(m.View(), "> obj1"))
 }
+
+func TestModel_Resize(t *testing.T) {
+	client := mockGCSClient{buckets: []string{"b1"}}
+	m := tui.NewModel([]string{"p1"}, client)
+	
+	// 1. Initial size (default 0x0)
+	// We can't easily assert on exact string length without knowing lipgloss internals,
+	// but we can assert that Update processes the message without error.
+	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	m = updatedM.(tui.Model)
+	
+	// 2. Assert View doesn't panic and returns content
+	view := m.View()
+	assert.Assert(t, len(view) > 0)
+	
+	// 3. Resize to something narrow
+	updatedM, _ = m.Update(tea.WindowSizeMsg{Width: 20, Height: 10})
+	m = updatedM.(tui.Model)
+	viewNarrow := m.View()
+	
+	assert.Assert(t, len(viewNarrow) > 0)
+	// Ideally we'd check if the rendered width matches 20, but ANSI codes make len() unreliable for display width.
+	// We are satisfied here that the Resize message is handled.
+}

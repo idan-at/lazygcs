@@ -43,7 +43,10 @@ type Model struct {
 	client     GCSClient
 	projectIDs []string
 
-	state viewState
+	// View State
+	width  int
+	height int
+	state  viewState
 
 	// Buckets View
 	buckets []string
@@ -110,6 +113,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		return m, nil
 
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "j", "down":
@@ -156,6 +164,10 @@ func (m Model) View() string {
 
 	var leftCol, rightCol string
 
+	// Calculate column widths
+	leftWidth := int(float64(m.width) * 0.3)
+	rightWidth := m.width - leftWidth - 4 // account for padding/border
+
 	// Left Column: Buckets
 	var lb strings.Builder
 	lb.WriteString(lipgloss.NewStyle().Bold(true).Render("Buckets") + "\n\n")
@@ -195,7 +207,7 @@ func (m Model) View() string {
 	rightCol = rb.String()
 
 	return lipgloss.JoinHorizontal(lipgloss.Top,
-		lipgloss.NewStyle().Width(30).PaddingRight(2).Render(leftCol),
-		lipgloss.NewStyle().Width(50).Render(rightCol),
+		lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(leftCol),
+		lipgloss.NewStyle().Width(rightWidth).Render(rightCol),
 	) + "\n\n(q: quit, h: back, l/enter: select)"
 }
