@@ -14,6 +14,12 @@ type Client struct {
 	storageClient *storage.Client
 }
 
+// ObjectList holds the list of objects and prefixes (folders) returned by ListObjects.
+type ObjectList struct {
+	Objects  []string
+	Prefixes []string
+}
+
 // NewClient initializes a new GCS Client with the provided storage client.
 func NewClient(sc *storage.Client) *Client {
 	return &Client{storageClient: sc}
@@ -55,14 +61,15 @@ func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]string
 //   - prefix: The object prefix (folder path) to list within.
 //
 // Returns:
-//   - objects: A list of object names (files) at the current level.
-//   - prefixes: A list of common prefixes (virtual folders) at the current level.
-//   - err: If the underlying API call fails.
-func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (objects []string, prefixes []string, err error) {
+//   - *ObjectList: A struct containing lists of objects and prefixes.
+//   - error: If the underlying API call fails.
+func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*ObjectList, error) {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: "/",
 	})
+
+	list := &ObjectList{}
 
 	for {
 		attrs, err := it.Next()
@@ -70,15 +77,15 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (ob
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to list objects for bucket %q: %w", bucketName, err)
+			return nil, fmt.Errorf("failed to list objects for bucket %q: %w", bucketName, err)
 		}
 
 		if attrs.Prefix != "" {
-			prefixes = append(prefixes, attrs.Prefix)
+			list.Prefixes = append(list.Prefixes, attrs.Prefix)
 		} else {
-			objects = append(objects, attrs.Name)
+			list.Objects = append(list.Objects, attrs.Name)
 		}
 	}
 
-	return objects, prefixes, nil
+	return list, nil
 }

@@ -7,19 +7,21 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"gotest.tools/v3/assert"
+	"lazygcs/internal/gcs"
 	"lazygcs/internal/tui"
 )
 
 type mockGCSClient struct {
 	buckets []string
+	objects *gcs.ObjectList
 }
 
 func (f mockGCSClient) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
 	return f.buckets, nil
 }
 
-func (f mockGCSClient) ListObjects(ctx context.Context, bucketName, prefix string) ([]string, []string, error) {
-	return nil, nil, nil
+func (f mockGCSClient) ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error) {
+	return f.objects, nil
 }
 
 func TestModel_AsyncLoading(t *testing.T) {
@@ -60,4 +62,24 @@ func TestModel_Update_CursorNavigation(t *testing.T) {
 
 	// 3. Assert cursor moved to b2
 	assert.Assert(t, strings.Contains(m.View(), "> b2"))
+}
+
+func TestModel_EnterBucket(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: &gcs.ObjectList{Objects: []string{"obj1"}},
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+
+	// 1. Load buckets
+	m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+
+	// 2. Select b1 and press Enter
+	updatedM, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// TODO: Implement Enter handling in next steps
+	// For now, just assert it doesn't crash
+	assert.Assert(t, m.View() != "")
+	// assert.Assert(t, cmd != nil) // This will fail until implemented
 }

@@ -45,26 +45,25 @@ func TestClient_ListObjects(t *testing.T) {
 	client := gcs.NewClient(server.Client())
 
 	t.Run("Root level", func(t *testing.T) {
-		objects, prefixes, err := client.ListObjects(context.Background(), "b1", "")
+		list, err := client.ListObjects(context.Background(), "b1", "")
 		assert.NilError(t, err)
 
 		// Should have file1.txt as object
-		assert.Assert(t, contains(objects, "file1.txt"))
+		assert.Assert(t, contains(list.Objects, "file1.txt"))
 		// Should have folder1/ and folder2/ as prefixes
-		assert.Assert(t, contains(prefixes, "folder1/"))
-		assert.Assert(t, contains(prefixes, "folder2/"))
+		assert.Assert(t, contains(list.Prefixes, "folder1/"))
+		assert.Assert(t, contains(list.Prefixes, "folder2/"))
 		// Should NOT have objects from subfolders
-		assert.Assert(t, !contains(objects, "file2.txt"))
+		assert.Assert(t, !contains(list.Objects, "file2.txt"))
 	})
 
 	t.Run("Inside folder1", func(t *testing.T) {
-		objects, prefixes, err := client.ListObjects(context.Background(), "b1", "folder1/")
+		list, err := client.ListObjects(context.Background(), "b1", "folder1/")
 		assert.NilError(t, err)
 
-		// Should have folder1/file2.txt (or just file2.txt depending on implementation)
-		// Usually GCS iterator returns the full path.
-		assert.Assert(t, contains(objects, "folder1/file2.txt"))
-		assert.Assert(t, contains(prefixes, "folder1/subfolder/"))
+		// Should have folder1/file2.txt
+		assert.Assert(t, contains(list.Objects, "folder1/file2.txt"))
+		assert.Assert(t, contains(list.Prefixes, "folder1/subfolder/"))
 	})
 }
 

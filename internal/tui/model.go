@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"lazygcs/internal/gcs"
 )
 
 // GCSClient defines the contract for interacting with Google Cloud Storage.
@@ -14,7 +15,7 @@ type GCSClient interface {
 	// ListBuckets returns names of buckets in the specified projects.
 	ListBuckets(ctx context.Context, projectIDs []string) ([]string, error)
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
-	ListObjects(ctx context.Context, bucketName, prefix string) (objects []string, prefixes []string, err error)
+	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
 }
 
 // BucketsMsg is sent when bucket listing completes.
