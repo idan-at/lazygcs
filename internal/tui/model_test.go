@@ -126,19 +126,29 @@ func TestModel_Update_Quit(t *testing.T) {
 func TestModel_EnterBucket(t *testing.T) {
 	client := mockGCSClient{
 		buckets: []string{"b1"},
-		objects: &gcs.ObjectList{Objects: []string{"obj1"}},
+		objects: &gcs.ObjectList{Objects: []string{"obj1", "obj2"}},
 	}
 	m := tui.NewModel([]string{"p1"}, client)
 
 	// 1. Load buckets
-	m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
-
-	// 2. Select b1 and press Enter
-	updatedM, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
 	m = updatedM.(tui.Model)
 
-	// TODO: Implement Enter handling in next steps
-	// For now, just assert it doesn't crash
-	assert.Assert(t, m.View() != "")
-	// assert.Assert(t, cmd != nil) // This will fail until implemented
+	// 2. Select b1 and press Enter
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// 3. Assert loading state for objects
+	assert.Assert(t, cmd != nil)
+
+	// 4. Simulate ObjectsMsg (Fetch complete)
+	msg := tui.ObjectsMsg{List: &gcs.ObjectList{Objects: []string{"obj1", "obj2"}}}
+	updatedM, _ = m.Update(msg)
+	m = updatedM.(tui.Model)
+
+	// 5. Assert View
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "b1"))
+	assert.Assert(t, strings.Contains(view, "obj1"))
+	assert.Assert(t, strings.Contains(view, "> obj1"))
 }

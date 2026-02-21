@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"lazygcs/internal/gcs"
 )
 
@@ -24,14 +25,37 @@ type BucketsMsg struct {
 	Err     error
 }
 
+// ObjectsMsg is sent when object listing completes.
+type ObjectsMsg struct {
+	List *gcs.ObjectList
+	Err  error
+}
+
+type viewState int
+
+const (
+	viewBuckets viewState = iota
+	viewObjects
+)
+
 // Model maintains the state of the TUI application.
 type Model struct {
 	client     GCSClient
 	projectIDs []string
-	buckets    []string
-	cursor     int
-	loading    bool
-	err        error
+
+	state viewState
+
+	// Buckets View
+	buckets []string
+	cursor  int // used for buckets or objects depending on state
+
+	// Objects View
+	currentBucket string
+	objects       []string
+	prefixes      []string
+
+	loading bool
+	err     error
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
@@ -43,6 +67,7 @@ func NewModel(projectIDs []string, client GCSClient) Model {
 	return Model{
 		projectIDs: projectIDs,
 		client:     client,
+		state:      viewBuckets,
 		loading:    true,
 	}
 }
@@ -52,6 +77,13 @@ func (m Model) Init() tea.Cmd {
 	return func() tea.Msg {
 		buckets, err := m.client.ListBuckets(context.Background(), m.projectIDs)
 		return BucketsMsg{Buckets: buckets, Err: err}
+	}
+}
+
+func (m Model) fetchObjects() tea.Cmd {
+	return func() tea.Msg {
+		list, err := m.client.ListObjects(context.Background(), m.currentBucket, "")
+		return ObjectsMsg{List: list, Err: err}
 	}
 }
 
@@ -67,19 +99,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.buckets = msg.Buckets
 		return m, nil
 
+	case ObjectsMsg:
+		m.loading = false
+		if msg.Err != nil {
+			m.err = msg.Err
+			return m, nil
+		}
+		m.objects = msg.List.Objects
+		m.prefixes = msg.List.Prefixes
+		m.cursor = 0
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "j", "down":
-			if m.cursor < len(m.buckets)-1 {
-				m.cursor++
-			} else {
-				m.cursor = 0
+			itemsCount := len(m.buckets)
+			if m.state == viewObjects {
+				itemsCount = len(m.objects) + len(m.prefixes)
+			}
+			if itemsCount > 0 {
+				m.cursor = (m.cursor + 1) % itemsCount
 			}
 		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
-			} else {
-				m.cursor = len(m.buckets) - 1
+			itemsCount := len(m.buckets)
+			if m.state == viewObjects {
+				itemsCount = len(m.objects) + len(m.prefixes)
+			}
+			if itemsCount > 0 {
+				m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
+			}
+		case "l", "enter":
+			if m.state == viewBuckets && len(m.buckets) > 0 {
+				m.currentBucket = m.buckets[m.cursor]
+				m.state = viewObjects
+				m.loading = true
+				return m, m.fetchObjects()
+			}
+		case "h":
+			if m.state == viewObjects {
+				m.state = viewBuckets
+				m.cursor = 0 // for now, reset cursor when going back
+				return m, nil
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -93,17 +153,49 @@ func (m Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
 	}
-	if m.loading {
-		return "Loading buckets...\n"
-	}
 
-	var s strings.Builder
-	for i, bucket := range m.buckets {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
+	var leftCol, rightCol string
+
+	// Left Column: Buckets
+	var lb strings.Builder
+	lb.WriteString(lipgloss.NewStyle().Bold(true).Render("Buckets") + "\n\n")
+	if m.state == viewBuckets && m.loading {
+		lb.WriteString("Loading...")
+	} else {
+		for i, bucket := range m.buckets {
+			cursor := " "
+			if m.state == viewBuckets && m.cursor == i {
+				cursor = ">"
+			}
+			lb.WriteString(fmt.Sprintf("%s %s\n", cursor, bucket))
 		}
-		s.WriteString(fmt.Sprintf("%s %s\n", cursor, bucket))
 	}
-	return s.String()
+	leftCol = lb.String()
+
+	// Right Column: Objects
+	var rb strings.Builder
+	if m.state == viewObjects {
+		rb.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Objects in %s", m.currentBucket)) + "\n\n")
+		if m.loading {
+			rb.WriteString("Loading...")
+		} else {
+			allItems := append(m.prefixes, m.objects...)
+			for i, item := range allItems {
+				cursor := " "
+				if m.cursor == i {
+					cursor = ">"
+				}
+				rb.WriteString(fmt.Sprintf("%s %s\n", cursor, item))
+			}
+			if len(allItems) == 0 {
+				rb.WriteString("(empty)")
+			}
+		}
+	}
+	rightCol = rb.String()
+
+	return lipgloss.JoinHorizontal(lipgloss.Top,
+		lipgloss.NewStyle().Width(30).PaddingRight(2).Render(leftCol),
+		lipgloss.NewStyle().Width(50).Render(rightCol),
+	) + "\n\n(q: quit, h: back, l/enter: select)"
 }
