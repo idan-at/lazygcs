@@ -9,6 +9,7 @@ import (
 
 // Config represents the application's runtime configuration.
 type Config struct {
+	// Projects is a list of Google Cloud Project IDs to operate on.
 	Projects []string
 }
 
@@ -17,23 +18,32 @@ type tomlConfig struct {
 	Projects []string `toml:"projects"`
 }
 
-// Load resolves the configuration based on the precedence hierarchy:
-// 1. CLI Arguments
-// 2. Config File (TOML)
+// Load resolves the configuration based on the precedence hierarchy.
+//
+// It checks sources in the following order (first match wins):
+//  1. CLI Arguments: Passed directly to the application.
+//  2. Config File: TOML file at the specified path (e.g., ~/.config/lazygcs/config.toml).
+//
+// Arguments:
+//   - args: Command-line arguments (excluding the program name).
+//   - configPath: Absolute path to the TOML configuration file.
+//
+// Returns:
+//   - *Config: The resolved configuration.
+//   - error: If the config file exists but cannot be parsed.
 func Load(args []string, configPath string) (*Config, error) {
-	// 1. CLI Arguments
 	if len(args) > 0 {
 		return &Config{Projects: trimProjects(args)}, nil
 	}
 
-	// 2. Config File
 	if configPath != "" {
 		if _, err := os.Stat(configPath); err == nil {
 			var tc tomlConfig
-			if _, err := toml.DecodeFile(configPath, &tc); err == nil {
-				if len(tc.Projects) > 0 {
-					return &Config{Projects: trimProjects(tc.Projects)}, nil
-				}
+			if _, err := toml.DecodeFile(configPath, &tc); err != nil {
+				return nil, err
+			}
+			if len(tc.Projects) > 0 {
+				return &Config{Projects: trimProjects(tc.Projects)}, nil
 			}
 		}
 	}

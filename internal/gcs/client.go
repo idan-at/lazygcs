@@ -8,17 +8,26 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// Client wraps the GCS storage client.
+// Client provides methods to interact with Google Cloud Storage.
+// It wraps the official storage.Client to provide a simplified API for the TUI.
 type Client struct {
 	storageClient *storage.Client
 }
 
-// NewClient creates a new GCS client.
+// NewClient initializes a new GCS Client with the provided storage client.
 func NewClient(sc *storage.Client) *Client {
 	return &Client{storageClient: sc}
 }
 
-// ListBuckets fetches buckets for the given project IDs.
+// ListBuckets retrieves the names of all buckets accessible within the given projects.
+//
+// Arguments:
+//   - ctx: The context for the API calls.
+//   - projectIDs: A list of Google Cloud Project IDs to scan for buckets.
+//
+// Returns:
+//   - []string: A combined list of bucket names from all projects.
+//   - error: If any underlying API call fails.
 func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
 	var allBuckets []string
 	for _, pID := range projectIDs {
@@ -37,11 +46,19 @@ func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]string
 	return allBuckets, nil
 }
 
-// ListObjects fetches objects and prefixes (folders) for a given bucket and prefix.
-func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) ([]string, []string, error) {
-	var objects []string
-	var prefixes []string
-
+// ListObjects retrieves object names and common prefixes (folders) for a specific bucket and prefix.
+// It uses "/" as a delimiter to enable hierarchical navigation.
+//
+// Arguments:
+//   - ctx: The context for the API call.
+//   - bucketName: The name of the bucket to list.
+//   - prefix: The object prefix (folder path) to list within.
+//
+// Returns:
+//   - objects: A list of object names (files) at the current level.
+//   - prefixes: A list of common prefixes (virtual folders) at the current level.
+//   - err: If the underlying API call fails.
+func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (objects []string, prefixes []string, err error) {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: "/",

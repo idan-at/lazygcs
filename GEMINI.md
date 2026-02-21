@@ -34,12 +34,17 @@ Before committing any code, MUST run:
 4.  `go test -v ./...` (Verify tests pass)
 
 ## Current Status
-*   **Phase:** Initialization.
+*   **Phase:** Navigation Implementation.
+*   **Completed:**
+    *   Simplified configuration (CLI args, TOML file).
+    *   Async TUI initialization (Loading buckets).
+    *   GCS Client abstraction with `ListBuckets` and `ListObjects`.
+    *   Basic bucket list navigation (`j`/`k`).
 *   **Next Steps:**
-    1.  Setup basic project structure.
-    2.  Implement the `Model` struct.
-    3.  Create the first TUI view (Bucket List).
-    4.  Connect to GCS (using `fakestorage` for tests).
+    1.  Implement entering a bucket (`Enter` or `l`) to list objects.
+    2.  Implement prefix-based navigation (drill down into "folders").
+    3.  Implement backward navigation (`h` or `backspace`).
+    4.  Add Miller Columns layout (view parent/current/preview).
 
 ## Key Files
 *   `DESIGN.md`: The architectural blueprint.

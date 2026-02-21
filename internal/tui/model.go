@@ -8,19 +8,22 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// GCSClient defines the interface for fetching GCS data.
+// GCSClient defines the contract for interacting with Google Cloud Storage.
+// This interface allows for easy mocking in TUI unit tests.
 type GCSClient interface {
+	// ListBuckets returns names of buckets in the specified projects.
 	ListBuckets(ctx context.Context, projectIDs []string) ([]string, error)
+	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
 	ListObjects(ctx context.Context, bucketName, prefix string) (objects []string, prefixes []string, err error)
 }
 
-// BucketsMsg is the message sent when buckets have been fetched.
+// BucketsMsg is sent when bucket listing completes.
 type BucketsMsg struct {
 	Buckets []string
 	Err     error
 }
 
-// Model represents the state of the TUI.
+// Model maintains the state of the TUI application.
 type Model struct {
 	client     GCSClient
 	projectIDs []string
@@ -30,7 +33,11 @@ type Model struct {
 	err        error
 }
 
-// NewModel initializes a model with a GCS client and project IDs.
+// NewModel creates a Model initialized with the provided projects and GCS client.
+//
+// Arguments:
+//   - projectIDs: List of projects to scan for buckets initially.
+//   - client: Implementation of the GCSClient interface.
 func NewModel(projectIDs []string, client GCSClient) Model {
 	return Model{
 		projectIDs: projectIDs,
@@ -39,7 +46,7 @@ func NewModel(projectIDs []string, client GCSClient) Model {
 	}
 }
 
-// Init triggers the bucket fetching command.
+// Init initializes the application by triggering the first bucket fetch.
 func (m Model) Init() tea.Cmd {
 	return func() tea.Msg {
 		buckets, err := m.client.ListBuckets(context.Background(), m.projectIDs)
@@ -47,7 +54,7 @@ func (m Model) Init() tea.Cmd {
 	}
 }
 
-// Update handles messages.
+// Update processes terminal messages (key presses, window resizes) and async responses.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case BucketsMsg:
@@ -76,7 +83,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the TUI.
+// View renders the current state of the application as a string.
 func (m Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
