@@ -36,9 +36,9 @@ Before committing any code, MUST run:
 ## Current Status
 *   **Phase:** Navigation Implementation.
 *   **Completed:**
+    *   Refactored `ListObjects` to return `ObjectList` struct.
     *   Simplified configuration (CLI args, TOML file).
     *   Async TUI initialization (Loading buckets).
-    *   GCS Client abstraction with `ListBuckets` and `ListObjects`.
     *   Basic bucket list navigation (`j`/`k`).
 *   **Next Steps:**
     1.  Implement entering a bucket (`Enter` or `l`) to list objects.
