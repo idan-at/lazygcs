@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"lazygcs/internal/config"
 	"gotest.tools/v3/assert"
+	"lazygcs/internal/config"
 )
 
 // Helper to create a temp config file
