@@ -32,15 +32,18 @@ func TestListBuckets(t *testing.T) {
 				Content: []byte("hi"),
 			},
 		},
-		Host: "127.0.0.1",
-		Port: 8081,
+		Host:   "127.0.0.1",
+		Port:   8081,
+		Scheme: "http",
 	})
 	assert.NilError(t, err)
 	defer server.Stop()
 
 	// 3. Run App
 	cmd := exec.Command(bin)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("STORAGE_EMULATOR_HOST=%s", server.URL()))
+	// STORAGE_EMULATOR_HOST must be host:port without scheme
+	emulatorHost := strings.TrimPrefix(server.URL(), "http://")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("STORAGE_EMULATOR_HOST=%s", emulatorHost))
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 
