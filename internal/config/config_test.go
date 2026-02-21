@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gotest.tools/v3/assert"
 	"lazygcs/internal/config"
+	"gotest.tools/v3/assert"
 )
 
 // Helper to create a temp config file
@@ -29,12 +29,28 @@ func TestLoad_CLIArgsPrecedence(t *testing.T) {
 	assert.DeepEqual(t, cfg.Projects, []string{"cli-project"})
 }
 
+func TestLoad_CLIArgsWithWhitespace(t *testing.T) {
+	// Simulate args with spaces (e.g. from shell expansion issues)
+	cfg, err := config.Load([]string{" p1 ", "p2 "}, "", nil)
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
+}
+
 func TestLoad_LazyGCSProjectsEnvVarPrecedence(t *testing.T) {
 	t.Setenv("LAZYGCS_PROJECTS", "p1,p2")
 	t.Setenv("GOOGLE_CLOUD_PROJECT", "gcp-project")
 	configFile := createConfigFile(t, `projects = ["file-project"]`)
 
 	cfg, err := config.Load(nil, configFile, nil)
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
+}
+
+func TestLoad_LazyGCSProjectsEnvVarWithSpaces(t *testing.T) {
+	t.Setenv("LAZYGCS_PROJECTS", " p1 ,  p2  ")
+	cfg, err := config.Load(nil, "", nil)
 	assert.NilError(t, err)
 
 	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
@@ -52,6 +68,15 @@ func TestLoad_GoogleCloudProjectEnvVarPrecedence(t *testing.T) {
 
 func TestLoad_ConfigFile(t *testing.T) {
 	configFile := createConfigFile(t, `projects = ["p1", "p2"]`)
+
+	cfg, err := config.Load(nil, configFile, nil)
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
+}
+
+func TestLoad_ConfigFileWithWhitespace(t *testing.T) {
+	configFile := createConfigFile(t, `projects = [" p1 ", " p2 "]`)
 
 	cfg, err := config.Load(nil, configFile, nil)
 	assert.NilError(t, err)

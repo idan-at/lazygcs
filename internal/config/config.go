@@ -29,13 +29,12 @@ type FallbackFunc func() string
 func Load(args []string, configPath string, fallback FallbackFunc) (*Config, error) {
 	// 1. CLI Arguments
 	if len(args) > 0 {
-		return &Config{Projects: args}, nil
+		return &Config{Projects: trimProjects(args)}, nil
 	}
 
 	// 2. LAZYGCS_PROJECTS env var
 	if p := os.Getenv("LAZYGCS_PROJECTS"); p != "" {
-		projects := strings.Split(p, ",")
-		return &Config{Projects: projects}, nil
+		return &Config{Projects: trimProjects(strings.Split(p, ","))}, nil
 	}
 
 	// 3. GOOGLE_CLOUD_PROJECT env var
@@ -49,7 +48,7 @@ func Load(args []string, configPath string, fallback FallbackFunc) (*Config, err
 			var tc tomlConfig
 			if _, err := toml.DecodeFile(configPath, &tc); err == nil {
 				if len(tc.Projects) > 0 {
-					return &Config{Projects: tc.Projects}, nil
+					return &Config{Projects: trimProjects(tc.Projects)}, nil
 				}
 			}
 		}
@@ -63,4 +62,16 @@ func Load(args []string, configPath string, fallback FallbackFunc) (*Config, err
 	}
 
 	return &Config{Projects: []string{}}, nil
+}
+
+// trimProjects trims whitespace from each project ID and filters out empty strings.
+func trimProjects(raw []string) []string {
+	var clean []string
+	for _, p := range raw {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			clean = append(clean, trimmed)
+		}
+	}
+	return clean
 }
