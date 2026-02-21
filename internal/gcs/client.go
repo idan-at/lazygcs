@@ -36,3 +36,32 @@ func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]string
 	}
 	return allBuckets, nil
 }
+
+// ListObjects fetches objects and prefixes (folders) for a given bucket and prefix.
+func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) ([]string, []string, error) {
+	var objects []string
+	var prefixes []string
+
+	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
+		Prefix:    prefix,
+		Delimiter: "/",
+	})
+
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to list objects for bucket %q: %w", bucketName, err)
+		}
+
+		if attrs.Prefix != "" {
+			prefixes = append(prefixes, attrs.Prefix)
+		} else {
+			objects = append(objects, attrs.Name)
+		}
+	}
+
+	return objects, prefixes, nil
+}

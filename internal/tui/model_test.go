@@ -10,17 +10,21 @@ import (
 	"lazygcs/internal/tui"
 )
 
-type mockFetcher struct {
+type mockGCSClient struct {
 	buckets []string
 }
 
-func (f mockFetcher) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
+func (f mockGCSClient) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
 	return f.buckets, nil
 }
 
+func (f mockGCSClient) ListObjects(ctx context.Context, bucketName, prefix string) ([]string, []string, error) {
+	return nil, nil, nil
+}
+
 func TestModel_AsyncLoading(t *testing.T) {
-	fetcher := mockFetcher{buckets: []string{"async-b1"}}
-	m := tui.NewModel([]string{"p1"}, fetcher)
+	client := mockGCSClient{buckets: []string{"async-b1"}}
+	m := tui.NewModel([]string{"p1"}, client)
 
 	// 1. Initial State should be loading
 	assert.Assert(t, strings.Contains(m.View(), "Loading"))
@@ -42,8 +46,8 @@ func TestModel_AsyncLoading(t *testing.T) {
 
 func TestModel_Update_CursorNavigation(t *testing.T) {
 	// Initialize and move out of loading state
-	fetcher := mockFetcher{buckets: []string{"b1", "b2"}}
-	m := tui.NewModel([]string{"p1"}, fetcher)
+	client := mockGCSClient{buckets: []string{"b1", "b2"}}
+	m := tui.NewModel([]string{"p1"}, client)
 	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2"}})
 	m = updatedM.(tui.Model)
 

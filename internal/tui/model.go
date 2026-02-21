@@ -8,9 +8,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// BucketFetcher defines the interface for fetching GCS data.
-type BucketFetcher interface {
+// GCSClient defines the interface for fetching GCS data.
+type GCSClient interface {
 	ListBuckets(ctx context.Context, projectIDs []string) ([]string, error)
+	ListObjects(ctx context.Context, bucketName, prefix string) (objects []string, prefixes []string, err error)
 }
 
 // BucketsMsg is the message sent when buckets have been fetched.
@@ -21,7 +22,7 @@ type BucketsMsg struct {
 
 // Model represents the state of the TUI.
 type Model struct {
-	fetcher    BucketFetcher
+	client     GCSClient
 	projectIDs []string
 	buckets    []string
 	cursor     int
@@ -29,11 +30,11 @@ type Model struct {
 	err        error
 }
 
-// NewModel initializes a model with a fetcher and project IDs.
-func NewModel(projectIDs []string, fetcher BucketFetcher) Model {
+// NewModel initializes a model with a GCS client and project IDs.
+func NewModel(projectIDs []string, client GCSClient) Model {
 	return Model{
 		projectIDs: projectIDs,
-		fetcher:    fetcher,
+		client:     client,
 		loading:    true,
 	}
 }
@@ -41,7 +42,7 @@ func NewModel(projectIDs []string, fetcher BucketFetcher) Model {
 // Init triggers the bucket fetching command.
 func (m Model) Init() tea.Cmd {
 	return func() tea.Msg {
-		buckets, err := m.fetcher.ListBuckets(context.Background(), m.projectIDs)
+		buckets, err := m.client.ListBuckets(context.Background(), m.projectIDs)
 		return BucketsMsg{Buckets: buckets, Err: err}
 	}
 }
@@ -93,9 +94,4 @@ func (m Model) View() string {
 		s.WriteString(fmt.Sprintf("%s %s\n", cursor, bucket))
 	}
 	return s.String()
-}
-func InitialModel(buckets []string) Model {
-	return Model{
-		buckets: buckets,
-	}
 }

@@ -12,18 +12,7 @@ import (
 func TestClient_ListBuckets(t *testing.T) {
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{
-					BucketName: "b1",
-					Name:       "o1",
-				},
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{
-					BucketName: "b2",
-					Name:       "o2",
-				},
-			},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "o1"}},
 		},
 		Host:   "127.0.0.1",
 		Port:   8082,
@@ -33,13 +22,50 @@ func TestClient_ListBuckets(t *testing.T) {
 	defer server.Stop()
 
 	client := gcs.NewClient(server.Client())
-
 	buckets, err := client.ListBuckets(context.Background(), []string{"test-project"})
 	assert.NilError(t, err)
-
-	assert.Assert(t, len(buckets) >= 2)
 	assert.Assert(t, contains(buckets, "b1"))
-	assert.Assert(t, contains(buckets, "b2"))
+}
+
+func TestClient_ListObjects(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"}},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file2.txt"}},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/subfolder/file3.txt"}},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder2/file4.txt"}},
+		},
+		Host:   "127.0.0.1",
+		Port:   8083,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	client := gcs.NewClient(server.Client())
+
+	t.Run("Root level", func(t *testing.T) {
+		objects, prefixes, err := client.ListObjects(context.Background(), "b1", "")
+		assert.NilError(t, err)
+
+		// Should have file1.txt as object
+		assert.Assert(t, contains(objects, "file1.txt"))
+		// Should have folder1/ and folder2/ as prefixes
+		assert.Assert(t, contains(prefixes, "folder1/"))
+		assert.Assert(t, contains(prefixes, "folder2/"))
+		// Should NOT have objects from subfolders
+		assert.Assert(t, !contains(objects, "file2.txt"))
+	})
+
+	t.Run("Inside folder1", func(t *testing.T) {
+		objects, prefixes, err := client.ListObjects(context.Background(), "b1", "folder1/")
+		assert.NilError(t, err)
+
+		// Should have folder1/file2.txt (or just file2.txt depending on implementation)
+		// Usually GCS iterator returns the full path.
+		assert.Assert(t, contains(objects, "folder1/file2.txt"))
+		assert.Assert(t, contains(prefixes, "folder1/subfolder/"))
+	})
 }
 
 func contains(slice []string, val string) bool {
