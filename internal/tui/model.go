@@ -220,7 +220,9 @@ func (m Model) View() string {
 				if m.cursor == i {
 					cursor = ">"
 				}
-				rb.WriteString(fmt.Sprintf("%s %s\n", cursor, item))
+				// Display relative path
+				displayItem := strings.TrimPrefix(item, m.currentPrefix)
+				rb.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
 			}
 			if len(allItems) == 0 {
 				rb.WriteString("(empty)")

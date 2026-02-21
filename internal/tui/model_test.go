@@ -185,22 +185,22 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 func TestModel_Resize(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"b1"}}
 	m := tui.NewModel([]string{"p1"}, client)
-	
+
 	// 1. Initial size (default 0x0)
 	// We can't easily assert on exact string length without knowing lipgloss internals,
 	// but we can assert that Update processes the message without error.
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	m = updatedM.(tui.Model)
-	
+
 	// 2. Assert View doesn't panic and returns content
 	view := m.View()
 	assert.Assert(t, len(view) > 0)
-	
+
 	// 3. Resize to something narrow
 	updatedM, _ = m.Update(tea.WindowSizeMsg{Width: 20, Height: 10})
 	m = updatedM.(tui.Model)
 	viewNarrow := m.View()
-	
+
 	assert.Assert(t, len(viewNarrow) > 0)
 	// Ideally we'd check if the rendered width matches 20, but ANSI codes make len() unreliable for display width.
 	// We are satisfied here that the Resize message is handled.
@@ -217,7 +217,7 @@ func TestModel_EnterPrefix(t *testing.T) {
 	m := tui.NewModel([]string{"p1"}, client)
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	m = updatedM.(tui.Model)
-	
+
 	// 1. Enter b1
 	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
 	m = updatedM.(tui.Model)
@@ -238,5 +238,21 @@ func TestModel_EnterPrefix(t *testing.T) {
 
 	// 4. Assert loading state and correct command
 	assert.Assert(t, cmd != nil)
-	assert.Assert(t, strings.Contains(m.View(), "Loading"))
+	// GCS returns full paths
+	nestedObjects := &gcs.ObjectList{
+		Objects:  []string{"folder1/file2.txt"},
+		Prefixes: []string{"folder1/sub/"},
+	}
+	updatedM, _ = m.Update(tui.ObjectsMsg{List: nestedObjects})
+	m = updatedM.(tui.Model)
+
+	// 5. Assert View shows RELATIVE names
+	view := m.View()
+	// Should show "file2.txt", NOT "folder1/file2.txt"
+	assert.Assert(t, strings.Contains(view, "file2.txt"))
+	assert.Assert(t, !strings.Contains(view, "folder1/file2.txt"))
+
+	// Should show "sub/", NOT "folder1/sub/"
+	assert.Assert(t, strings.Contains(view, "sub/"))
+	assert.Assert(t, !strings.Contains(view, "folder1/sub/"))
 }

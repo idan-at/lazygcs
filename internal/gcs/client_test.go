@@ -64,6 +64,9 @@ func TestClient_ListObjects(t *testing.T) {
 		// Should have folder1/file2.txt
 		assert.Assert(t, contains(list.Objects, "folder1/file2.txt"))
 		assert.Assert(t, contains(list.Prefixes, "folder1/subfolder/"))
+
+		// Should NOT contain the current prefix "folder1/" itself
+		assert.Assert(t, !contains(list.Prefixes, "folder1/"))
 	})
 }
 
