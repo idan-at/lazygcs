@@ -152,3 +152,32 @@ func TestModel_EnterBucket(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "obj1"))
 	assert.Assert(t, strings.Contains(view, "> obj1"))
 }
+
+func TestModel_Update_ObjectCursorCycle(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: &gcs.ObjectList{Objects: []string{"obj1", "obj2"}},
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+
+	// 1. Load buckets and enter b1
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// 2. Initial object state: cursor at obj1
+	assert.Assert(t, strings.Contains(m.View(), "> obj1"))
+
+	// 3. Cycle Up -> obj2
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> obj2"))
+
+	// 4. Cycle Down -> obj1
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> obj1"))
+}
