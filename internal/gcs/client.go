@@ -92,12 +92,14 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*O
 		if attrs.Prefix != "" {
 			list.Prefixes = append(list.Prefixes, attrs.Prefix)
 		} else {
-			list.Objects = append(list.Objects, ObjectMetadata{
-				Name:        attrs.Name,
-				Size:        attrs.Size,
-				ContentType: attrs.ContentType,
-				Updated:     attrs.Updated,
-			})
+			if attrs.Name != prefix {
+				list.Objects = append(list.Objects, ObjectMetadata{
+					Name:        attrs.Name,
+					Size:        attrs.Size,
+					ContentType: attrs.ContentType,
+					Updated:     attrs.Updated,
+				})
+			}
 		}
 	}
 

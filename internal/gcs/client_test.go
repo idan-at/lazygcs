@@ -31,6 +31,7 @@ func TestClient_ListObjects(t *testing.T) {
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt", Size: 100}},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}}, // Directory stub
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file2.txt"}},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/subfolder/file3.txt"}},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder2/file4.txt"}},
@@ -68,8 +69,9 @@ func TestClient_ListObjects(t *testing.T) {
 		assert.Assert(t, containsObject(list.Objects, "folder1/file2.txt"))
 		assert.Assert(t, contains(list.Prefixes, "folder1/subfolder/"))
 
-		// Should NOT contain the current prefix "folder1/" itself
+		// Should NOT contain the current prefix "folder1/" itself as a prefix or an object
 		assert.Assert(t, !contains(list.Prefixes, "folder1/"))
+		assert.Assert(t, !containsObject(list.Objects, "folder1/"))
 	})
 }
 
