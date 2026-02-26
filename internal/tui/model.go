@@ -223,6 +223,37 @@ func (m Model) footerView() string {
 	return "\n\n(q: quit, h: back, l/enter: select)"
 }
 
+func (m Model) maxItemsVisible() int {
+	v := m.height - 10
+	if v < 1 {
+		v = 1
+	}
+	return v
+}
+
+func visibleRange(cursor, totalItems, maxVisible int) (start, end int) {
+	if maxVisible <= 0 {
+		return 0, 0
+	}
+	if totalItems <= maxVisible {
+		return 0, totalItems
+	}
+
+	start = cursor - maxVisible/2
+	if start < 0 {
+		start = 0
+	}
+	end = start + maxVisible
+	if end > totalItems {
+		end = totalItems
+		start = end - maxVisible
+		if start < 0 {
+			start = 0
+		}
+	}
+	return start, end
+}
+
 func (m Model) objectsView() string {
 	var s strings.Builder
 	if m.state == viewObjects {
@@ -234,7 +265,9 @@ func (m Model) objectsView() string {
 			// We iterate through them separately or build a unified list of display strings
 			totalItems := len(m.prefixes) + len(m.objects)
 
-			for i := 0; i < totalItems; i++ {
+			start, end := visibleRange(m.cursor, totalItems, m.maxItemsVisible())
+
+			for i := start; i < end; i++ {
 				cursor := " "
 				if m.cursor == i {
 					cursor = ">"
@@ -265,7 +298,9 @@ func (m Model) bucketsView() string {
 	if m.state == viewBuckets && m.loading {
 		s.WriteString("Loading...")
 	} else {
-		for i, bucket := range m.buckets {
+		start, end := visibleRange(m.cursor, len(m.buckets), m.maxItemsVisible())
+		for i := start; i < end; i++ {
+			bucket := m.buckets[i]
 			cursor := " "
 			if m.state == viewBuckets && m.cursor == i {
 				cursor = ">"

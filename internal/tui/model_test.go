@@ -2,6 +2,7 @@ package tui_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -289,5 +290,78 @@ func TestModel_CursorBug_SingleItem(t *testing.T) {
 	// 4. Assert Bug: Preview pane shows "file1" (stale)
 	if strings.Contains(m.View(), "file1") {
 		t.Fatalf("Preview pane shows stale data 'file1' during loading!\nView:\n%q", m.View())
+	}
+}
+
+func TestModel_Pagination_Buckets(t *testing.T) {
+	var buckets []string
+	for i := 0; i < 50; i++ {
+		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
+	}
+	client := mockGCSClient{buckets: buckets}
+	m := tui.NewModel([]string{"p1"}, client)
+
+	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 10})
+	m = updatedM.(tui.Model)
+
+	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: buckets})
+	m = updatedM.(tui.Model)
+
+	view := m.View()
+	if strings.Contains(view, "bucket-49") {
+		t.Fatalf("Expected bucket-49 to be hidden due to pagination, but it was visible.")
+	}
+
+	for i := 0; i < 49; i++ {
+		updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m = updatedM.(tui.Model)
+	}
+
+	view2 := m.View()
+	if !strings.Contains(view2, "bucket-49") {
+		t.Fatalf("Expected bucket-49 to be visible after scrolling down, but it wasn't.")
+	}
+	if strings.Contains(view2, "bucket-00") {
+		t.Fatalf("Expected bucket-00 to be hidden after scrolling down, but it was visible.")
+	}
+}
+
+func TestModel_Pagination_Objects(t *testing.T) {
+	var objects []string
+	for i := 0; i < 50; i++ {
+		objects = append(objects, fmt.Sprintf("obj-%02d", i))
+	}
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList(objects, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+
+	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 10})
+	m = updatedM.(tui.Model)
+
+	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	m = updatedM.(tui.Model)
+
+	view := m.View()
+	if strings.Contains(view, "obj-49") {
+		t.Fatalf("Expected obj-49 to be hidden due to pagination, but it was visible.")
+	}
+
+	for i := 0; i < 49; i++ {
+		updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m = updatedM.(tui.Model)
+	}
+
+	view2 := m.View()
+	if !strings.Contains(view2, "obj-49") {
+		t.Fatalf("Expected obj-49 to be visible after scrolling down, but it wasn't.")
+	}
+	if strings.Contains(view2, "obj-00") {
+		t.Fatalf("Expected obj-00 to be hidden after scrolling down, but it was visible.")
 	}
 }
