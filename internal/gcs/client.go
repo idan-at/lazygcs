@@ -21,17 +21,44 @@ type ObjectMetadata struct {
 	Size        int64
 	ContentType string
 	Updated     time.Time
+	Created     time.Time
+	Owner       string
+}
+
+// PrefixMetadata holds metadata for a GCS prefix (folder).
+type PrefixMetadata struct {
+	Name    string
+	Updated time.Time
+	Created time.Time
+	Owner   string
 }
 
 // ObjectList holds the list of objects and prefixes (folders) returned by ListObjects.
 type ObjectList struct {
 	Objects  []ObjectMetadata
-	Prefixes []string
+	Prefixes []PrefixMetadata
 }
 
 // NewClient initializes a new GCS Client with the provided storage client.
 func NewClient(sc *storage.Client) *Client {
 	return &Client{storageClient: sc}
+}
+
+// GetObjectMetadata retrieves full metadata for a specific object or directory stub.
+func (c *Client) GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*ObjectMetadata, error) {
+	attrs, err := c.storageClient.Bucket(bucketName).Object(objectName).Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metadata for %q in %q: %w", objectName, bucketName, err)
+	}
+
+	return &ObjectMetadata{
+		Name:        attrs.Name,
+		Size:        attrs.Size,
+		ContentType: attrs.ContentType,
+		Updated:     attrs.Updated,
+		Created:     attrs.Created,
+		Owner:       attrs.Owner,
+	}, nil
 }
 
 // ListBuckets retrieves the names of all buckets accessible within the given projects.
@@ -90,7 +117,7 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*O
 		}
 
 		if attrs.Prefix != "" {
-			list.Prefixes = append(list.Prefixes, attrs.Prefix)
+			list.Prefixes = append(list.Prefixes, PrefixMetadata{Name: attrs.Prefix})
 		} else {
 			if attrs.Name != prefix {
 				list.Objects = append(list.Objects, ObjectMetadata{
@@ -98,6 +125,8 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*O
 					Size:        attrs.Size,
 					ContentType: attrs.ContentType,
 					Updated:     attrs.Updated,
+					Created:     attrs.Created,
+					Owner:       attrs.Owner,
 				})
 			}
 		}

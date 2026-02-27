@@ -17,6 +17,8 @@ type GCSClient interface {
 	ListBuckets(ctx context.Context, projectIDs []string) ([]string, error)
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
+	// GetObjectMetadata returns full metadata for a specific object or directory stub.
+	GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error)
 }
 
 // BucketsMsg is sent when bucket listing completes.
@@ -29,6 +31,13 @@ type BucketsMsg struct {
 type ObjectsMsg struct {
 	List *gcs.ObjectList
 	Err  error
+}
+
+// MetadataMsg is sent when on-demand metadata fetching completes.
+type MetadataMsg struct {
+	PrefixIndex int
+	Metadata    *gcs.ObjectMetadata
+	Err         error
 }
 
 type viewState int
@@ -56,7 +65,7 @@ type Model struct {
 	currentBucket string
 	currentPrefix string
 	objects       []gcs.ObjectMetadata
-	prefixes      []string
+	prefixes      []gcs.PrefixMetadata
 
 	loading bool
 	err     error
@@ -88,6 +97,14 @@ func (m Model) fetchObjects() tea.Cmd {
 	return func() tea.Msg {
 		list, err := m.client.ListObjects(context.Background(), m.currentBucket, m.currentPrefix)
 		return ObjectsMsg{List: list, Err: err}
+	}
+}
+
+func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
+	return func() tea.Msg {
+		name := m.prefixes[idx].Name
+		meta, err := m.client.GetObjectMetadata(context.Background(), m.currentBucket, name)
+		return MetadataMsg{PrefixIndex: idx, Metadata: meta, Err: err}
 	}
 }
 
@@ -127,6 +144,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.objects = msg.List.Objects
 		m.prefixes = msg.List.Prefixes
 		m.cursor = 0
+		if len(m.prefixes) > 0 {
+			return m, m.fetchPrefixMetadata(0)
+		}
+		return m, nil
+
+	case MetadataMsg:
+		if msg.Err == nil && msg.PrefixIndex < len(m.prefixes) {
+			m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
+			m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated
+			m.prefixes[msg.PrefixIndex].Owner = msg.Metadata.Owner
+		}
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -143,6 +171,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if itemsCount > 0 {
 				m.cursor = (m.cursor + 1) % itemsCount
+				if m.state == viewObjects && m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
+					return m, m.fetchPrefixMetadata(m.cursor)
+				}
 			}
 		case "k", "up":
 			itemsCount := len(m.buckets)
@@ -151,6 +182,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if itemsCount > 0 {
 				m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
+				if m.state == viewObjects && m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
+					return m, m.fetchPrefixMetadata(m.cursor)
+				}
 			}
 		case "l", "enter":
 			if m.state == viewBuckets && len(m.buckets) > 0 {
@@ -162,7 +196,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.state == viewObjects {
 				// Check if selected item is a prefix
 				if m.cursor < len(m.prefixes) {
-					m.currentPrefix = m.prefixes[m.cursor]
+					m.currentPrefix = m.prefixes[m.cursor].Name
 					m.resetObjectsState()
 					return m, m.fetchObjects()
 				}
@@ -195,16 +229,39 @@ func (m Model) fullPath() string {
 
 func (m Model) previewView() string {
 	var s strings.Builder
-	if m.state == viewObjects && m.cursor >= len(m.prefixes) && len(m.objects) > 0 {
-		// Selected item is an object (not a prefix)
-		idx := m.cursor - len(m.prefixes)
-		if idx < len(m.objects) {
-			obj := m.objects[idx]
+	if m.state == viewObjects {
+		if m.cursor < len(m.prefixes) {
+			// Selected item is a prefix (folder)
+			prefix := m.prefixes[m.cursor]
 			s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
-			s.WriteString(fmt.Sprintf("Name: %s\n", obj.Name))
-			s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
-			s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
-			s.WriteString(fmt.Sprintf("Updated: %s\n", obj.Updated.Format("2006-01-02 15:04:05")))
+			s.WriteString(fmt.Sprintf("Name: %s\n", prefix.Name))
+			s.WriteString("Type: Folder\n")
+			if !prefix.Created.IsZero() {
+				s.WriteString(fmt.Sprintf("Created: %s\n", prefix.Created.Format("2006-01-02 15:04:05")))
+			}
+			if !prefix.Updated.IsZero() {
+				s.WriteString(fmt.Sprintf("Updated: %s\n", prefix.Updated.Format("2006-01-02 15:04:05")))
+			}
+			if prefix.Owner != "" {
+				s.WriteString(fmt.Sprintf("Owner: %s\n", prefix.Owner))
+			}
+		} else if m.cursor >= len(m.prefixes) && len(m.objects) > 0 {
+			// Selected item is an object (not a prefix)
+			idx := m.cursor - len(m.prefixes)
+			if idx < len(m.objects) {
+				obj := m.objects[idx]
+				s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
+				s.WriteString(fmt.Sprintf("Name: %s\n", obj.Name))
+				s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
+				s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
+				if !obj.Created.IsZero() {
+					s.WriteString(fmt.Sprintf("Created: %s\n", obj.Created.Format("2006-01-02 15:04:05")))
+				}
+				s.WriteString(fmt.Sprintf("Updated: %s\n", obj.Updated.Format("2006-01-02 15:04:05")))
+				if obj.Owner != "" {
+					s.WriteString(fmt.Sprintf("Owner: %s\n", obj.Owner))
+				}
+			}
 		}
 	}
 	return s.String()
@@ -275,7 +332,7 @@ func (m Model) objectsView() string {
 
 				var displayItem string
 				if i < len(m.prefixes) {
-					displayItem = m.prefixes[i]
+					displayItem = m.prefixes[i].Name
 				} else {
 					displayItem = m.objects[i-len(m.prefixes)].Name
 				}

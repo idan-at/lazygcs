@@ -4,7 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"cloud.google.com/go/storage"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
+	"google.golang.org/api/iterator"
 	"gotest.tools/v3/assert"
 	"lazygcs/internal/gcs"
 )
@@ -54,8 +56,8 @@ func TestClient_ListObjects(t *testing.T) {
 		assert.Assert(t, list.Objects[0].Size == 100)
 
 		// Should have folder1/ and folder2/ as prefixes
-		assert.Assert(t, contains(list.Prefixes, "folder1/"))
-		assert.Assert(t, contains(list.Prefixes, "folder2/"))
+		assert.Assert(t, containsPrefix(list.Prefixes, "folder1/"))
+		assert.Assert(t, containsPrefix(list.Prefixes, "folder2/"))
 
 		// Should NOT have objects from subfolders
 		assert.Assert(t, !containsObject(list.Objects, "file2.txt"))
@@ -67,10 +69,10 @@ func TestClient_ListObjects(t *testing.T) {
 
 		// Should have folder1/file2.txt
 		assert.Assert(t, containsObject(list.Objects, "folder1/file2.txt"))
-		assert.Assert(t, contains(list.Prefixes, "folder1/subfolder/"))
+		assert.Assert(t, containsPrefix(list.Prefixes, "folder1/subfolder/"))
 
 		// Should NOT contain the current prefix "folder1/" itself as a prefix or an object
-		assert.Assert(t, !contains(list.Prefixes, "folder1/"))
+		assert.Assert(t, !containsPrefix(list.Prefixes, "folder1/"))
 		assert.Assert(t, !containsObject(list.Objects, "folder1/"))
 	})
 }
@@ -84,6 +86,15 @@ func contains(slice []string, val string) bool {
 	return false
 }
 
+func containsPrefix(slice []gcs.PrefixMetadata, val string) bool {
+	for _, s := range slice {
+		if s.Name == val {
+			return true
+		}
+	}
+	return false
+}
+
 func containsObject(slice []gcs.ObjectMetadata, name string) bool {
 	for _, o := range slice {
 		if o.Name == name {
@@ -91,4 +102,49 @@ func containsObject(slice []gcs.ObjectMetadata, name string) bool {
 		}
 	}
 	return false
+}
+
+func TestFakestorage_Behavior(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}},
+		},
+		Host:   "127.0.0.1",
+		Port:   8085,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	ctx := context.Background()
+	client := server.Client()
+
+	t.Run("With delimiter", func(t *testing.T) {
+		it := client.Bucket("b1").Objects(ctx, &storage.Query{Delimiter: "/"})
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			assert.NilError(t, err)
+			if attrs.Prefix != "" {
+				t.Logf("Prefix: %q", attrs.Prefix)
+			} else {
+				t.Logf("Object: %q", attrs.Name)
+			}
+		}
+	})
+
+	t.Run("Without delimiter", func(t *testing.T) {
+		it := client.Bucket("b1").Objects(ctx, &storage.Query{})
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			assert.NilError(t, err)
+			t.Logf("Object: %q", attrs.Name)
+		}
+	})
 }
