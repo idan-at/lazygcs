@@ -52,3 +52,23 @@ func TestLoad_ConfigFileWithWhitespace(t *testing.T) {
 
 	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
 }
+
+func TestLoad_DefaultDownloadDir(t *testing.T) {
+	cfg, err := config.Load(nil, "")
+	assert.NilError(t, err)
+
+	home, err := os.UserHomeDir()
+	assert.NilError(t, err)
+	expectedDir := filepath.Join(home, "Downloads")
+
+	assert.Equal(t, cfg.DownloadDir, expectedDir)
+}
+
+func TestLoad_OverrideDownloadDir(t *testing.T) {
+	configFile := createConfigFile(t, `download_dir = "/tmp/custom_downloads"`)
+
+	cfg, err := config.Load(nil, configFile)
+	assert.NilError(t, err)
+
+	assert.Equal(t, cfg.DownloadDir, "/tmp/custom_downloads")
+}

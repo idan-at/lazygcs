@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -12,11 +13,22 @@ import (
 type Config struct {
 	// Projects is a list of Google Cloud Project IDs to operate on.
 	Projects []string
+	// DownloadDir is the directory where files will be downloaded.
+	DownloadDir string
 }
 
 // tomlConfig represents the structure of the config.toml file.
 type tomlConfig struct {
-	Projects []string `toml:"projects"`
+	Projects    []string `toml:"projects"`
+	DownloadDir string   `toml:"download_dir"`
+}
+
+func defaultDownloadDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "."
+	}
+	return filepath.Join(home, "Downloads")
 }
 
 // Load resolves the configuration based on the precedence hierarchy.
@@ -33,8 +45,14 @@ type tomlConfig struct {
 //   - *Config: The resolved configuration.
 //   - error: If the config file exists but cannot be parsed.
 func Load(args []string, configPath string) (*Config, error) {
+	cfg := &Config{
+		Projects:    []string{},
+		DownloadDir: defaultDownloadDir(),
+	}
+
 	if len(args) > 0 {
-		return &Config{Projects: trimProjects(args)}, nil
+		cfg.Projects = trimProjects(args)
+		// We still try to load DownloadDir from config if it exists
 	}
 
 	if configPath != "" {
@@ -43,13 +61,17 @@ func Load(args []string, configPath string) (*Config, error) {
 			if _, err := toml.DecodeFile(configPath, &tc); err != nil {
 				return nil, err
 			}
-			if len(tc.Projects) > 0 {
-				return &Config{Projects: trimProjects(tc.Projects)}, nil
+
+			if len(tc.Projects) > 0 && len(cfg.Projects) == 0 {
+				cfg.Projects = trimProjects(tc.Projects)
+			}
+			if tc.DownloadDir != "" {
+				cfg.DownloadDir = tc.DownloadDir
 			}
 		}
 	}
 
-	return &Config{Projects: []string{}}, nil
+	return cfg, nil
 }
 
 // trimProjects trims whitespace from each project ID and filters out empty strings.
