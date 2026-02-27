@@ -29,12 +29,16 @@ type BucketsMsg struct {
 
 // ObjectsMsg is sent when object listing completes.
 type ObjectsMsg struct {
-	List *gcs.ObjectList
-	Err  error
+	Bucket string
+	Prefix string
+	List   *gcs.ObjectList
+	Err    error
 }
 
 // MetadataMsg is sent when on-demand metadata fetching completes.
 type MetadataMsg struct {
+	Bucket      string
+	Prefix      string
 	PrefixIndex int
 	Metadata    *gcs.ObjectMetadata
 	Err         error
@@ -94,17 +98,21 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) fetchObjects() tea.Cmd {
+	bucket := m.currentBucket
+	prefix := m.currentPrefix
 	return func() tea.Msg {
-		list, err := m.client.ListObjects(context.Background(), m.currentBucket, m.currentPrefix)
-		return ObjectsMsg{List: list, Err: err}
+		list, err := m.client.ListObjects(context.Background(), bucket, prefix)
+		return ObjectsMsg{Bucket: bucket, Prefix: prefix, List: list, Err: err}
 	}
 }
 
 func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
+	bucket := m.currentBucket
+	prefix := m.currentPrefix
+	name := m.prefixes[idx].Name
 	return func() tea.Msg {
-		name := m.prefixes[idx].Name
-		meta, err := m.client.GetObjectMetadata(context.Background(), m.currentBucket, name)
-		return MetadataMsg{PrefixIndex: idx, Metadata: meta, Err: err}
+		meta, err := m.client.GetObjectMetadata(context.Background(), bucket, name)
+		return MetadataMsg{Bucket: bucket, Prefix: prefix, PrefixIndex: idx, Metadata: meta, Err: err}
 	}
 }
 
@@ -136,6 +144,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ObjectsMsg:
+		if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
+			return m, nil
+		}
 		m.loading = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -150,6 +161,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case MetadataMsg:
+		if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
+			return m, nil
+		}
 		if msg.Err == nil && msg.PrefixIndex < len(m.prefixes) {
 			m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
 			m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated

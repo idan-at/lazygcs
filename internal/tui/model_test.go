@@ -153,7 +153,7 @@ func TestModel_EnterBucket(t *testing.T) {
 
 	assert.Assert(t, cmd != nil)
 
-	msg := tui.ObjectsMsg{List: client.objects}
+	msg := tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects}
 	updatedM, _ = m.Update(msg)
 	m = updatedM.(tui.Model)
 
@@ -174,7 +174,7 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
-	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, strings.Contains(m.View(), "> obj1"))
@@ -218,7 +218,7 @@ func TestModel_EnterPrefix(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
-	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	if !strings.Contains(m.View(), "> folder1/") {
@@ -232,7 +232,7 @@ func TestModel_EnterPrefix(t *testing.T) {
 
 	// Simulate nested fetch
 	nestedObjects := simpleObjectList([]string{"folder1/file2.txt"}, []string{"folder1/sub/"})
-	updatedM, _ = m.Update(tui.ObjectsMsg{List: nestedObjects})
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "folder1/", List: nestedObjects})
 	m = updatedM.(tui.Model)
 
 	view := m.View()
@@ -267,7 +267,7 @@ func TestModel_SelectObject(t *testing.T) {
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
 
-	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	// Cursor on file1.txt
@@ -294,7 +294,7 @@ func TestModel_CursorBug_SingleItem(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
-	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	// 2. Enter folder1/
@@ -365,7 +365,7 @@ func TestModel_Pagination_Objects(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
-	updatedM, _ = m.Update(tui.ObjectsMsg{List: client.objects})
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	view := m.View()
@@ -414,7 +414,7 @@ func TestModel_SelectPrefix(t *testing.T) {
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
 
-	updatedM, cmd := m.Update(tui.ObjectsMsg{List: client.objects})
+	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	if cmd != nil {
@@ -459,4 +459,45 @@ func TestModel_HeaderClearedOnBack(t *testing.T) {
 	viewInBucketsList := m.View()
 	assert.Assert(t, !strings.Contains(viewInBucketsList, "gs://b1/"), "View should not show bucket in header after returning to bucket list")
 	assert.Assert(t, strings.Contains(viewInBucketsList, "gs://"), "View should show gs:// in header after returning to bucket list")
+}
+
+func TestModel_StaleObjectsMsg(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1", "b2"},
+		objects: simpleObjectList([]string{"obj-from-b1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter b1
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2"}})
+	m = updatedM.(tui.Model)
+
+	// User enters b1 (this triggers a fetch for b1, but we simulate a delay by NOT applying the msg yet)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// User decides to go back to buckets list before b1 loads
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m = updatedM.(tui.Model)
+
+	// User moves to b2 and enters it
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// At this point, the user is in b2, waiting for its objects.
+	// Now, the delayed response for b1 arrives!
+	staleMsg := tui.ObjectsMsg{
+		List: simpleObjectList([]string{"obj-from-b1"}, nil),
+	}
+	updatedM, _ = m.Update(staleMsg)
+	m = updatedM.(tui.Model)
+
+	// The view should NOT show objects from b1 when we are currently in b2.
+	view := m.View()
+	if strings.Contains(view, "obj-from-b1") {
+		t.Fatalf("Bug: Stale ObjectsMsg from b1 took over the view while user is in b2!\nView:\n%s", view)
+	}
 }
