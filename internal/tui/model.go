@@ -205,6 +205,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == viewObjects {
 				if m.currentPrefix == "" {
 					m.state = viewBuckets
+					m.currentBucket = ""
 					m.cursor = 0 // for now, reset cursor when going back
 					return m, nil
 				}

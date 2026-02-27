@@ -432,3 +432,31 @@ func TestModel_SelectPrefix(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "Updated:"), "View should show updated time for folder")
 	assert.Assert(t, strings.Contains(view, "Created:"), "View should show created time for folder")
 }
+
+func TestModel_HeaderClearedOnBack(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client)
+	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	m = updatedM.(tui.Model)
+
+	// Enter bucket
+	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	viewInBucket := m.View()
+	assert.Assert(t, strings.Contains(viewInBucket, "gs://b1/"), "View should show bucket in header when inside bucket")
+
+	// Go back to bucket list
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m = updatedM.(tui.Model)
+
+	viewInBucketsList := m.View()
+	assert.Assert(t, !strings.Contains(viewInBucketsList, "gs://b1/"), "View should not show bucket in header after returning to bucket list")
+	assert.Assert(t, strings.Contains(viewInBucketsList, "gs://"), "View should show gs:// in header after returning to bucket list")
+}
