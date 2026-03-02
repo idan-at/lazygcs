@@ -1,27 +1,43 @@
 package main_test
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/poll"
+
+	"lazygcs/internal/gcs"
+	"lazygcs/internal/tui"
 )
 
-func TestListBuckets(t *testing.T) {
-	// 1. Build Binary
-	bin := filepath.Join(t.TempDir(), "lazygcs")
-	out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput()
-	assert.NilError(t, err, "Build failed: %s", out)
+func setupTestApp(t *testing.T, server *fakestorage.Server, projectIDs []string, downloadDir string) *teatest.TestModel {
+	t.Helper()
 
-	// 2. Setup Fake GCS
+	gcsClient := gcs.NewClient(server.Client())
+	m := tui.NewModel(projectIDs, gcsClient, downloadDir)
+
+	tm := teatest.NewTestModel(t, m)
+	return tm
+}
+
+func waitForFile(path string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("timeout waiting for file %s", path)
+}
+
+func TestListBuckets(t *testing.T) {
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
 			{
@@ -39,37 +55,23 @@ func TestListBuckets(t *testing.T) {
 	assert.NilError(t, err)
 	defer server.Stop()
 
-	// 3. Run App
-	cmd := exec.Command(bin, "test-project-1")
-	// STORAGE_EMULATOR_HOST must be host:port without scheme
-	emulatorHost := strings.TrimPrefix(server.URL(), "http://")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("STORAGE_EMULATOR_HOST=%s", emulatorHost))
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
+	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
+	t.Cleanup(func() {
+		tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
 
-	assert.NilError(t, cmd.Start())
-	defer func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-		}
-	}()
-
-	// 4. Assert with Awaitability
-	poll.WaitOn(t, func(t poll.LogT) poll.Result {
-		if strings.Contains(stdout.String(), "test-bucket-1") {
-			return poll.Success()
-		}
-		return poll.Continue("waiting for bucket name in output")
-	}, poll.WithTimeout(3*time.Second))
+	teatest.WaitFor(
+		t,
+		tm.Output(),
+		func(bts []byte) bool {
+			return strings.Contains(string(bts), "test-bucket-1")
+		},
+		teatest.WithDuration(3*time.Second),
+	)
 }
 
 func TestDownloadObject_E2E(t *testing.T) {
-	// 1. Build Binary
-	bin := filepath.Join(t.TempDir(), "lazygcs")
-	out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput()
-	assert.NilError(t, err, "Build failed: %s", out)
-
-	// 2. Setup Fake GCS
 	content := []byte("download test content")
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
@@ -88,76 +90,55 @@ func TestDownloadObject_E2E(t *testing.T) {
 	assert.NilError(t, err)
 	defer server.Stop()
 
-	// Create a temp download dir and a config file
 	downloadDir := t.TempDir()
-	configDir := t.TempDir()
-	configPath := filepath.Join(configDir, "config.toml")
-	configContent := fmt.Sprintf("download_dir = %q\nprojects = [\"test-project\"]", downloadDir)
-	assert.NilError(t, os.WriteFile(configPath, []byte(configContent), 0644))
 
-	// Temporarily override HOME so lazygcs reads our config
-	// lazygcs looks at ~/.config/lazygcs/config.toml
-	homeDir := t.TempDir()
-	appConfigDir := filepath.Join(homeDir, ".config", "lazygcs")
-	assert.NilError(t, os.MkdirAll(appConfigDir, 0755))
-	assert.NilError(t, os.WriteFile(filepath.Join(appConfigDir, "config.toml"), []byte(configContent), 0644))
+	tm := setupTestApp(t, server, []string{"test-project-1"}, downloadDir)
+	t.Cleanup(func() {
+		tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
 
-
-	// 3. Run App
-	cmd := exec.Command(bin)
-	emulatorHost := strings.TrimPrefix(server.URL(), "http://")
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("STORAGE_EMULATOR_HOST=%s", emulatorHost),
-		fmt.Sprintf("HOME=%s", homeDir),
+	// Wait for bucket
+	teatest.WaitFor(
+		t,
+		tm.Output(),
+		func(bts []byte) bool {
+			return strings.Contains(string(bts), "test-bucket-1")
+		},
+		teatest.WithDuration(3*time.Second),
 	)
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	stdin, err := cmd.StdinPipe()
-	assert.NilError(t, err)
 
-	assert.NilError(t, cmd.Start())
-	defer func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-		}
-	}()
+	// Enter bucket
+	tm.Type("l")
 
-	// Wait for bucket list
-	poll.WaitOn(t, func(t poll.LogT) poll.Result {
-		if strings.Contains(stdout.String(), "test-bucket-1") {
-			return poll.Success()
-		}
-		return poll.Continue("waiting for bucket")
-	}, poll.WithTimeout(3*time.Second))
+	// Wait for object
+	teatest.WaitFor(
+		t,
+		tm.Output(),
+		func(bts []byte) bool {
+			return strings.Contains(string(bts), "file_to_dl.txt")
+		},
+		teatest.WithDuration(3*time.Second),
+	)
 
-	// Press 'l' to enter the bucket
-	_, err = stdin.Write([]byte("l\n"))
-	assert.NilError(t, err)
+	// Download object
+	tm.Type("d")
 
-	// Wait for object list
-	poll.WaitOn(t, func(t poll.LogT) poll.Result {
-		if strings.Contains(stdout.String(), "file_to_dl.txt") {
-			return poll.Success()
-		}
-		return poll.Continue("waiting for object\nStdout so far:\n%s", stdout.String())
-	}, poll.WithTimeout(3*time.Second))
+	// Wait for downloaded to show on the screen just in case we need to give it more time or see what it looks like
+	teatest.WaitFor(
+		t,
+		tm.Output(),
+		func(bts []byte) bool {
+			return strings.Contains(string(bts), "Downloaded to")
+		},
+		teatest.WithDuration(3*time.Second),
+	)
 
-	// Press 'd' to download
-	_, err = stdin.Write([]byte("d\n"))
-	assert.NilError(t, err)
-
-	// Verify the file was downloaded
+	// Check file was downloaded
 	expectedPath := filepath.Join(downloadDir, "file_to_dl.txt")
-	poll.WaitOn(t, func(t poll.LogT) poll.Result {
-		_, err := os.Stat(expectedPath)
-		if err == nil {
-			return poll.Success()
-		}
-		return poll.Continue("waiting for file to be downloaded")
-	}, poll.WithTimeout(3*time.Second))
+	assert.NilError(t, waitForFile(expectedPath, 3*time.Second))
 
 	b, err := os.ReadFile(expectedPath)
 	assert.NilError(t, err)
 	assert.Equal(t, string(b), string(content))
 }
-
