@@ -3,6 +3,8 @@ package gcs
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -42,6 +44,27 @@ type ObjectList struct {
 // NewClient initializes a new GCS Client with the provided storage client.
 func NewClient(sc *storage.Client) *Client {
 	return &Client{storageClient: sc}
+}
+
+// DownloadObject downloads the content of a GCS object to a local file.
+func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error {
+	rc, err := c.storageClient.Bucket(bucketName).Object(objectName).NewReader(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to open reader for %q in %q: %w", objectName, bucketName, err)
+	}
+	defer rc.Close()
+
+	f, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("failed to create local file %q: %w", destPath, err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, rc); err != nil {
+		return fmt.Errorf("failed to copy content to %q: %w", destPath, err)
+	}
+
+	return nil
 }
 
 // GetObjectMetadata retrieves full metadata for a specific object or directory stub.

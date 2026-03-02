@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,6 +20,8 @@ type GCSClient interface {
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
 	// GetObjectMetadata returns full metadata for a specific object or directory stub.
 	GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error)
+	// DownloadObject downloads the content of a GCS object to a local file.
+	DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error
 }
 
 // BucketsMsg is sent when bucket listing completes.
@@ -44,6 +47,12 @@ type MetadataMsg struct {
 	Err         error
 }
 
+// DownloadMsg is sent when a download operation completes.
+type DownloadMsg struct {
+	Path string
+	Err  error
+}
+
 type viewState int
 
 const (
@@ -53,8 +62,9 @@ const (
 
 // Model maintains the state of the TUI application.
 type Model struct {
-	client     GCSClient
-	projectIDs []string
+	client      GCSClient
+	projectIDs  []string
+	downloadDir string
 
 	// View State
 	width  int
@@ -72,6 +82,7 @@ type Model struct {
 	prefixes      []gcs.PrefixMetadata
 
 	loading bool
+	status  string
 	err     error
 }
 
@@ -80,12 +91,14 @@ type Model struct {
 // Arguments:
 //   - projectIDs: List of projects to scan for buckets initially.
 //   - client: Implementation of the GCSClient interface.
-func NewModel(projectIDs []string, client GCSClient) Model {
+//   - downloadDir: Local directory where files will be downloaded.
+func NewModel(projectIDs []string, client GCSClient, downloadDir string) Model {
 	return Model{
-		projectIDs: projectIDs,
-		client:     client,
-		state:      viewBuckets,
-		loading:    true,
+		projectIDs:  projectIDs,
+		client:      client,
+		downloadDir: downloadDir,
+		state:       viewBuckets,
+		loading:     true,
 	}
 }
 
@@ -116,11 +129,20 @@ func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
 	}
 }
 
+func (m Model) fetchDownload(bucketName, objectName string) tea.Cmd {
+	dest := filepath.Join(m.downloadDir, filepath.Base(objectName))
+	return func() tea.Msg {
+		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
+		return DownloadMsg{Path: dest, Err: err}
+	}
+}
+
 func (m *Model) resetObjectsState() {
 	m.objects = nil
 	m.prefixes = nil
 	m.cursor = 0
 	m.loading = true
+	m.status = ""
 }
 
 func parentPrefix(p string) string {
@@ -171,6 +193,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case DownloadMsg:
+		if msg.Err != nil {
+			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf("Download failed: %v", msg.Err))
+		} else {
+			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded to %s", msg.Path))
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -179,6 +209,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "j", "down":
+			m.status = ""
 			itemsCount := len(m.buckets)
 			if m.state == viewObjects {
 				itemsCount = len(m.objects) + len(m.prefixes)
@@ -190,6 +221,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "k", "up":
+			m.status = ""
 			itemsCount := len(m.buckets)
 			if m.state == viewObjects {
 				itemsCount = len(m.objects) + len(m.prefixes)
@@ -227,6 +259,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentPrefix = parentPrefix(m.currentPrefix)
 				m.resetObjectsState()
 				return m, m.fetchObjects()
+			}
+		case "d":
+			if m.state == viewObjects && m.cursor >= len(m.prefixes) {
+				idx := m.cursor - len(m.prefixes)
+				if idx < len(m.objects) {
+					obj := m.objects[idx]
+					m.status = "Downloading..."
+					return m, m.fetchDownload(m.currentBucket, obj.Name)
+				}
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -292,7 +333,11 @@ func (m Model) headerView() string {
 }
 
 func (m Model) footerView() string {
-	return "\n\n(q: quit, h: back, l/enter: select)"
+	statusLine := ""
+	if m.status != "" {
+		statusLine = "\n" + m.status
+	}
+	return statusLine + "\n\n(q: quit, h: back, l/enter: select, d: download)"
 }
 
 func (m Model) maxItemsVisible() int {

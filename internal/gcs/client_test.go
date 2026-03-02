@@ -2,6 +2,8 @@ package gcs_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -102,6 +104,33 @@ func containsObject(slice []gcs.ObjectMetadata, name string) bool {
 		}
 	}
 	return false
+}
+
+func TestClient_DownloadObject(t *testing.T) {
+	content := []byte("hello gcs")
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
+				Content:     content,
+			},
+		},
+		Host:   "127.0.0.1",
+		Port:   8086,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	client := gcs.NewClient(server.Client())
+	dest := filepath.Join(t.TempDir(), "downloaded.txt")
+
+	err = client.DownloadObject(context.Background(), "b1", "file1.txt", dest)
+	assert.NilError(t, err)
+
+	got, err := os.ReadFile(dest)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, got, content)
 }
 
 func TestFakestorage_Behavior(t *testing.T) {

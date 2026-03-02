@@ -43,6 +43,10 @@ func (f mockGCSClient) GetObjectMetadata(ctx context.Context, bucketName, object
 	return nil, fmt.Errorf("not found")
 }
 
+func (f mockGCSClient) DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error {
+	return nil
+}
+
 // Helper to create simple object list from names
 func simpleObjectList(names []string, prefixes []string) *gcs.ObjectList {
 	var objects []gcs.ObjectMetadata
@@ -58,7 +62,7 @@ func simpleObjectList(names []string, prefixes []string) *gcs.ObjectList {
 
 func TestModel_AsyncLoading(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"async-b1"}}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 
 	assert.Assert(t, strings.Contains(m.View(), "Loading"))
 
@@ -76,7 +80,7 @@ func TestModel_AsyncLoading(t *testing.T) {
 
 func TestModel_Update_CursorNavigation(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"b1", "b2", "b3"}}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2", "b3"}})
 	m = updatedM.(tui.Model)
 
@@ -101,7 +105,7 @@ func TestModel_Update_CursorNavigation(t *testing.T) {
 
 func TestModel_Update_CursorCycle(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"b1", "b2", "b3"}}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2", "b3"}})
 	m = updatedM.(tui.Model)
 
@@ -126,7 +130,7 @@ func TestModel_Update_CursorCycle(t *testing.T) {
 
 func TestModel_Update_Quit(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"b1"}}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
@@ -143,7 +147,7 @@ func TestModel_EnterBucket(t *testing.T) {
 		buckets: []string{"b1"},
 		objects: simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 
 	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
 	m = updatedM.(tui.Model)
@@ -168,7 +172,7 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 		buckets: []string{"b1"},
 		objects: simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 
 	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
 	m = updatedM.(tui.Model)
@@ -190,7 +194,7 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 
 func TestModel_Resize(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"b1"}}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	m = updatedM.(tui.Model)
@@ -210,7 +214,7 @@ func TestModel_EnterPrefix(t *testing.T) {
 		buckets: []string{"b1"},
 		objects: simpleObjectList([]string{"file1"}, []string{"folder1/"}),
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	m = updatedM.(tui.Model)
 
@@ -257,7 +261,7 @@ func TestModel_SelectObject(t *testing.T) {
 			}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
@@ -286,7 +290,7 @@ func TestModel_CursorBug_SingleItem(t *testing.T) {
 			Objects:  []gcs.ObjectMetadata{{Name: "file1"}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// 1. Enter bucket
@@ -320,7 +324,7 @@ func TestModel_Pagination_Buckets(t *testing.T) {
 		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
 	}
 	client := mockGCSClient{buckets: buckets}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 10})
 	m = updatedM.(tui.Model)
@@ -356,7 +360,7 @@ func TestModel_Pagination_Objects(t *testing.T) {
 		buckets: []string{"b1"},
 		objects: simpleObjectList(objects, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 10})
 	m = updatedM.(tui.Model)
@@ -404,7 +408,7 @@ func TestModel_SelectPrefix(t *testing.T) {
 			}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
@@ -438,7 +442,7 @@ func TestModel_HeaderClearedOnBack(t *testing.T) {
 		buckets: []string{"b1"},
 		objects: simpleObjectList([]string{"obj1"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	m = updatedM.(tui.Model)
 
@@ -466,7 +470,7 @@ func TestModel_StaleObjectsMsg(t *testing.T) {
 		buckets: []string{"b1", "b2"},
 		objects: simpleObjectList([]string{"obj-from-b1"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client)
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter b1
@@ -500,4 +504,34 @@ func TestModel_StaleObjectsMsg(t *testing.T) {
 	if strings.Contains(view, "obj-from-b1") {
 		t.Fatalf("Bug: Stale ObjectsMsg from b1 took over the view while user is in b2!\nView:\n%s", view)
 	}
+}
+
+func TestModel_DownloadAction(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Press 'd' to download
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, cmd != nil, "Cmd should be returned for download")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading..."), "View should show downloading status")
+
+	// Simulate download completion
+	updatedM, _ = m.Update(tui.DownloadMsg{Path: "/tmp/obj1"})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "View should show success status")
 }
