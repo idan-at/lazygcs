@@ -232,7 +232,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.fetchPrefixMetadata(m.cursor)
 				}
 			}
-		case "l", "enter":
+		case "l", "right", "enter":
 			if m.state == viewBuckets && len(m.buckets) > 0 {
 				m.currentBucket = m.buckets[m.cursor]
 				m.currentPrefix = "" // Reset prefix when entering bucket
@@ -247,7 +247,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.fetchObjects()
 				}
 			}
-		case "h":
+		case "h", "left":
 			if m.state == viewObjects {
 				if m.currentPrefix == "" {
 					m.state = viewBuckets

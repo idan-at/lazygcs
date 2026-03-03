@@ -78,6 +78,31 @@ func TestModel_AsyncLoading(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "Loading"))
 }
 
+func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
+	client := mockGCSClient{buckets: []string{"b1", "b2", "b3"}}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2", "b3"}})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, strings.Contains(m.View(), "> b1"))
+
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b2"))
+
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b3"))
+
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b2"))
+
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b1"))
+}
+
 func TestModel_Update_CursorNavigation(t *testing.T) {
 	client := mockGCSClient{buckets: []string{"b1", "b2", "b3"}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp")

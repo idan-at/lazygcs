@@ -43,10 +43,11 @@ Before committing any code, MUST run:
     *   Simplified configuration (CLI args, TOML file).
     *   Async TUI initialization (Loading buckets).
     *   Basic bucket list navigation (`j`/`k`) with cycle support.
+    *   Implemented Download (`d`) action.
 *   **Next Steps:**
     1.  Refactor `View` logic into smaller components (e.g., `bucketsView`, `objectsView`).
     2.  Add File Preview pane (3rd column).
-    3.  Implement Download (`d`) and Delete (`x`) actions.
+    3.  Implement Delete (`x`) actions.
     4.  Add Search functionality (`/`).
 
 ## Key Files
