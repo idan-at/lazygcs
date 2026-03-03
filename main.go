@@ -26,13 +26,13 @@ func main() {
 	home, _ := os.UserHomeDir()
 	configPath := filepath.Join(home, ".config", "lazygcs", "config.toml")
 
-	cfg, err := config.Load(os.Args[1:], configPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Failed to load config from %s: %v", configPath, err)
 	}
 
 	if len(cfg.Projects) == 0 {
-		log.Fatal("No project IDs found. Please provide them as arguments or configure them in ~/.config/lazygcs/config.toml")
+		log.Fatal("No project IDs found in config file. Please configure them in ~/.config/lazygcs/config.toml")
 	}
 
 	gcsClient := gcs.NewClient(storageClient)

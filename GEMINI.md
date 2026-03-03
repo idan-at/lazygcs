@@ -40,7 +40,7 @@ Before committing any code, MUST run:
     *   Folder/Prefix navigation (Drill down/up) with `h`/`l` and `Enter`.
     *   Relative path display for nested objects.
     *   Refactored `ListObjects` to return `ObjectList` struct.
-    *   Simplified configuration (CLI args, TOML file).
+    *   Simplified configuration (TOML file).
     *   Async TUI initialization (Loading buckets).
     *   Basic bucket list navigation (`j`/`k`) with cycle support.
     *   Implemented Download (`d`) action.

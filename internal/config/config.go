@@ -31,44 +31,38 @@ func defaultDownloadDir() string {
 	return filepath.Join(home, "Downloads")
 }
 
-// Load resolves the configuration based on the precedence hierarchy.
-//
-// It checks sources in the following order (first match wins):
-//  1. CLI Arguments: Passed directly to the application.
-//  2. Config File: TOML file at the specified path (e.g., ~/.config/lazygcs/config.toml).
+// Load resolves the configuration from the specified TOML file.
 //
 // Arguments:
-//   - args: Command-line arguments (excluding the program name).
 //   - configPath: Absolute path to the TOML configuration file.
 //
 // Returns:
 //   - *Config: The resolved configuration.
-//   - error: If the config file exists but cannot be parsed.
-func Load(args []string, configPath string) (*Config, error) {
+//   - error: If the config file does not exist, or cannot be parsed.
+func Load(configPath string) (*Config, error) {
+	if configPath == "" {
+		return nil, os.ErrNotExist
+	}
+
+	if _, err := os.Stat(configPath); err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		Projects:    []string{},
 		DownloadDir: defaultDownloadDir(),
 	}
 
-	if len(args) > 0 {
-		cfg.Projects = trimProjects(args)
-		// We still try to load DownloadDir from config if it exists
+	var tc tomlConfig
+	if _, err := toml.DecodeFile(configPath, &tc); err != nil {
+		return nil, err
 	}
 
-	if configPath != "" {
-		if _, err := os.Stat(configPath); err == nil {
-			var tc tomlConfig
-			if _, err := toml.DecodeFile(configPath, &tc); err != nil {
-				return nil, err
-			}
-
-			if len(tc.Projects) > 0 && len(cfg.Projects) == 0 {
-				cfg.Projects = trimProjects(tc.Projects)
-			}
-			if tc.DownloadDir != "" {
-				cfg.DownloadDir = tc.DownloadDir
-			}
-		}
+	if len(tc.Projects) > 0 {
+		cfg.Projects = trimProjects(tc.Projects)
+	}
+	if tc.DownloadDir != "" {
+		cfg.DownloadDir = tc.DownloadDir
 	}
 
 	return cfg, nil

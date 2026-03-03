@@ -12,15 +12,34 @@ import (
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"gotest.tools/v3/assert"
 
+	"lazygcs/internal/config"
 	"lazygcs/internal/gcs"
 	"lazygcs/internal/tui"
 )
 
+func createConfigFile(t *testing.T, projects []string, downloadDir string) string {
+	t.Helper()
+	var quoted []string
+	for _, p := range projects {
+		quoted = append(quoted, fmt.Sprintf("%q", p))
+	}
+	content := fmt.Sprintf("projects = [%s]\ndownload_dir = %q\n", strings.Join(quoted, ", "), downloadDir)
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	err := os.WriteFile(path, []byte(content), 0644)
+	assert.NilError(t, err)
+	return path
+}
+
 func setupTestApp(t *testing.T, server *fakestorage.Server, projectIDs []string, downloadDir string) *teatest.TestModel {
 	t.Helper()
 
+	configPath := createConfigFile(t, projectIDs, downloadDir)
+	cfg, err := config.Load(configPath)
+	assert.NilError(t, err)
+
 	gcsClient := gcs.NewClient(server.Client())
-	m := tui.NewModel(projectIDs, gcsClient, downloadDir)
+	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir)
 
 	tm := teatest.NewTestModel(t, m)
 	return tm

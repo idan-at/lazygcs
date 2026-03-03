@@ -58,12 +58,15 @@ Inspired by `ranger` and `yazi`.
     *   `q`: Quit.
 
 ## 6. Configuration Strategy
-Project IDs are resolved in the following precedence order:
-1.  **CLI Arguments:** `lazygcs project-a project-b` (Takes precedence).
-2.  **Config File:** `~/.config/lazygcs/config.toml`
-    ```toml
-    projects = ["project-a", "project-b"]
-    ```
+Configuration is loaded exclusively from a TOML file.
+
+**Location:** `~/.config/lazygcs/config.toml`
+
+**Format:**
+```toml
+projects = ["project-a", "project-b"]
+download_dir = "~/Downloads"
+```
 
 ## 7. Testing Strategy
 *   **E2E Tests (`e2e_test.go`):** Verify the entire binary lifecycle.
