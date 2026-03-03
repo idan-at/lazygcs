@@ -22,9 +22,12 @@ func main() {
 	}
 	defer storageClient.Close()
 
-	// Determine config path: ~/.config/lazygcs/config.toml
-	home, _ := os.UserHomeDir()
-	configPath := filepath.Join(home, ".config", "lazygcs", "config.toml")
+	// Determine config path: LAZYGCS_CONFIG env var or ~/.config/lazygcs/config.toml
+	configPath := os.Getenv("LAZYGCS_CONFIG")
+	if configPath == "" {
+		home, _ := os.UserHomeDir()
+		configPath = filepath.Join(home, ".config", "lazygcs", "config.toml")
+	}
 
 	cfg, err := config.Load(configPath)
 	if err != nil {

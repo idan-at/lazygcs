@@ -3,6 +3,7 @@ package main_test
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +17,43 @@ import (
 	"lazygcs/internal/gcs"
 	"lazygcs/internal/tui"
 )
+
+func TestMain_NoConfig(t *testing.T) {
+	// Build the binary
+	binaryPath := filepath.Join(t.TempDir(), "lazygcs")
+	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
+	err := buildCmd.Run()
+	assert.NilError(t, err)
+
+	// Run without config (pointing to a non-existent file via env)
+	cmd := exec.Command(binaryPath)
+	cmd.Env = append(os.Environ(), "LAZYGCS_CONFIG=/tmp/non-existent-lazygcs-config.toml")
+	output, err := cmd.CombinedOutput()
+
+	// Should fail
+	assert.Assert(t, err != nil)
+	assert.Assert(t, strings.Contains(string(output), "Failed to load config"))
+}
+
+func TestMain_EmptyProjects(t *testing.T) {
+	// Build the binary
+	binaryPath := filepath.Join(t.TempDir(), "lazygcs")
+	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
+	err := buildCmd.Run()
+	assert.NilError(t, err)
+
+	// Create config with empty projects
+	configPath := createConfigFile(t, []string{}, t.TempDir())
+
+	// Run with config
+	cmd := exec.Command(binaryPath)
+	cmd.Env = append(os.Environ(), "LAZYGCS_CONFIG="+configPath)
+	output, err := cmd.CombinedOutput()
+
+	// Should fail
+	assert.Assert(t, err != nil)
+	assert.Assert(t, strings.Contains(string(output), "No project IDs found in config file"))
+}
 
 func createConfigFile(t *testing.T, projects []string, downloadDir string) string {
 	t.Helper()
