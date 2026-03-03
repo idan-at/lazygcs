@@ -20,6 +20,8 @@ type GCSClient interface {
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
 	// GetObjectMetadata returns full metadata for a specific object or directory stub.
 	GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error)
+	// GetObjectContent returns the first 1KB of content for a specific object.
+	GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error)
 	// DownloadObject downloads the content of a GCS object to a local file.
 	DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error
 }
@@ -47,6 +49,13 @@ type MetadataMsg struct {
 	Err         error
 }
 
+// ContentMsg is sent when on-demand content fetching completes.
+type ContentMsg struct {
+	ObjectName string
+	Content    string
+	Err        error
+}
+
 // DownloadMsg is sent when a download operation completes.
 type DownloadMsg struct {
 	Path string
@@ -67,9 +76,10 @@ type Model struct {
 	downloadDir string
 
 	// View State
-	width  int
-	height int
-	state  viewState
+	width          int
+	height         int
+	state          viewState
+	previewContent string
 
 	// Buckets View
 	buckets []string
@@ -116,6 +126,13 @@ func (m Model) fetchObjects() tea.Cmd {
 	return func() tea.Msg {
 		list, err := m.client.ListObjects(context.Background(), bucket, prefix)
 		return ObjectsMsg{Bucket: bucket, Prefix: prefix, List: list, Err: err}
+	}
+}
+
+func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
+	return func() tea.Msg {
+		content, err := m.client.GetObjectContent(context.Background(), bucketName, objectName)
+		return ContentMsg{ObjectName: objectName, Content: content, Err: err}
 	}
 }
 
@@ -193,6 +210,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case ContentMsg:
+		// Make sure the content is for the currently selected object
+		if m.state == viewObjects && m.cursor >= len(m.prefixes) {
+			idx := m.cursor - len(m.prefixes)
+			if idx < len(m.objects) && m.objects[idx].Name == msg.ObjectName {
+				if msg.Err != nil {
+					m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
+				} else {
+					m.previewContent = msg.Content
+				}
+			}
+		}
+		return m, nil
+
 	case DownloadMsg:
 		if msg.Err != nil {
 			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf("Download failed: %v", msg.Err))
@@ -216,8 +247,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if itemsCount > 0 {
 				m.cursor = (m.cursor + 1) % itemsCount
-				if m.state == viewObjects && m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
-					return m, m.fetchPrefixMetadata(m.cursor)
+				m.previewContent = "" // Reset preview on move
+				if m.state == viewObjects {
+					if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
+						return m, m.fetchPrefixMetadata(m.cursor)
+					} else if m.cursor >= len(m.prefixes) {
+						idx := m.cursor - len(m.prefixes)
+						obj := m.objects[idx]
+						m.previewContent = "Loading..."
+						return m, m.fetchContent(m.currentBucket, obj.Name)
+					}
 				}
 			}
 		case "k", "up":
@@ -228,8 +267,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if itemsCount > 0 {
 				m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
-				if m.state == viewObjects && m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
-					return m, m.fetchPrefixMetadata(m.cursor)
+				m.previewContent = "" // Reset preview on move
+				if m.state == viewObjects {
+					if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
+						return m, m.fetchPrefixMetadata(m.cursor)
+					} else if m.cursor >= len(m.prefixes) {
+						idx := m.cursor - len(m.prefixes)
+						obj := m.objects[idx]
+						m.previewContent = "Loading..."
+						return m, m.fetchContent(m.currentBucket, obj.Name)
+					}
 				}
 			}
 		case "l", "right", "enter":
@@ -240,6 +287,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.resetObjectsState()
 				return m, m.fetchObjects()
 			} else if m.state == viewObjects {
+				m.previewContent = ""
 				// Check if selected item is a prefix
 				if m.cursor < len(m.prefixes) {
 					m.currentPrefix = m.prefixes[m.cursor].Name
@@ -249,6 +297,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "h", "left":
 			if m.state == viewObjects {
+				m.previewContent = ""
 				if m.currentPrefix == "" {
 					m.state = viewBuckets
 					m.currentBucket = ""
@@ -286,10 +335,11 @@ func (m Model) fullPath() string {
 func (m Model) previewView() string {
 	var s strings.Builder
 	if m.state == viewObjects {
+		s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
+
 		if m.cursor < len(m.prefixes) {
 			// Selected item is a prefix (folder)
 			prefix := m.prefixes[m.cursor]
-			s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
 			s.WriteString(fmt.Sprintf("Name: %s\n", prefix.Name))
 			s.WriteString("Type: Folder\n")
 			if !prefix.Created.IsZero() {
@@ -306,7 +356,6 @@ func (m Model) previewView() string {
 			idx := m.cursor - len(m.prefixes)
 			if idx < len(m.objects) {
 				obj := m.objects[idx]
-				s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
 				s.WriteString(fmt.Sprintf("Name: %s\n", obj.Name))
 				s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
 				s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
@@ -316,6 +365,10 @@ func (m Model) previewView() string {
 				s.WriteString(fmt.Sprintf("Updated: %s\n", obj.Updated.Format("2006-01-02 15:04:05")))
 				if obj.Owner != "" {
 					s.WriteString(fmt.Sprintf("Owner: %s\n", obj.Owner))
+				}
+				if m.previewContent != "" {
+					s.WriteString("\n---\n")
+					s.WriteString(m.previewContent)
 				}
 			}
 		}

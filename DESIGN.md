@@ -46,7 +46,7 @@ Inspired by `ranger` and `yazi`.
     *   `l`: Enter Directory / Select Bucket.
     *   `Enter`: Same as `l`.
 2.  **Operations:**
-    *   `space`: Toggle selection (multi-select support planned).
+    *   `space`: Toggle selection for an item.
     *   `d`: Download selected item(s).
     *   `x`: Delete selected item(s) (with confirmation).
     *   `v`: Toggle Object Versions view in Right Pane.

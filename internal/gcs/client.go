@@ -67,6 +67,22 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 	return nil
 }
 
+// GetObjectContent retrieves the first 1KB of content for a specific object.
+func (c *Client) GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error) {
+	rc, err := c.storageClient.Bucket(bucketName).Object(objectName).NewRangeReader(ctx, 0, 1024)
+	if err != nil {
+		return "", fmt.Errorf("failed to create reader for %q in %q: %w", objectName, bucketName, err)
+	}
+	defer rc.Close()
+
+	bytes, err := io.ReadAll(rc)
+	if err != nil {
+		return "", fmt.Errorf("failed to read content from %q in %q: %w", objectName, bucketName, err)
+	}
+
+	return string(bytes), nil
+}
+
 // GetObjectMetadata retrieves full metadata for a specific object or directory stub.
 func (c *Client) GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*ObjectMetadata, error) {
 	attrs, err := c.storageClient.Bucket(bucketName).Object(objectName).Attrs(ctx)

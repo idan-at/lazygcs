@@ -133,6 +133,46 @@ func TestClient_DownloadObject(t *testing.T) {
 	assert.DeepEqual(t, got, content)
 }
 
+func TestClient_GetObjectContent(t *testing.T) {
+	longContent := make([]byte, 2048)
+	for i := range longContent {
+		longContent[i] = 'a'
+	}
+	shortContent := []byte("hello")
+
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "long.txt"},
+				Content:     longContent,
+			},
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "short.txt"},
+				Content:     shortContent,
+			},
+		},
+		Host:   "127.0.0.1",
+		Port:   8087,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	client := gcs.NewClient(server.Client())
+
+	// Test case 1: Content is longer than 1KB, should be truncated
+	content, err := client.GetObjectContent(context.Background(), "b1", "long.txt")
+	assert.NilError(t, err)
+	assert.Equal(t, len(content), 1024, "Content should be truncated to 1024 bytes")
+	assert.Equal(t, content, string(longContent[:1024]))
+
+	// Test case 2: Content is shorter than 1KB, should be returned as is
+	content, err = client.GetObjectContent(context.Background(), "b1", "short.txt")
+	assert.NilError(t, err)
+	assert.Equal(t, len(content), len(shortContent))
+	assert.Equal(t, content, string(shortContent))
+}
+
 func TestFakestorage_Behavior(t *testing.T) {
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{

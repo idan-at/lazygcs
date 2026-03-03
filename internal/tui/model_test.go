@@ -43,6 +43,18 @@ func (f mockGCSClient) GetObjectMetadata(ctx context.Context, bucketName, object
 	return nil, fmt.Errorf("not found")
 }
 
+func (f mockGCSClient) GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error) {
+	if f.objects != nil {
+		for _, o := range f.objects.Objects {
+			if o.Name == objectName {
+				// Fake content for testing
+				return fmt.Sprintf("content of %s", objectName), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("not found")
+}
+
 func (f mockGCSClient) DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error {
 	return nil
 }
@@ -58,6 +70,40 @@ func simpleObjectList(names []string, prefixes []string) *gcs.ObjectList {
 		prefs = append(prefs, gcs.PrefixMetadata{Name: p})
 	}
 	return &gcs.ObjectList{Objects: objects, Prefixes: prefs}
+}
+
+func TestModel_ObjectPreview(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, []string{"folder1/"}),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Move cursor down to obj1 (index 1)
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// Verify we got a command and view shows loading
+	assert.Assert(t, cmd != nil)
+	assert.Assert(t, strings.Contains(m.View(), "Loading..."))
+
+	// Simulate receiving the content
+	msg := cmd()
+	updatedM, _ = m.Update(msg)
+	m = updatedM.(tui.Model)
+
+	// Verify view shows the content
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "content of obj1"))
 }
 
 func TestModel_AsyncLoading(t *testing.T) {
