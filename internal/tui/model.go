@@ -114,6 +114,8 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string) Model {
 		projectIDs:  projectIDs,
 		client:      client,
 		downloadDir: downloadDir,
+		width:       120,
+		height:      40,
 		state:       viewBuckets,
 		loading:     true,
 	}
@@ -396,7 +398,7 @@ func (m Model) fullPath() string {
 	return fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
 }
 
-func (m Model) previewView() string {
+func (m Model) previewView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects {
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
@@ -404,7 +406,7 @@ func (m Model) previewView() string {
 		if m.cursor < len(m.prefixes) {
 			// Selected item is a prefix (folder)
 			prefix := m.prefixes[m.cursor]
-			s.WriteString(fmt.Sprintf("Name: %s\n", prefix.Name))
+			s.WriteString(fmt.Sprintf("Name: %s\n", truncate(prefix.Name, width-6)))
 			s.WriteString("Type: Folder\n")
 			if !prefix.Created.IsZero() {
 				s.WriteString(fmt.Sprintf("Created: %s\n", prefix.Created.Format("2006-01-02 15:04:05")))
@@ -420,7 +422,7 @@ func (m Model) previewView() string {
 			idx := m.cursor - len(m.prefixes)
 			if idx < len(m.objects) {
 				obj := m.objects[idx]
-				s.WriteString(fmt.Sprintf("Name: %s\n", obj.Name))
+				s.WriteString(fmt.Sprintf("Name: %s\n", truncate(obj.Name, width-6)))
 				s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
 				s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
 				if !obj.Created.IsZero() {
@@ -446,7 +448,7 @@ func (m Model) headerView() string {
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Padding(0, 1).
-		Render(m.fullPath())
+		Render(truncate(m.fullPath(), m.width-2))
 }
 
 func (m Model) footerView() string {
@@ -488,10 +490,25 @@ func visibleRange(cursor, totalItems, maxVisible int) (start, end int) {
 	return start, end
 }
 
-func (m Model) objectsView() string {
+func truncate(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) > maxLen {
+		if maxLen > 3 {
+			return string(r[:maxLen-3]) + "..."
+		}
+		return string(r[:maxLen])
+	}
+	return s
+}
+
+func (m Model) objectsView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects {
-		s.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Objects in %s", m.currentBucket)) + "\n\n")
+		title := fmt.Sprintf("Objects in %s", m.currentBucket)
+		s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(title, width)) + "\n\n")
 		if m.loading {
 			s.WriteString("Loading...")
 		} else {
@@ -516,6 +533,8 @@ func (m Model) objectsView() string {
 
 				// Display relative path
 				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
+				// Truncate to fit column (account for cursor and padding)
+				displayItem = truncate(displayItem, width-2)
 				s.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
 			}
 			if totalItems == 0 {
@@ -526,9 +545,9 @@ func (m Model) objectsView() string {
 	return s.String()
 }
 
-func (m Model) bucketsView() string {
+func (m Model) bucketsView(width int) string {
 	var s strings.Builder
-	s.WriteString(lipgloss.NewStyle().Bold(true).Render("Buckets") + "\n\n")
+	s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width)) + "\n\n")
 	if m.state == viewBuckets && m.loading {
 		s.WriteString("Loading...")
 	} else {
@@ -539,7 +558,9 @@ func (m Model) bucketsView() string {
 			if m.state == viewBuckets && m.cursor == i {
 				cursor = ">"
 			}
-			s.WriteString(fmt.Sprintf("%s %s\n", cursor, bucket))
+			// Truncate to fit column (account for cursor and padding)
+			truncatedBucket := truncate(bucket, width-2)
+			s.WriteString(fmt.Sprintf("%s %s\n", cursor, truncatedBucket))
 		}
 	}
 	return s.String()
@@ -557,9 +578,9 @@ func (m Model) View() string {
 	midWidth := int(float64(m.width) * 0.35)
 	rightWidth := m.width - leftWidth - midWidth - 6 // account for borders/padding
 
-	leftCol := lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(m.bucketsView())
-	midCol := lipgloss.NewStyle().Width(midWidth).PaddingRight(2).Render(m.objectsView())
-	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(m.previewView())
+	leftCol := lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(m.bucketsView(leftWidth))
+	midCol := lipgloss.NewStyle().Width(midWidth).PaddingRight(2).Render(m.objectsView(midWidth))
+	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(m.previewView(rightWidth))
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 

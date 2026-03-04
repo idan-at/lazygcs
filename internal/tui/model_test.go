@@ -742,6 +742,40 @@ func TestModel_DownloadAction(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "View should show success status")
 }
 
+func TestModel_Truncation(t *testing.T) {
+	longName := "this_is_a_very_long_object_name_that_should_be_truncated_to_fit_in_the_column"
+	client := mockGCSClient{
+		buckets: []string{longName},
+		objects: simpleObjectList([]string{longName}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	
+	// Set a specific width where we know it should truncate everywhere
+	// leftWidth = 40 * 0.3 = 12.
+	// Header width = 40 - 2 = 38.
+	updatedM, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 50})
+	m = updatedM.(tui.Model)
+
+	// 1. Check Bucket truncation
+	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: []string{longName}})
+	m = updatedM.(tui.Model)
+	
+	view := m.View()
+	// Should contain truncated version (usually ending in ...)
+	assert.Assert(t, strings.Contains(view, "..."), "View should contain ellipsis for truncated bucket name")
+	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long bucket name")
+
+	// 2. Check Object truncation
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: longName, Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	view = m.View()
+	assert.Assert(t, strings.Contains(view, "..."), "View should contain ellipsis for truncated object name")
+	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long object name")
+}
+
 func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	// Create a temp directory for downloads
 	downloadDir := t.TempDir()
