@@ -434,7 +434,20 @@ func (m Model) previewView(width int) string {
 				}
 				if m.previewContent != "" {
 					s.WriteString("\n---\n")
-					s.WriteString(m.previewContent)
+
+					// Leave room for the metadata lines and the "..." truncation indicator
+					maxContentLines := m.maxItemsVisible() - 12
+					if maxContentLines < 1 {
+						maxContentLines = 1
+					}
+
+					lines := strings.Split(m.previewContent, "\n")
+					if len(lines) > maxContentLines {
+						s.WriteString(strings.Join(lines[:maxContentLines], "\n"))
+						s.WriteString("\n...")
+					} else {
+						s.WriteString(m.previewContent)
+					}
 				}
 			}
 		}

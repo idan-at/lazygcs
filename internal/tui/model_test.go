@@ -776,6 +776,46 @@ func TestModel_Truncation(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long object name")
 }
 
+func TestModel_PreviewContentTooManyLines(t *testing.T) {
+	var longContent strings.Builder
+	for i := 0; i < 100; i++ {
+		longContent.WriteString(fmt.Sprintf("line %d\n", i))
+	}
+	
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	// override the content just for this test
+	client.contentError = nil
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	
+	// Set height to 50
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+	
+	// Simulate receiving the content but with 100 lines
+	msg := cmd()
+	contentMsg := msg.(tui.ContentMsg)
+	contentMsg.Content = longContent.String()
+	updatedM, _ = m.Update(contentMsg)
+	m = updatedM.(tui.Model)
+
+	view := m.View()
+	// Total lines should not exceed the window height significantly.
+	// Since lipgloss.JoinHorizontal matches heights, if one column is very tall,
+	// the whole view will be tall.
+	lineCount := strings.Count(view, "\n")
+	assert.Assert(t, lineCount <= 50, "View has %d lines, expected <= 50", lineCount)
+}
+
 func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	// Create a temp directory for downloads
 	downloadDir := t.TempDir()
