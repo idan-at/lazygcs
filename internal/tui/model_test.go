@@ -142,6 +142,41 @@ func TestModel_InitialObjectPreview(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "content of obj1"))
 }
 
+func TestModel_CursorNoop_PreviewNotReloaded(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// 1. Setup: In bucket, obj1 loaded and previewed
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+	
+	// Process initial fetchContent
+	updatedM, _ = m.Update(cmd())
+	m = updatedM.(tui.Model)
+	
+	assert.Assert(t, strings.Contains(m.View(), "content of obj1"))
+
+	// 2. Press 'j' (down). Since there's only 1 item, cursor stays at 0.
+	updatedM, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// Assertions:
+	// - No command should be returned (no new fetch)
+	// - View should NOT show "Loading..."
+	// - View should still show the content
+	assert.Assert(t, cmd == nil, "Pressing 'j' when only one item is present should not trigger a new fetch")
+	assert.Assert(t, !strings.Contains(m.View(), "Loading..."), "View should not show 'Loading...' if the cursor didn't move")
+	assert.Assert(t, strings.Contains(m.View(), "content of obj1"), "Preview content should still be visible")
+}
+
 func TestModel_ObjectPreview_Error(t *testing.T) {
 	client := mockGCSClient{
 		buckets:      []string{"b1"},
@@ -156,11 +191,7 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
-	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
-	m = updatedM.(tui.Model)
-
-	// Move cursor to obj1, which will trigger a fetch
-	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
 	// Simulate receiving the error message

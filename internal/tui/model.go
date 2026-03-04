@@ -253,16 +253,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				itemsCount = len(m.objects) + len(m.prefixes)
 			}
 			if itemsCount > 0 {
+				oldCursor := m.cursor
 				m.cursor = (m.cursor + 1) % itemsCount
-				m.previewContent = "" // Reset preview on move
-				if m.state == viewObjects {
-					if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
-						return m, m.fetchPrefixMetadata(m.cursor)
-					} else if m.cursor >= len(m.prefixes) {
-						idx := m.cursor - len(m.prefixes)
-						obj := m.objects[idx]
-						m.previewContent = "Loading..."
-						return m, m.fetchContent(m.currentBucket, obj.Name)
+				if oldCursor != m.cursor {
+					m.previewContent = "" // Reset preview on move
+					if m.state == viewObjects {
+						if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
+							return m, m.fetchPrefixMetadata(m.cursor)
+						} else if m.cursor >= len(m.prefixes) {
+							idx := m.cursor - len(m.prefixes)
+							obj := m.objects[idx]
+							m.previewContent = "Loading..."
+							return m, m.fetchContent(m.currentBucket, obj.Name)
+						}
 					}
 				}
 			}
@@ -273,16 +276,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				itemsCount = len(m.objects) + len(m.prefixes)
 			}
 			if itemsCount > 0 {
+				oldCursor := m.cursor
 				m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
-				m.previewContent = "" // Reset preview on move
-				if m.state == viewObjects {
-					if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
-						return m, m.fetchPrefixMetadata(m.cursor)
-					} else if m.cursor >= len(m.prefixes) {
-						idx := m.cursor - len(m.prefixes)
-						obj := m.objects[idx]
-						m.previewContent = "Loading..."
-						return m, m.fetchContent(m.currentBucket, obj.Name)
+				if oldCursor != m.cursor {
+					m.previewContent = "" // Reset preview on move
+					if m.state == viewObjects {
+						if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
+							return m, m.fetchPrefixMetadata(m.cursor)
+						} else if m.cursor >= len(m.prefixes) {
+							idx := m.cursor - len(m.prefixes)
+							obj := m.objects[idx]
+							m.previewContent = "Loading..."
+							return m, m.fetchContent(m.currentBucket, obj.Name)
+						}
 					}
 				}
 			}
