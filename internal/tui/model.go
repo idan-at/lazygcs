@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -67,6 +68,7 @@ type viewState int
 const (
 	viewBuckets viewState = iota
 	viewObjects
+	viewDownloadConfirm
 )
 
 // Model maintains the state of the TUI application.
@@ -80,6 +82,11 @@ type Model struct {
 	height         int
 	state          viewState
 	previewContent string
+
+	// Download Confirm State
+	pendingDownloadBucket string
+	pendingDownloadObject string
+	pendingDownloadDest   string
 
 	// Buckets View
 	buckets []string
@@ -146,8 +153,7 @@ func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
 	}
 }
 
-func (m Model) fetchDownload(bucketName, objectName string) tea.Cmd {
-	dest := filepath.Join(m.downloadDir, filepath.Base(objectName))
+func (m Model) fetchDownload(bucketName, objectName, dest string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
 		return DownloadMsg{Path: dest, Err: err}
@@ -168,6 +174,20 @@ func parentPrefix(p string) string {
 		return p[:i+1]
 	}
 	return ""
+}
+
+func autoRename(path string) string {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+
+	for i := 1; ; i++ {
+		newPath := filepath.Join(dir, fmt.Sprintf("%s_%d%s", name, i, ext))
+		if _, err := os.Stat(newPath); os.IsNotExist(err) {
+			return newPath
+		}
+	}
 }
 
 // Update processes terminal messages (key presses, window resizes) and async responses.
@@ -245,6 +265,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.state == viewDownloadConfirm {
+			switch msg.String() {
+			case "o":
+				m.status = "Downloading (overwriting)..."
+				m.state = viewObjects
+				return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, m.pendingDownloadDest)
+			case "a", "q", "ctrl+c", "esc":
+				m.status = "Download aborted."
+				m.state = viewObjects
+				return m, nil
+			case "r":
+				newDest := autoRename(m.pendingDownloadDest)
+				m.status = fmt.Sprintf("Downloading as %s...", filepath.Base(newDest))
+				m.state = viewObjects
+				return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, newDest)
+			}
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "j", "down":
 			m.status = ""
@@ -327,8 +366,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				idx := m.cursor - len(m.prefixes)
 				if idx < len(m.objects) {
 					obj := m.objects[idx]
+					dest := filepath.Join(m.downloadDir, filepath.Base(obj.Name))
+					
+					// Check if file already exists
+					if _, err := os.Stat(dest); err == nil {
+						m.state = viewDownloadConfirm
+						m.pendingDownloadBucket = m.currentBucket
+						m.pendingDownloadObject = obj.Name
+						m.pendingDownloadDest = dest
+						m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(dest))
+						return m, nil
+					}
+
 					m.status = "Downloading..."
-					return m, m.fetchDownload(m.currentBucket, obj.Name)
+					return m, m.fetchDownload(m.currentBucket, obj.Name, dest)
 				}
 			}
 		case "q", "ctrl+c":

@@ -3,6 +3,8 @@ package tui_test
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -738,4 +740,124 @@ func TestModel_DownloadAction(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "View should show success status")
+}
+
+func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
+	// Create a temp directory for downloads
+	downloadDir := t.TempDir()
+	
+	// Create a dummy file that already exists
+	existingFile := filepath.Join(downloadDir, "obj1")
+	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
+	assert.NilError(t, err)
+
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, downloadDir)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Press 'd' to download
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updatedM.(tui.Model)
+
+	// Assert that we are prompted for confirmation and no command is returned yet
+	assert.Assert(t, cmd == nil, "No command should be returned when asking for confirmation")
+	assert.Assert(t, strings.Contains(m.View(), "File exists"), "View should indicate file exists")
+	assert.Assert(t, strings.Contains(m.View(), "(o)verwrite"), "View should present overwrite option")
+	assert.Assert(t, strings.Contains(m.View(), "(a)bort"), "View should present abort option")
+	assert.Assert(t, strings.Contains(m.View(), "(r)ename"), "View should present rename option")
+
+	// Press 'a' to abort
+	updatedM, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, cmd == nil, "No command should be returned after abort")
+	assert.Assert(t, strings.Contains(m.View(), "Download aborted"), "View should indicate abortion")
+}
+
+func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
+	downloadDir := t.TempDir()
+	
+	existingFile := filepath.Join(downloadDir, "obj1")
+	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
+	assert.NilError(t, err)
+
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, downloadDir)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Press 'd' to download
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updatedM.(tui.Model)
+
+	// Press 'o' to overwrite
+	updatedM, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, cmd != nil, "Cmd should be returned for overwrite")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading (overwriting)..."), "View should show overwriting status")
+
+	msg := cmd()
+	downloadMsg, ok := msg.(tui.DownloadMsg)
+	assert.Assert(t, ok, "Expected DownloadMsg")
+	assert.Equal(t, downloadMsg.Path, existingFile)
+}
+
+func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
+	downloadDir := t.TempDir()
+	
+	existingFile := filepath.Join(downloadDir, "obj1")
+	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
+	assert.NilError(t, err)
+
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, downloadDir)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Press 'd' to download
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updatedM.(tui.Model)
+
+	// Press 'r' to rename
+	updatedM, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, cmd != nil, "Cmd should be returned for rename")
+	
+	msg := cmd()
+	downloadMsg, ok := msg.(tui.DownloadMsg)
+	assert.Assert(t, ok, "Expected DownloadMsg")
+	expectedNewPath := filepath.Join(downloadDir, "obj1_1")
+	assert.Equal(t, downloadMsg.Path, expectedNewPath)
+	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1_1..."), "View should show downloading renamed file status")
 }
