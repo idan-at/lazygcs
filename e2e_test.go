@@ -18,13 +18,28 @@ import (
 	"lazygcs/internal/tui"
 )
 
-func TestMain_NoConfig(t *testing.T) {
-	// Build the binary
-	binaryPath := filepath.Join(t.TempDir(), "lazygcs")
-	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
-	err := buildCmd.Run()
-	assert.NilError(t, err)
+var binaryPath string
 
+func TestMain(m *testing.M) {
+	// Build the binary once for all E2E tests
+	tmpDir, err := os.MkdirTemp("", "lazygcs-e2e-")
+	if err != nil {
+		fmt.Printf("failed to create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	binaryPath = filepath.Join(tmpDir, "lazygcs")
+	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
+	if err := buildCmd.Run(); err != nil {
+		fmt.Printf("failed to build binary: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(m.Run())
+}
+
+func TestMain_NoConfig(t *testing.T) {
 	// Run without config (pointing to a non-existent file via env)
 	cmd := exec.Command(binaryPath)
 	cmd.Env = append(os.Environ(), "LAZYGCS_CONFIG=/tmp/non-existent-lazygcs-config.toml")
@@ -36,12 +51,6 @@ func TestMain_NoConfig(t *testing.T) {
 }
 
 func TestMain_EmptyProjects(t *testing.T) {
-	// Build the binary
-	binaryPath := filepath.Join(t.TempDir(), "lazygcs")
-	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
-	err := buildCmd.Run()
-	assert.NilError(t, err)
-
 	// Create config with empty projects
 	configPath := createConfigFile(t, []string{}, t.TempDir())
 
@@ -198,4 +207,41 @@ func TestDownloadObject_E2E(t *testing.T) {
 	b, err := os.ReadFile(expectedPath)
 	assert.NilError(t, err)
 	assert.Equal(t, string(b), string(content))
+}
+
+func TestPreviewObject_E2E(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
+				Content:     []byte("content1"),
+			},
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file2.txt"},
+				Content:     []byte("content2"),
+			},
+		},
+		Host:   "127.0.0.1",
+		Port:   8089,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
+	t.Cleanup(func() {
+		tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
+
+	// Enter bucket
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") })
+	tm.Type("l")
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") })
+
+	// Move to second file and check for its preview
+	tm.Type("j")
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "content2")
+	}, teatest.WithDuration(3*time.Second))
 }

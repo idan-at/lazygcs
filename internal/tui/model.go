@@ -194,10 +194,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.objects = msg.List.Objects
 		m.prefixes = msg.List.Prefixes
 		m.cursor = 0
+
+		var cmd tea.Cmd
+		// After listing, if the first item in the list is a prefix,
+		// fetch its metadata. If it's an object, fetch its content for preview.
 		if len(m.prefixes) > 0 {
-			return m, m.fetchPrefixMetadata(0)
+			cmd = m.fetchPrefixMetadata(0)
+		} else if len(m.objects) > 0 {
+			cmd = m.fetchContent(m.currentBucket, m.objects[0].Name)
+			m.previewContent = "Loading..."
 		}
-		return m, nil
+		return m, cmd
 
 	case MetadataMsg:
 		if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {

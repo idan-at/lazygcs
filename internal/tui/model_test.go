@@ -14,8 +14,9 @@ import (
 )
 
 type mockGCSClient struct {
-	buckets []string
-	objects *gcs.ObjectList
+	buckets      []string
+	objects      *gcs.ObjectList
+	contentError error // Used to force an error for GetObjectContent
 }
 
 func (f mockGCSClient) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
@@ -44,6 +45,9 @@ func (f mockGCSClient) GetObjectMetadata(ctx context.Context, bucketName, object
 }
 
 func (f mockGCSClient) GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error) {
+	if f.contentError != nil {
+		return "", f.contentError
+	}
 	if f.objects != nil {
 		for _, o := range f.objects.Objects {
 			if o.Name == objectName {
@@ -104,6 +108,104 @@ func TestModel_ObjectPreview(t *testing.T) {
 	// Verify view shows the content
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "content of obj1"))
+}
+
+func TestModel_InitialObjectPreview(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+
+	// Process ObjectsMsg - this should trigger initial fetchContent
+	msg := tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects}
+	updatedM, cmd := m.Update(msg)
+	m = updatedM.(tui.Model)
+
+	// Verify fetchContent was triggered automatically
+	assert.Assert(t, cmd != nil)
+	assert.Assert(t, strings.Contains(m.View(), "Loading..."))
+
+	// Simulate receiving the content
+	contentMsg := cmd()
+	updatedM, _ = m.Update(contentMsg)
+	m = updatedM.(tui.Model)
+
+	// Verify view shows the content
+	assert.Assert(t, strings.Contains(m.View(), "content of obj1"))
+}
+
+func TestModel_ObjectPreview_Error(t *testing.T) {
+	client := mockGCSClient{
+		buckets:      []string{"b1"},
+		objects:      simpleObjectList([]string{"obj1"}, nil),
+		contentError: fmt.Errorf("permission denied"),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Move cursor to obj1, which will trigger a fetch
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// Simulate receiving the error message
+	msg := cmd()
+	updatedM, _ = m.Update(msg)
+	m = updatedM.(tui.Model)
+
+	// Verify view shows the error
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "Error: permission denied"))
+}
+
+func TestModel_StalePreviewContent(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Setup: In bucket, objects loaded
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// 1. Move to obj1, triggering a fetch. Capture the command.
+	_, cmdForObj1 := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	msgForObj1 := cmdForObj1()
+
+	// 2. Before the content for obj1 arrives, move to obj2.
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// 3. Now, the stale message for obj1 arrives.
+	updatedM, _ = m.Update(msgForObj1)
+	m = updatedM.(tui.Model)
+
+	// The view should NOT show content for "obj1" because we are on "obj2"
+	view := m.View()
+	if strings.Contains(view, "content of obj1") {
+		t.Fatalf("Bug: Stale preview content for obj1 was displayed while obj2 is selected.")
+	}
 }
 
 func TestModel_AsyncLoading(t *testing.T) {
