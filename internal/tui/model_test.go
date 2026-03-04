@@ -776,6 +776,36 @@ func TestModel_Truncation(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long object name")
 }
 
+func TestModel_PreviewBinaryContent(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"binary_obj"}, nil),
+	}
+	client.contentError = nil
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Simulate receiving binary content
+	binaryContent := "ELF\x01\x02\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00"
+	msg := cmd()
+	contentMsg := msg.(tui.ContentMsg)
+	contentMsg.Content = binaryContent
+	updatedM, _ = m.Update(contentMsg)
+	m = updatedM.(tui.Model)
+
+	view := m.View()
+	// UI shouldn't break by printing raw binary. It should indicate it's a binary file.
+	assert.Assert(t, strings.Contains(view, "(binary content)"), "View should indicate binary content instead of printing raw bytes")
+	assert.Assert(t, !strings.Contains(view, "ELF"), "View should not contain the raw binary data")
+}
+
 func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	var longContent strings.Builder
 	for i := 0; i < 100; i++ {

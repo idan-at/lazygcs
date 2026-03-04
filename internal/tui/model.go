@@ -398,6 +398,11 @@ func (m Model) fullPath() string {
 	return fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
 }
 
+func isBinary(s string) bool {
+	// A simple heuristic: if it contains a null byte, it's likely binary.
+	return strings.ContainsRune(s, '\x00')
+}
+
 func (m Model) previewView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects {
@@ -435,18 +440,22 @@ func (m Model) previewView(width int) string {
 				if m.previewContent != "" {
 					s.WriteString("\n---\n")
 
-					// Leave room for the metadata lines and the "..." truncation indicator
-					maxContentLines := m.maxItemsVisible() - 12
-					if maxContentLines < 1 {
-						maxContentLines = 1
-					}
-
-					lines := strings.Split(m.previewContent, "\n")
-					if len(lines) > maxContentLines {
-						s.WriteString(strings.Join(lines[:maxContentLines], "\n"))
-						s.WriteString("\n...")
+					if isBinary(m.previewContent) {
+						s.WriteString("(binary content)")
 					} else {
-						s.WriteString(m.previewContent)
+						// Leave room for the metadata lines and the "..." truncation indicator
+						maxContentLines := m.maxItemsVisible() - 12
+						if maxContentLines < 1 {
+							maxContentLines = 1
+						}
+
+						lines := strings.Split(m.previewContent, "\n")
+						if len(lines) > maxContentLines {
+							s.WriteString(strings.Join(lines[:maxContentLines], "\n"))
+							s.WriteString("\n...")
+						} else {
+							s.WriteString(m.previewContent)
+						}
 					}
 				}
 			}
