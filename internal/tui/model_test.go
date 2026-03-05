@@ -370,7 +370,7 @@ func TestModel_EnterBucket(t *testing.T) {
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "b1"))
 	assert.Assert(t, strings.Contains(view, "obj1"))
-	assert.Assert(t, strings.Contains(view, "> obj1"))
+	assert.Assert(t, strings.Contains(view, "> [ ] obj1"))
 }
 
 func TestModel_Update_ObjectCursorCycle(t *testing.T) {
@@ -387,15 +387,15 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
-	assert.Assert(t, strings.Contains(m.View(), "> obj1"))
+	assert.Assert(t, strings.Contains(m.View(), "> [ ] obj1"))
 
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = updatedM.(tui.Model)
-	assert.Assert(t, strings.Contains(m.View(), "> obj2"))
+	assert.Assert(t, strings.Contains(m.View(), "> [ ] obj2"))
 
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updatedM.(tui.Model)
-	assert.Assert(t, strings.Contains(m.View(), "> obj1"))
+	assert.Assert(t, strings.Contains(m.View(), "> [ ] obj1"))
 }
 
 func TestModel_Resize(t *testing.T) {
@@ -431,8 +431,8 @@ func TestModel_EnterPrefix(t *testing.T) {
 	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
 
-	if !strings.Contains(m.View(), "> folder1/") {
-		t.Fatalf("Expected view to contain '> folder1/', but got:\n%q", m.View())
+	if !strings.Contains(m.View(), "> [ ] folder1/") {
+		t.Fatalf("Expected view to contain '> [ ] folder1/', but got:\n%q", m.View())
 	}
 
 	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -452,8 +452,8 @@ func TestModel_EnterPrefix(t *testing.T) {
 	// Split view into columns to be more precise if possible, but let's just check the objects list part
 	// The objects list is the middle column.
 	// For now, let's just verify that RELATIVE names are present.
-	assert.Assert(t, strings.Contains(view, " file2.txt"))
-	assert.Assert(t, strings.Contains(view, " sub/"))
+	assert.Assert(t, strings.Contains(view, "[ ] file2.txt"))
+	assert.Assert(t, strings.Contains(view, "[ ] sub/"))
 }
 
 func TestModel_SelectObject(t *testing.T) {
@@ -804,6 +804,56 @@ func TestModel_PreviewBinaryContent(t *testing.T) {
 	// UI shouldn't break by printing raw binary. It should indicate it's a binary file.
 	assert.Assert(t, strings.Contains(view, "(binary content)"), "View should indicate binary content instead of printing raw bytes")
 	assert.Assert(t, !strings.Contains(view, "ELF"), "View should not contain the raw binary data")
+}
+
+func TestModel_MultiSelect(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Initially, obj1 is at cursor but not selected
+	view := m.View()
+	assert.Assert(t, !strings.Contains(view, "[x] obj1"))
+	assert.Assert(t, strings.Contains(view, "[ ] obj1"))
+
+	// Press space to select obj1
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updatedM.(tui.Model)
+
+	view = m.View()
+	assert.Assert(t, strings.Contains(view, "[x] obj1"), "obj1 should be selected")
+	assert.Assert(t, strings.Contains(view, "[ ] obj2"), "obj2 should not be selected")
+
+	// Move cursor down to obj2
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// Press space to select obj2
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updatedM.(tui.Model)
+
+	view = m.View()
+	assert.Assert(t, strings.Contains(view, "[x] obj1"), "obj1 should still be selected")
+	assert.Assert(t, strings.Contains(view, "[x] obj2"), "obj2 should be selected")
+
+	// Press space again to deselect obj2
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updatedM.(tui.Model)
+
+	view = m.View()
+	assert.Assert(t, strings.Contains(view, "[x] obj1"), "obj1 should still be selected")
+	assert.Assert(t, strings.Contains(view, "[ ] obj2"), "obj2 should be deselected")
 }
 
 func TestModel_SearchFilter(t *testing.T) {

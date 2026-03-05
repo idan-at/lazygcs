@@ -50,6 +50,7 @@ type Model struct {
 	currentPrefix string
 	objects       []gcs.ObjectMetadata
 	prefixes      []gcs.PrefixMetadata
+	selected      map[string]struct{}
 
 	loading bool
 	status  string
@@ -66,6 +67,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string) Model {
 		height:      40,
 		state:       viewBuckets,
 		loading:     true,
+		selected:    make(map[string]struct{}),
 	}
 }
 
@@ -126,6 +128,7 @@ func (m *Model) resetObjectsState() {
 	m.cursor = 0
 	m.loading = true
 	m.status = ""
+	m.selected = make(map[string]struct{})
 }
 
 func parentPrefix(p string) string {
@@ -325,9 +328,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchQuery = ""
 			m.cursor = 0
 			return m, nil
-			
-		case "j", "down":
-			m.status = ""
+
+		case " ":
+			if m.state == viewObjects {
+				currentPrefixes, currentObjects, _ := m.filteredObjects()
+				if m.cursor < len(currentPrefixes) {
+					name := currentPrefixes[m.cursor].Name
+					if _, ok := m.selected[name]; ok {
+						delete(m.selected, name)
+					} else {
+						m.selected[name] = struct{}{}
+					}
+				} else if m.cursor >= len(currentPrefixes) {
+					idx := m.cursor - len(currentPrefixes)
+					if idx < len(currentObjects) {
+						name := currentObjects[idx].Name
+						if _, ok := m.selected[name]; ok {
+							delete(m.selected, name)
+						} else {
+							m.selected[name] = struct{}{}
+						}
+					}
+				}
+			}
+			return m, nil
+
+		case "j", "down":			m.status = ""
 			
 			var itemsCount int
 			var currentPrefixes []gcs.PrefixMetadata

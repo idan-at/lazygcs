@@ -168,17 +168,36 @@ func (m Model) objectsView(width int) string {
 				}
 
 				var displayItem string
+				var originalName string
 				if i < len(currentPrefixes) {
-					displayItem = currentPrefixes[i].Name
+					originalName = currentPrefixes[i].Name
+					displayItem = originalName
 				} else {
-					displayItem = currentObjects[i-len(currentPrefixes)].Name
+					originalName = currentObjects[i-len(currentPrefixes)].Name
+					displayItem = originalName
+				}
+
+				// Check if selected
+				var isSelected bool
+				if m.selected != nil {
+					_, isSelected = m.selected[originalName]
+				}
+
+				selectionIndicator := "[ ]"
+				if isSelected {
+					selectionIndicator = "[x]"
 				}
 
 				// Display relative path
 				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
-				// Truncate to fit column (account for cursor and padding)
-				displayItem = truncate(displayItem, width-2)
-				s.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
+				// Truncate to fit column (account for cursor, selection indicator, and padding: 1+1+3+1+padding = 6)
+				displayItem = truncate(displayItem, width-7)
+				
+				if isSelected {
+					displayItem = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(displayItem)
+				}
+
+				s.WriteString(fmt.Sprintf("%s %s %s\n", cursor, selectionIndicator, displayItem))
 			}
 			if totalItems == 0 {
 				s.WriteString("(empty)")
