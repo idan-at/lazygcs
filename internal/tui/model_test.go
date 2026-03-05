@@ -742,6 +742,63 @@ func TestModel_DownloadAction(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "View should show success status")
 }
 
+func TestModel_DownloadAction_MultiSelect(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1", "obj2", "obj3"}, nil),
+	}
+	downloadDir := t.TempDir()
+	m := tui.NewModel([]string{"p1"}, client, downloadDir)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = updatedM.(tui.Model)
+
+	// Select obj1
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updatedM.(tui.Model)
+
+	// Move to obj2 and select it
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updatedM.(tui.Model)
+
+	// Press 'd' to download
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updatedM.(tui.Model)
+
+	assert.Assert(t, cmd != nil, "Cmd should not be nil")
+	
+	// Process the command. If it's a tea.Batch, executing it will return a tea.BatchMsg.
+	msg := cmd()
+	batchMsg, ok := msg.(tea.BatchMsg)
+	assert.Assert(t, ok, "Expected a tea.BatchMsg for multiple downloads")
+	assert.Equal(t, len(batchMsg), 2, "Expected 2 download commands in the batch")
+
+	// We can execute each cmd in the batch to verify they are DownloadMsgs
+	msg1 := batchMsg[0]()
+	dl1, ok1 := msg1.(tui.DownloadMsg)
+	assert.Assert(t, ok1)
+
+	msg2 := batchMsg[1]()
+	dl2, ok2 := msg2.(tui.DownloadMsg)
+	assert.Assert(t, ok2)
+
+	// We expect the paths to be obj1 and obj2 in any order
+	paths := map[string]bool{
+		filepath.Base(dl1.Path): true,
+		filepath.Base(dl2.Path): true,
+	}
+	assert.Assert(t, paths["obj1"], "obj1 should be downloaded")
+	assert.Assert(t, paths["obj2"], "obj2 should be downloaded")
+}
+
 func TestModel_Truncation(t *testing.T) {
 	longName := "this_is_a_very_long_object_name_that_should_be_truncated_to_fit_in_the_column"
 	client := mockGCSClient{
