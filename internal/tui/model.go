@@ -156,7 +156,7 @@ func isBinary(s string) bool {
 }
 
 func (m Model) filteredBuckets() []string {
-	if m.searchQuery == "" {
+	if m.searchQuery == "" || m.state != viewBuckets {
 		return m.buckets
 	}
 	var filtered []string
@@ -170,8 +170,8 @@ func (m Model) filteredBuckets() []string {
 }
 
 func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []int) {
-	if m.searchQuery == "" {
-		// When no search query, original indices are a straight mapping
+	if m.searchQuery == "" || m.state != viewObjects {
+		// When no search query or not in objects view, original indices are a straight mapping
 		indices := make([]int, len(m.prefixes))
 		for i := range m.prefixes {
 			indices[i] = i

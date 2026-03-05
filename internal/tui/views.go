@@ -195,12 +195,28 @@ func (m Model) bucketsView(width int) string {
 		s.WriteString("Loading...")
 	} else {
 		filtered := m.filteredBuckets()
-		start, end := visibleRange(m.cursor, len(filtered), m.maxItemsVisible())
+		
+		// Determine the active index for the buckets list
+		activeIdx := m.cursor
+		if m.state != viewBuckets {
+			// Find the index of the current bucket to keep it in view
+			activeIdx = 0
+			for i, b := range filtered {
+				if b == m.currentBucket {
+					activeIdx = i
+					break
+				}
+			}
+		}
+
+		start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
 		for i := start; i < end; i++ {
 			bucket := filtered[i]
 			cursor := " "
 			if m.state == viewBuckets && m.cursor == i {
 				cursor = ">"
+			} else if m.state != viewBuckets && bucket == m.currentBucket {
+				cursor = "*" // Indicate the currently selected bucket when focus is elsewhere
 			}
 			// Truncate to fit column (account for cursor and padding)
 			truncatedBucket := truncate(bucket, width-2)
