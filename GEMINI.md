@@ -43,12 +43,13 @@ Before committing any code, MUST run:
     *   Simplified configuration (TOML file).
     *   Async TUI initialization (Loading buckets).
     *   Basic bucket list navigation (`j`/`k`) with cycle support.
-    *   Implemented Download (`d`) action.
+    *   Implemented Download (`d`) action with overwrite/rename handling.
+    *   Refactored TUI View logic into smaller files (`views.go`, `types.go`).
+    *   Added File Preview pane (3rd column) with binary detection and truncation.
+    *   Added inline Search functionality (`/`).
 *   **Next Steps:**
-    1.  Refactor `View` logic into smaller components (e.g., `bucketsView`, `objectsView`).
-    2.  Add File Preview pane (3rd column).
-    3.  Implement Delete (`x`) actions.
-    4.  Add Search functionality (`/`).
+    1.  Implement multi-select (`space`).
+    2.  Implement Delete (`x`) action (with multi-select support).
 
 ## Key Files
 *   `DESIGN.md`: The architectural blueprint.
