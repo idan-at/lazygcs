@@ -806,6 +806,41 @@ func TestModel_PreviewBinaryContent(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "ELF"), "View should not contain the raw binary data")
 }
 
+func TestModel_SearchFilter(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"apple", "banana", "apricot"},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Load buckets
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"apple", "banana", "apricot"}})
+	m = updatedM.(tui.Model)
+
+	// Enter search mode
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = updatedM.(tui.Model)
+
+	// Type 'a', 'p'
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	m = updatedM.(tui.Model)
+
+	view := m.View()
+	// Should show 'apple' and 'apricot', but not 'banana'
+	assert.Assert(t, strings.Contains(view, "apple"))
+	assert.Assert(t, strings.Contains(view, "apricot"))
+	assert.Assert(t, !strings.Contains(view, "banana"))
+	assert.Assert(t, strings.Contains(view, "Search: ap"))
+
+	// Exit search mode
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updatedM.(tui.Model)
+	view = m.View()
+	assert.Assert(t, !strings.Contains(view, "Search: ap"))
+}
+
 func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	var longContent strings.Builder
 	for i := 0; i < 100; i++ {

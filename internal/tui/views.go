@@ -19,9 +19,11 @@ func (m Model) previewView(width int) string {
 	if m.state == viewObjects {
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
 
-		if m.cursor < len(m.prefixes) {
+		currentPrefixes, currentObjects, _ := m.filteredObjects()
+
+		if m.cursor < len(currentPrefixes) {
 			// Selected item is a prefix (folder)
-			prefix := m.prefixes[m.cursor]
+			prefix := currentPrefixes[m.cursor]
 			s.WriteString(fmt.Sprintf("Name: %s\n", truncate(prefix.Name, width-6)))
 			s.WriteString("Type: Folder\n")
 			if !prefix.Created.IsZero() {
@@ -33,11 +35,11 @@ func (m Model) previewView(width int) string {
 			if prefix.Owner != "" {
 				s.WriteString(fmt.Sprintf("Owner: %s\n", prefix.Owner))
 			}
-		} else if m.cursor >= len(m.prefixes) && len(m.objects) > 0 {
+		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
 			// Selected item is an object (not a prefix)
-			idx := m.cursor - len(m.prefixes)
-			if idx < len(m.objects) {
-				obj := m.objects[idx]
+			idx := m.cursor - len(currentPrefixes)
+			if idx < len(currentObjects) {
+				obj := currentObjects[idx]
 				s.WriteString(fmt.Sprintf("Name: %s\n", truncate(obj.Name, width-6)))
 				s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
 				s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
@@ -85,11 +87,20 @@ func (m Model) headerView() string {
 }
 
 func (m Model) footerView() string {
-	statusLine := ""
+	var s strings.Builder
 	if m.status != "" {
-		statusLine = "\n" + m.status
+		s.WriteString("\n" + m.status)
 	}
-	return statusLine + "\n\n(q: quit, h: back, l/enter: select, d: download)"
+
+	if m.searchMode {
+		s.WriteString(fmt.Sprintf("\nSearch: %s█\n\n(esc/enter: exit search)", m.searchQuery))
+	} else if m.searchQuery != "" {
+		s.WriteString(fmt.Sprintf("\nSearch: %s\n\n(/: search, q: quit, h: back, l/enter: select, d: download)", m.searchQuery))
+	} else {
+		s.WriteString("\n\n(/: search, q: quit, h: back, l/enter: select, d: download)")
+	}
+
+	return s.String()
 }
 
 func (m Model) maxItemsVisible() int {
@@ -145,9 +156,8 @@ func (m Model) objectsView(width int) string {
 		if m.loading {
 			s.WriteString("Loading...")
 		} else {
-			// Combine prefixes (strings) and objects (structs) for display
-			// We iterate through them separately or build a unified list of display strings
-			totalItems := len(m.prefixes) + len(m.objects)
+			currentPrefixes, currentObjects, _ := m.filteredObjects()
+			totalItems := len(currentPrefixes) + len(currentObjects)
 
 			start, end := visibleRange(m.cursor, totalItems, m.maxItemsVisible())
 
@@ -158,10 +168,10 @@ func (m Model) objectsView(width int) string {
 				}
 
 				var displayItem string
-				if i < len(m.prefixes) {
-					displayItem = m.prefixes[i].Name
+				if i < len(currentPrefixes) {
+					displayItem = currentPrefixes[i].Name
 				} else {
-					displayItem = m.objects[i-len(m.prefixes)].Name
+					displayItem = currentObjects[i-len(currentPrefixes)].Name
 				}
 
 				// Display relative path
@@ -184,9 +194,10 @@ func (m Model) bucketsView(width int) string {
 	if m.state == viewBuckets && m.loading {
 		s.WriteString("Loading...")
 	} else {
-		start, end := visibleRange(m.cursor, len(m.buckets), m.maxItemsVisible())
+		filtered := m.filteredBuckets()
+		start, end := visibleRange(m.cursor, len(filtered), m.maxItemsVisible())
 		for i := start; i < end; i++ {
-			bucket := m.buckets[i]
+			bucket := filtered[i]
 			cursor := " "
 			if m.state == viewBuckets && m.cursor == i {
 				cursor = ">"

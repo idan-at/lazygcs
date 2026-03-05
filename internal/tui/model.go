@@ -32,6 +32,10 @@ type Model struct {
 	state          viewState
 	previewContent string
 
+	// Search State
+	searchMode  bool
+	searchQuery string
+
 	// Download Confirm State
 	pendingDownloadBucket string
 	pendingDownloadObject string
@@ -90,14 +94,24 @@ func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
 }
 
 func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
-	bucket := m.currentBucket
-	prefix := m.currentPrefix
-	name := m.prefixes[idx].Name
+	// Ensure we get the correct prefix name from the filtered list, but fetchPrefixMetadata
+	// is typically called with an index into the main list. 
+	// Wait, the index passed to this function might be the filtered index. Let's fix this
+	// to take the name directly to avoid issues.
 	return func() tea.Msg {
-		meta, err := m.client.GetObjectMetadata(context.Background(), bucket, name)
-		return MetadataMsg{Bucket: bucket, Prefix: prefix, PrefixIndex: idx, Metadata: meta, Err: err}
+		return nil // Replaced by fetchPrefixMetadataByName
 	}
 }
+
+func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
+	bucket := m.currentBucket
+	prefix := m.currentPrefix
+	return func() tea.Msg {
+		meta, err := m.client.GetObjectMetadata(context.Background(), bucket, name)
+		return MetadataMsg{Bucket: bucket, Prefix: prefix, PrefixIndex: originalIdx, Metadata: meta, Err: err}
+	}
+}
+
 
 func (m Model) fetchDownload(bucketName, objectName, dest string) tea.Cmd {
 	return func() tea.Msg {
@@ -141,6 +155,50 @@ func isBinary(s string) bool {
 	return strings.ContainsRune(s, '\x00')
 }
 
+func (m Model) filteredBuckets() []string {
+	if m.searchQuery == "" {
+		return m.buckets
+	}
+	var filtered []string
+	lowerQuery := strings.ToLower(m.searchQuery)
+	for _, b := range m.buckets {
+		if strings.Contains(strings.ToLower(b), lowerQuery) {
+			filtered = append(filtered, b)
+		}
+	}
+	return filtered
+}
+
+func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []int) {
+	if m.searchQuery == "" {
+		// When no search query, original indices are a straight mapping
+		indices := make([]int, len(m.prefixes))
+		for i := range m.prefixes {
+			indices[i] = i
+		}
+		return m.prefixes, m.objects, indices
+	}
+	
+	var filteredPrefixes []gcs.PrefixMetadata
+	var filteredObjects []gcs.ObjectMetadata
+	var originalPrefixIndices []int
+	
+	lowerQuery := strings.ToLower(m.searchQuery)
+
+	for i, p := range m.prefixes {
+		if strings.Contains(strings.ToLower(p.Name), lowerQuery) {
+			filteredPrefixes = append(filteredPrefixes, p)
+			originalPrefixIndices = append(originalPrefixIndices, i)
+		}
+	}
+	for _, o := range m.objects {
+		if strings.Contains(strings.ToLower(o.Name), lowerQuery) {
+			filteredObjects = append(filteredObjects, o)
+		}
+	}
+	return filteredPrefixes, filteredObjects, originalPrefixIndices
+}
+
 // Update processes terminal messages (key presses, window resizes) and async responses.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -167,10 +225,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 
 		var cmd tea.Cmd
-		// After listing, if the first item in the list is a prefix,
-		// fetch its metadata. If it's an object, fetch its content for preview.
 		if len(m.prefixes) > 0 {
-			cmd = m.fetchPrefixMetadata(0)
+			cmd = m.fetchPrefixMetadataByName(m.prefixes[0].Name, 0)
 		} else if len(m.objects) > 0 {
 			cmd = m.fetchContent(m.currentBucket, m.objects[0].Name)
 			m.previewContent = "Loading..."
@@ -181,7 +237,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
 			return m, nil
 		}
-		if msg.Err == nil && msg.PrefixIndex < len(m.prefixes) {
+		if msg.Err == nil && msg.PrefixIndex >= 0 && msg.PrefixIndex < len(m.prefixes) {
 			m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
 			m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated
 			m.prefixes[msg.PrefixIndex].Owner = msg.Metadata.Owner
@@ -189,14 +245,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ContentMsg:
-		// Make sure the content is for the currently selected object
-		if m.state == viewObjects && m.cursor >= len(m.prefixes) {
-			idx := m.cursor - len(m.prefixes)
-			if idx < len(m.objects) && m.objects[idx].Name == msg.ObjectName {
-				if msg.Err != nil {
-					m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
-				} else {
-					m.previewContent = msg.Content
+		// Make sure the content is for the currently selected object (respecting filters)
+		if m.state == viewObjects {
+			currentPrefixes, currentObjects, _ := m.filteredObjects()
+			if m.cursor >= len(currentPrefixes) {
+				idx := m.cursor - len(currentPrefixes)
+				if idx < len(currentObjects) && currentObjects[idx].Name == msg.ObjectName {
+					if msg.Err != nil {
+						m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
+					} else {
+						m.previewContent = msg.Content
+					}
 				}
 			}
 		}
@@ -216,6 +275,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.searchMode {
+			switch msg.Type {
+			case tea.KeyEsc:
+				m.searchMode = false
+				m.searchQuery = ""
+				m.cursor = 0
+				return m, nil
+			case tea.KeyEnter:
+				m.searchMode = false
+				return m, nil
+			case tea.KeyBackspace, tea.KeyDelete:
+				if len(m.searchQuery) > 0 {
+					runes := []rune(m.searchQuery)
+					m.searchQuery = string(runes[:len(runes)-1])
+					m.cursor = 0
+				}
+				return m, nil
+			case tea.KeyRunes, tea.KeySpace:
+				m.searchQuery += msg.String()
+				m.cursor = 0
+				return m, nil
+			}
+			return m, nil
+		}
+
 		if m.state == viewDownloadConfirm {
 			switch msg.String() {
 			case "o":
@@ -236,23 +320,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "/":
+			m.searchMode = true
+			m.searchQuery = ""
+			m.cursor = 0
+			return m, nil
+			
 		case "j", "down":
 			m.status = ""
-			itemsCount := len(m.buckets)
-			if m.state == viewObjects {
-				itemsCount = len(m.objects) + len(m.prefixes)
+			
+			var itemsCount int
+			var currentPrefixes []gcs.PrefixMetadata
+			var currentObjects []gcs.ObjectMetadata
+			var origIndices []int
+
+			if m.state == viewBuckets {
+				itemsCount = len(m.filteredBuckets())
+			} else if m.state == viewObjects {
+				currentPrefixes, currentObjects, origIndices = m.filteredObjects()
+				itemsCount = len(currentObjects) + len(currentPrefixes)
 			}
+			
 			if itemsCount > 0 {
 				oldCursor := m.cursor
 				m.cursor = (m.cursor + 1) % itemsCount
 				if oldCursor != m.cursor {
 					m.previewContent = "" // Reset preview on move
 					if m.state == viewObjects {
-						if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
-							return m, m.fetchPrefixMetadata(m.cursor)
-						} else if m.cursor >= len(m.prefixes) {
-							idx := m.cursor - len(m.prefixes)
-							obj := m.objects[idx]
+						if m.cursor < len(currentPrefixes) {
+							origIdx := origIndices[m.cursor]
+							if m.prefixes[origIdx].Created.IsZero() {
+								return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
+							}
+						} else if m.cursor >= len(currentPrefixes) {
+							idx := m.cursor - len(currentPrefixes)
+							obj := currentObjects[idx]
 							m.previewContent = "Loading..."
 							return m, m.fetchContent(m.currentBucket, obj.Name)
 						}
@@ -261,21 +363,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "k", "up":
 			m.status = ""
-			itemsCount := len(m.buckets)
-			if m.state == viewObjects {
-				itemsCount = len(m.objects) + len(m.prefixes)
+			
+			var itemsCount int
+			var currentPrefixes []gcs.PrefixMetadata
+			var currentObjects []gcs.ObjectMetadata
+			var origIndices []int
+
+			if m.state == viewBuckets {
+				itemsCount = len(m.filteredBuckets())
+			} else if m.state == viewObjects {
+				currentPrefixes, currentObjects, origIndices = m.filteredObjects()
+				itemsCount = len(currentObjects) + len(currentPrefixes)
 			}
+
 			if itemsCount > 0 {
 				oldCursor := m.cursor
 				m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
 				if oldCursor != m.cursor {
 					m.previewContent = "" // Reset preview on move
 					if m.state == viewObjects {
-						if m.cursor < len(m.prefixes) && m.prefixes[m.cursor].Created.IsZero() {
-							return m, m.fetchPrefixMetadata(m.cursor)
-						} else if m.cursor >= len(m.prefixes) {
-							idx := m.cursor - len(m.prefixes)
-							obj := m.objects[idx]
+						if m.cursor < len(currentPrefixes) {
+							origIdx := origIndices[m.cursor]
+							if m.prefixes[origIdx].Created.IsZero() {
+								return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
+							}
+						} else if m.cursor >= len(currentPrefixes) {
+							idx := m.cursor - len(currentPrefixes)
+							obj := currentObjects[idx]
 							m.previewContent = "Loading..."
 							return m, m.fetchContent(m.currentBucket, obj.Name)
 						}
@@ -283,17 +397,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "l", "right", "enter":
-			if m.state == viewBuckets && len(m.buckets) > 0 {
-				m.currentBucket = m.buckets[m.cursor]
-				m.currentPrefix = "" // Reset prefix when entering bucket
-				m.state = viewObjects
-				m.resetObjectsState()
-				return m, m.fetchObjects()
+			if m.state == viewBuckets {
+				filtered := m.filteredBuckets()
+				if len(filtered) > 0 {
+					m.currentBucket = filtered[m.cursor]
+					m.currentPrefix = "" // Reset prefix when entering bucket
+					m.state = viewObjects
+					m.searchMode = false
+					m.searchQuery = ""
+					m.resetObjectsState()
+					return m, m.fetchObjects()
+				}
 			} else if m.state == viewObjects {
 				m.previewContent = ""
+				currentPrefixes, _, _ := m.filteredObjects()
 				// Check if selected item is a prefix
-				if m.cursor < len(m.prefixes) {
-					m.currentPrefix = m.prefixes[m.cursor].Name
+				if m.cursor < len(currentPrefixes) {
+					m.currentPrefix = currentPrefixes[m.cursor].Name
+					m.searchMode = false
+					m.searchQuery = ""
 					m.resetObjectsState()
 					return m, m.fetchObjects()
 				}
@@ -301,6 +423,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "h", "left":
 			if m.state == viewObjects {
 				m.previewContent = ""
+				m.searchMode = false
+				m.searchQuery = ""
 				if m.currentPrefix == "" {
 					m.state = viewBuckets
 					m.currentBucket = ""
@@ -313,24 +437,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.fetchObjects()
 			}
 		case "d":
-			if m.state == viewObjects && m.cursor >= len(m.prefixes) {
-				idx := m.cursor - len(m.prefixes)
-				if idx < len(m.objects) {
-					obj := m.objects[idx]
-					dest := filepath.Join(m.downloadDir, filepath.Base(obj.Name))
-					
-					// Check if file already exists
-					if _, err := os.Stat(dest); err == nil {
-						m.state = viewDownloadConfirm
-						m.pendingDownloadBucket = m.currentBucket
-						m.pendingDownloadObject = obj.Name
-						m.pendingDownloadDest = dest
-						m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(dest))
-						return m, nil
-					}
+			if m.state == viewObjects {
+				currentPrefixes, currentObjects, _ := m.filteredObjects()
+				if m.cursor >= len(currentPrefixes) {
+					idx := m.cursor - len(currentPrefixes)
+					if idx < len(currentObjects) {
+						obj := currentObjects[idx]
+						dest := filepath.Join(m.downloadDir, filepath.Base(obj.Name))
+						
+						// Check if file already exists
+						if _, err := os.Stat(dest); err == nil {
+							m.state = viewDownloadConfirm
+							m.pendingDownloadBucket = m.currentBucket
+							m.pendingDownloadObject = obj.Name
+							m.pendingDownloadDest = dest
+							m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(dest))
+							return m, nil
+						}
 
-					m.status = "Downloading..."
-					return m, m.fetchDownload(m.currentBucket, obj.Name, dest)
+						m.status = "Downloading..."
+						return m, m.fetchDownload(m.currentBucket, obj.Name, dest)
+					}
 				}
 			}
 		case "q", "ctrl+c":
