@@ -913,6 +913,40 @@ func TestModel_MultiSelect(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "[ ] obj2"), "obj2 should be deselected")
 }
 
+func TestModel_CursorPersistsOnBack(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1", "b2", "b3"},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// 1. Initial state: Buckets loaded, cursor at 0 (b1)
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1", "b2", "b3"}})
+	m = updatedM.(tui.Model)
+
+	// 2. Move cursor down to b2 (index 1)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "> b2"))
+
+	// 3. Enter bucket b2
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "Objects in b2"))
+	
+	// 4. Go back to bucket list
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m = updatedM.(tui.Model)
+
+	// Assertions:
+	// - Should be back in buckets view (has "Buckets" header and no "Objects in")
+	// - Cursor should still be on b2
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "Buckets"), "Should show Buckets header")
+	assert.Assert(t, !strings.Contains(view, "Objects in"), "Should NOT show Objects header")
+	assert.Assert(t, strings.Contains(view, "> b2"), "Cursor should be on b2, view:\n%s", view)
+}
+
 func TestModel_SearchFilter(t *testing.T) {
 	client := mockGCSClient{
 		buckets: []string{"apple", "banana", "apricot"},

@@ -42,8 +42,9 @@ type Model struct {
 	pendingDownloadDest   string
 
 	// Buckets View
-	buckets []string
-	cursor  int // used for buckets or objects depending on state
+	buckets      []string
+	cursor       int // used for buckets or objects depending on state
+	bucketCursor int // stores the cursor position in the bucket list
 
 	// Objects View
 	currentBucket string
@@ -426,6 +427,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == viewBuckets {
 				filtered := m.filteredBuckets()
 				if len(filtered) > 0 {
+					m.bucketCursor = m.cursor
 					m.currentBucket = filtered[m.cursor]
 					m.currentPrefix = "" // Reset prefix when entering bucket
 					m.state = viewObjects
@@ -454,7 +456,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.currentPrefix == "" {
 					m.state = viewBuckets
 					m.currentBucket = ""
-					m.cursor = 0 // for now, reset cursor when going back
+					m.cursor = m.bucketCursor
+					m.loading = false
 					return m, nil
 				}
 				// Go up one level
