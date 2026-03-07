@@ -651,7 +651,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, keys.Left):
-			if m.state == viewObjects {
+			if m.state == viewBuckets {
+				filtered := m.filteredBuckets()
+				if len(filtered) > 0 {
+					item := filtered[m.cursor]
+					if item.IsProject {
+						// Ensure project is collapsed
+						m.collapsedProjects[item.ProjectID] = struct{}{}
+					} else {
+						// Optional: If on a bucket, 'h' could jump back up to the project header
+						// Let's implement that since it's a standard tree navigation behavior
+						for i := m.cursor - 1; i >= 0; i-- {
+							if filtered[i].IsProject && filtered[i].ProjectID == item.ProjectID {
+								m.cursor = i
+								break
+							}
+						}
+					}
+					return m, nil
+				}
+			} else if m.state == viewObjects {
 				m.previewContent = ""
 				m.searchMode = false
 				m.searchQuery = ""

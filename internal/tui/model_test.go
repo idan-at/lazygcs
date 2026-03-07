@@ -1285,6 +1285,34 @@ func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "▶  folder2/") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mfolder2/"), "Cursor should be specifically on folder2/")
 }
 
+func TestModel_CollapseProjectOnLeft(t *testing.T) {
+	client := mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Load buckets
+	updatedM, _ := m.Update(tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
+	m = updatedM.(tui.Model)
+
+	// Ensure p1 is expanded initially (it is by default)
+	assert.Assert(t, strings.Contains(m.View(), " b1"))
+	assert.Assert(t, strings.Contains(m.View(), "▼ p1"))
+
+	// Ensure cursor is on p1 (index 0)
+	// Press 'h' (Left) to collapse it
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m = updatedM.(tui.Model)
+
+	// Assertions:
+	// - The project should be collapsed (▶ p1)
+	// - The bucket (b1) should not be visible
+	view := m.View()
+	assert.Assert(t, !strings.Contains(view, " b1"), "Bucket b1 should be hidden")
+	assert.Assert(t, strings.Contains(view, "▶ p1") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mp1") || strings.Contains(view, "▶  \x1b[1m\x1b[38;5;69mp1"), "Project p1 should be collapsed")
+}
+
 func TestModel_SearchFilter(t *testing.T) {
 	client := mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},
