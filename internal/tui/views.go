@@ -451,7 +451,7 @@ func (m Model) helpView() string {
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("229")).
-		Render("HELP (WHICH-KEY)")
+		Render("HELP")
 
 	content := lipgloss.JoinVertical(lipgloss.Left, titleStyle, helpText)
 	return helpStyle.Render(content)

@@ -181,7 +181,7 @@ func TestModel_HelpMenu(t *testing.T) {
 
 	// Assert help menu is not shown initially
 	view := m.View()
-	assert.Assert(t, !strings.Contains(view, "HELP (WHICH-KEY)"))
+	assert.Assert(t, !strings.Contains(view, "HELP"))
 
 	// Press '?' to show help
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
@@ -190,7 +190,8 @@ func TestModel_HelpMenu(t *testing.T) {
 	view = m.View()
 	// In 'Which Key' style, we should see both the main content AND the help at the bottom
 	assert.Assert(t, strings.Contains(view, "Buckets"), "Buckets column should still be visible")
-	assert.Assert(t, strings.Contains(view, "HELP (WHICH-KEY)"), "View should contain 'HELP (WHICH-KEY)' header")
+	assert.Assert(t, strings.Contains(view, "HELP"), "View should contain 'HELP' header")
+	assert.Assert(t, !strings.Contains(view, "WHICH-KEY"), "View should NOT contain 'WHICH-KEY' anymore")
 	assert.Assert(t, strings.Contains(view, "toggle help"), "View should list the help keybind")
 
 	// Press '?' again to hide help
@@ -198,7 +199,7 @@ func TestModel_HelpMenu(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	view = m.View()
-	assert.Assert(t, !strings.Contains(view, "HELP (WHICH-KEY)"), "View should no longer contain 'HELP (WHICH-KEY)'")
+	assert.Assert(t, !strings.Contains(view, "HELP"), "View should no longer contain 'HELP'")
 }
 
 func TestModel_InitialObjectPreview(t *testing.T) {
