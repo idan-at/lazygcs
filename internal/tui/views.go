@@ -387,16 +387,20 @@ func (m Model) View() string {
 	}
 
 	// Styles
+	columnHeight := m.maxItemsVisible() + 2 // Title + blank line + list items
+
 	activeStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("69")). // Google Blue-ish
-		Padding(0, 1)
+		Padding(0, 1).
+		Height(columnHeight)
 
 	inactiveStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")). // Dimmed gray
 		Foreground(lipgloss.Color("244")).       // Dimmed text
-		Padding(0, 1)
+		Padding(0, 1).
+		Height(columnHeight)
 
 	// Calculate column widths
 	// 30% | 35% | 35%
