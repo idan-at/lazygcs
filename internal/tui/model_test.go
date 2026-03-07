@@ -774,6 +774,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, cmd != nil, "Cmd should not be nil")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading 1/2"), "View should show batch downloading progress")
 	
 	// With the queue system, the first command is a single download fetch
 	msg := cmd()
@@ -785,10 +786,16 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, cmd2 != nil, "Expected a second download command to be queued")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading 2/2"), "View should show batch downloading progress for the second item")
 
 	msg2 := cmd2()
 	dl2, ok2 := msg2.(tui.DownloadMsg)
 	assert.Assert(t, ok2, "Expected a tui.DownloadMsg for the second item")
+
+	// Update model with the final download result
+	updatedM, _ = m.Update(dl2)
+	m = updatedM.(tui.Model)
+	assert.Assert(t, strings.Contains(m.View(), "Downloaded 2 files"), "View should show final batch success message")
 
 	// We expect the paths to be obj1 and obj2 in any order
 	paths := map[string]bool{

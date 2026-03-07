@@ -47,6 +47,8 @@ type Model struct {
 	pendingDownloadObject string
 	pendingDownloadDest   string
 	downloadQueue         []downloadTask
+	downloadTotal         int
+	downloadFinished      int
 
 	// Buckets View
 	buckets      []string
@@ -228,7 +230,11 @@ func (m *Model) processDownloadQueue() tea.Cmd {
 		return nil
 	}
 
-	m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
+	if m.downloadTotal > 1 {
+		m.status = fmt.Sprintf("Downloading %d/%d: %s...", m.downloadFinished+1, m.downloadTotal, filepath.Base(task.dest))
+	} else {
+		m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
+	}
 	return m.fetchDownload(task.bucket, task.object, task.dest)
 }
 
@@ -298,7 +304,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf("Download failed: %v", msg.Err))
 		} else {
-			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded to %s", msg.Path))
+			m.downloadFinished++
+			if len(m.downloadQueue) == 0 && m.downloadTotal > 1 {
+				m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded %d files", m.downloadTotal))
+			} else if len(m.downloadQueue) == 0 {
+				m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded to %s", msg.Path))
+			}
 		}
 		
 		if len(m.downloadQueue) > 0 {
@@ -523,6 +534,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				if len(toDownload) > 0 {
+					m.downloadTotal = len(toDownload)
+					m.downloadFinished = 0
+
 					for _, objName := range toDownload {
 						dest := filepath.Join(m.downloadDir, filepath.Base(objName))
 						m.downloadQueue = append(m.downloadQueue, downloadTask{
