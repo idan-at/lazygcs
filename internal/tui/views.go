@@ -302,7 +302,7 @@ func (m Model) objectsView(width int) string {
 					truncateLen -= 2 // Icon + space
 				}
 				truncatedItem := truncate(displayItem, truncateLen)
-				content := fmt.Sprintf("%s %s %s%s", cursorIndicator, selectionIndicator, icon, textStyle.Render(truncatedItem))
+				content := fmt.Sprintf("%s%s %s%s", cursorIndicator, selectionIndicator, icon, textStyle.Render(truncatedItem))
 
 				s.WriteString(content + "\n")
 			}
@@ -369,7 +369,7 @@ func (m Model) bucketsView(width int) string {
 				truncateLen -= 2
 			}
 			truncatedBucket := truncate(bucket, truncateLen)
-			content := fmt.Sprintf("%s %s %s%s", cursorIndicator, indicator, icon, textStyle.Render(truncatedBucket))
+			content := fmt.Sprintf("%s%s %s%s", cursorIndicator, indicator, icon, textStyle.Render(truncatedBucket))
 
 			s.WriteString(content + "\n")
 		}
