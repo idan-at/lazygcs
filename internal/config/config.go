@@ -17,6 +17,8 @@ type Config struct {
 	DownloadDir string
 	// FuzzySearch enables fuzzy matching for filtering lists.
 	FuzzySearch bool
+	// Icons enables rendering of Nerd Font icons next to items.
+	Icons bool
 }
 
 // tomlConfig represents the structure of the config.toml file.
@@ -24,6 +26,7 @@ type tomlConfig struct {
 	Projects    []string `toml:"projects"`
 	DownloadDir string   `toml:"download_dir"`
 	FuzzySearch bool     `toml:"fuzzy_search"`
+	Icons       bool     `toml:"icons"`
 }
 
 func defaultDownloadDir() string {
@@ -68,6 +71,7 @@ func Load(configPath string) (*Config, error) {
 		cfg.DownloadDir = tc.DownloadDir
 	}
 	cfg.FuzzySearch = tc.FuzzySearch
+	cfg.Icons = tc.Icons
 
 	return cfg, nil
 }

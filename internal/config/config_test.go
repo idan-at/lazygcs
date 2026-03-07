@@ -82,3 +82,23 @@ fuzzy_search = true
 
 	assert.Equal(t, cfg.FuzzySearch, true)
 }
+
+func TestLoad_DefaultIcons(t *testing.T) {
+	configFile := createConfigFile(t, `projects = ["p1"]`)
+	cfg, err := config.Load(configFile)
+	assert.NilError(t, err)
+
+	assert.Equal(t, cfg.Icons, false)
+}
+
+func TestLoad_OverrideIcons(t *testing.T) {
+	configFile := createConfigFile(t, `
+projects = ["p1"]
+icons = true
+`)
+
+	cfg, err := config.Load(configFile)
+	assert.NilError(t, err)
+
+	assert.Equal(t, cfg.Icons, true)
+}

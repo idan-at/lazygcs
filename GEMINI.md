@@ -71,7 +71,7 @@ To transition the UI from a functional text layout to a delightful, modern termi
     *   Replace the raw text footer with a structured bottom ribbon (similar to `vim` or `k9s`).
     *   Create a left-aligned context/status pill (e.g., `[ NORMAL ]`, `[ SEARCH ]`, `[ DOWNLOADING ]`) with solid background colors based on state.
     *   Integrate `github.com/charmbracelet/bubbles/help` to render the right-aligned keybind hints dynamically and cleanly.
-*   **Task 5: Iconography & Loading States (Optional/Configurable)**
+*   [x] **Task 5: Iconography & Loading States (Optional/Configurable)**
     *   Add an `icons = true/false` flag to `config.toml`.
     *   Implement a helper to map file extensions/types to Nerd Font icons (e.g., `🪣` Buckets, `` Folders, `` Text, `` Images).
     *   Replace the static "Loading..." text with a dynamic spinner using `github.com/charmbracelet/bubbles/spinner`.

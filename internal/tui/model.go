@@ -46,6 +46,9 @@ type Model struct {
 	searchQuery string
 	fuzzySearch bool
 
+	// Settings
+	showIcons bool
+
 	// Download Confirm State
 	pendingDownloadBucket string
 	pendingDownloadObject string
@@ -73,12 +76,13 @@ type Model struct {
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
-func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool) Model {
+func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showIcons bool) Model {
 	return Model{
 		projectIDs:  projectIDs,
 		client:      client,
 		downloadDir: downloadDir,
 		fuzzySearch: fuzzySearch,
+		showIcons:   showIcons,
 		width:       120,
 		height:      40,
 		state:       viewBuckets,

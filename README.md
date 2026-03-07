@@ -51,6 +51,11 @@ download_dir = "/Users/me/Desktop/gcs_downloads"
 # Optional: Enable fuzzy searching when using the '/' filter.
 # Defaults to false (exact substring match).
 fuzzy_search = true
+
+# Optional: Display Nerd Font icons next to buckets, folders, and files.
+# Requires a Nerd Font to be installed and active in your terminal.
+# Defaults to false.
+icons = true
 ```
 
 ### Authentication

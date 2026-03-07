@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -194,6 +195,49 @@ func humanizeSize(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
+func getIcon(name string, isFolder bool, isBucket bool) string {
+	if isBucket {
+		return "🪣 " // Bucket icon
+	}
+	if isFolder {
+		return " " // Folder icon
+	}
+
+	ext := strings.ToLower(filepath.Ext(name))
+	switch ext {
+	case ".go":
+		return "󰟓 "
+	case ".md":
+		return " "
+	case ".json":
+		return " "
+	case ".txt":
+		return " "
+	case ".csv":
+		return "󰈙 "
+	case ".yaml", ".yml", ".toml":
+		return " "
+	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
+		return " "
+	case ".pdf":
+		return " "
+	case ".zip", ".tar", ".gz", ".tgz":
+		return " "
+	case ".sh", ".bash", ".zsh":
+		return " "
+	case ".py":
+		return " "
+	case ".js", ".ts", ".jsx", ".tsx":
+		return " "
+	case ".html", ".htm":
+		return " "
+	case ".css":
+		return " "
+	default:
+		return " " // Default file icon
+	}
+}
+
 func (m Model) objectsView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
@@ -209,10 +253,13 @@ func (m Model) objectsView(width int) string {
 
 			for i := start; i < end; i++ {
 				var originalName string
+				var isFolder bool
 				if i < len(currentPrefixes) {
 					originalName = currentPrefixes[i].Name
+					isFolder = true
 				} else {
 					originalName = currentObjects[i-len(currentPrefixes)].Name
+					isFolder = false
 				}
 
 				// Check if selected
@@ -230,6 +277,11 @@ func (m Model) objectsView(width int) string {
 				// Display relative path
 				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
 
+				icon := ""
+				if m.showIcons {
+					icon = getIcon(displayItem, isFolder, false)
+				}
+
 				// Styles
 				rowStyle := lipgloss.NewStyle().Width(width)
 				if m.cursor == i {
@@ -244,9 +296,13 @@ func (m Model) objectsView(width int) string {
 					textStyle = textStyle.Foreground(lipgloss.Color("250"))
 				}
 
-				// Truncate to fit column (account for selection indicator and padding)
-				truncatedItem := truncate(displayItem, width-4)
-				content := fmt.Sprintf("%s %s", selectionIndicator, textStyle.Render(truncatedItem))
+				// Truncate to fit column (account for selection indicator, optional icon, and padding)
+				truncateLen := width - 4
+				if m.showIcons {
+					truncateLen -= 2 // Icon + space
+				}
+				truncatedItem := truncate(displayItem, truncateLen)
+				content := fmt.Sprintf("%s %s%s", selectionIndicator, icon, textStyle.Render(truncatedItem))
 
 				s.WriteString(rowStyle.Render(content) + "\n")
 			}
@@ -293,9 +349,18 @@ func (m Model) bucketsView(width int) string {
 				indicator = "*"
 			}
 
+			icon := ""
+			if m.showIcons {
+				icon = getIcon(bucket, false, true)
+			}
+
 			// Truncate to fit column
-			truncatedBucket := truncate(bucket, width-4)
-			content := fmt.Sprintf("%s %s", indicator, truncatedBucket)
+			truncateLen := width - 4
+			if m.showIcons {
+				truncateLen -= 2
+			}
+			truncatedBucket := truncate(bucket, truncateLen)
+			content := fmt.Sprintf("%s %s%s", indicator, icon, truncatedBucket)
 
 			s.WriteString(rowStyle.Render(content) + "\n")
 		}
