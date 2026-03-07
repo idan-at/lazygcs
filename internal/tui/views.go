@@ -21,43 +21,60 @@ func (m Model) previewView(width int) string {
 
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244")) // Dimmed text
+		valStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")) // Bright white
+
 		if m.cursor < len(currentPrefixes) {
 			// Selected item is a prefix (folder)
 			prefix := currentPrefixes[m.cursor]
-			s.WriteString(fmt.Sprintf("Name: %s\n", truncate(prefix.Name, width-6)))
-			s.WriteString("Type: Folder\n")
+			
+			s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-6))))
+			s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder")))
+			
 			if !prefix.Created.IsZero() {
-				s.WriteString(fmt.Sprintf("Created: %s\n", prefix.Created.Format("2006-01-02 15:04:05")))
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Created:"), valStyle.Render(prefix.Created.Format("2006-01-02 15:04:05"))))
 			}
 			if !prefix.Updated.IsZero() {
-				s.WriteString(fmt.Sprintf("Updated: %s\n", prefix.Updated.Format("2006-01-02 15:04:05")))
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(prefix.Updated.Format("2006-01-02 15:04:05"))))
 			}
 			if prefix.Owner != "" {
-				s.WriteString(fmt.Sprintf("Owner: %s\n", prefix.Owner))
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(prefix.Owner)))
 			}
 		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
 			// Selected item is an object (not a prefix)
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				s.WriteString(fmt.Sprintf("Name: %s\n", truncate(obj.Name, width-6)))
-				s.WriteString(fmt.Sprintf("Size: %d bytes\n", obj.Size))
-				s.WriteString(fmt.Sprintf("Type: %s\n", obj.ContentType))
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-6))))
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size))))
+				
+				contentType := obj.ContentType
+				if contentType == "" {
+					contentType = "unknown"
+				}
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Type:"), valStyle.Render(contentType)))
+				
 				if !obj.Created.IsZero() {
-					s.WriteString(fmt.Sprintf("Created: %s\n", obj.Created.Format("2006-01-02 15:04:05")))
+					s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05"))))
 				}
-				s.WriteString(fmt.Sprintf("Updated: %s\n", obj.Updated.Format("2006-01-02 15:04:05")))
+				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05"))))
+				
 				if obj.Owner != "" {
-					s.WriteString(fmt.Sprintf("Owner: %s\n", obj.Owner))
+					s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(obj.Owner)))
 				}
+				
 				if m.previewContent != "" {
-					s.WriteString("\n---\n")
+					separator := lipgloss.NewStyle().
+						Foreground(lipgloss.Color("240")).
+						Render(strings.Repeat("─", width))
+					
+					s.WriteString("\n" + separator + "\n")
 
 					if isBinary(m.previewContent) {
-						s.WriteString("(binary content)")
+						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
 					} else {
 						// Leave room for the metadata lines and the "..." truncation indicator
-						maxContentLines := m.maxItemsVisible() - 12
+						maxContentLines := m.maxItemsVisible() - 14 // adjusted for the new border
 						if maxContentLines < 1 {
 							maxContentLines = 1
 						}
@@ -65,7 +82,7 @@ func (m Model) previewView(width int) string {
 						lines := strings.Split(m.previewContent, "\n")
 						if len(lines) > maxContentLines {
 							s.WriteString(strings.Join(lines[:maxContentLines], "\n"))
-							s.WriteString("\n...")
+							s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("..."))
 						} else {
 							s.WriteString(m.previewContent)
 						}
@@ -146,6 +163,19 @@ func truncate(s string, maxLen int) string {
 		return string(r[:maxLen])
 	}
 	return s
+}
+
+func humanizeSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func (m Model) objectsView(width int) string {

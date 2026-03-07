@@ -62,7 +62,7 @@ To transition the UI from a functional text layout to a delightful, modern termi
     *   Replace it with a full-row background highlight (inverted color or distinct background) using `lipgloss` to feel like a native application.
     *   Remove the `[x]` and `[ ]` selection brackets.
     *   Replace them by changing the text color of selected items to a distinct, bright color (e.g., Gold/Pink) and optionally prefixing them with a clean `•` or `✓` symbol.
-*   [ ] **Task 3: Preview Pane Formatting**
+*   [x] **Task 3: Preview Pane Formatting**
     *   Style the metadata keys (`Name:`, `Size:`, `Type:`) with a dimmed color to establish visual hierarchy.
     *   Style the metadata values with a bold or bright color.
     *   Implement a human-readable size formatter (e.g., convert `1048576 bytes` to `1.0 MB`).
