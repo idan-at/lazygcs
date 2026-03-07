@@ -53,16 +53,16 @@ Before committing any code, MUST run:
 ## UI Polish Roadmap
 To transition the UI from a functional text layout to a delightful, modern terminal application, we will execute the following tasks sequentially.
 
-*   **Task 1: Focus & Active State (Borders & Dimming)**
+*   [x] **Task 1: Focus & Active State (Borders & Dimming)**
     *   Add distinct vertical borders to separate the three columns.
     *   Implement "active state" highlighting: The currently active column (Buckets or Objects) should have a bright, primary-colored border.
     *   Implement "inactive state" dimming: Inactive columns should have a muted gray border and their text color should be slightly dimmed to draw the user's eye to the active pane.
-*   **Task 2: Elevate Cursor & Selection**
+*   [x] **Task 2: Elevate Cursor & Selection**
     *   Remove the utilitarian `>` cursor character.
     *   Replace it with a full-row background highlight (inverted color or distinct background) using `lipgloss` to feel like a native application.
     *   Remove the `[x]` and `[ ]` selection brackets.
     *   Replace them by changing the text color of selected items to a distinct, bright color (e.g., Gold/Pink) and optionally prefixing them with a clean `•` or `✓` symbol.
-*   **Task 3: Preview Pane Formatting**
+*   [ ] **Task 3: Preview Pane Formatting**
     *   Style the metadata keys (`Name:`, `Size:`, `Type:`) with a dimmed color to establish visual hierarchy.
     *   Style the metadata values with a bold or bright color.
     *   Implement a human-readable size formatter (e.g., convert `1048576 bytes` to `1.0 MB`).
