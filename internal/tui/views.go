@@ -139,6 +139,9 @@ func (m Model) footerView() string {
 
 func (m Model) maxItemsVisible() int {
 	v := m.height - 10
+	if m.showHelp {
+		v -= 6 // Make columns shorter when help is shown at the bottom
+	}
 	if v < 1 {
 		v = 1
 	}
@@ -373,17 +376,14 @@ func (m Model) bucketsView(width int) string {
 
 			s.WriteString(content + "\n")
 		}
-		}
-		return s.String()}
+	}
+	return s.String()
+}
 
 // View renders the current state of the application as a string.
 func (m Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
-	}
-
-	if m.showHelp {
-		return m.helpView()
 	}
 
 	// Styles
@@ -423,30 +423,32 @@ func (m Model) View() string {
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
-	return m.headerView() + "\n\n" + mainContent + m.footerView()
+	view := m.headerView() + "\n\n" + mainContent
+
+	if m.showHelp {
+		view += "\n" + m.helpView()
+	} else {
+		view += m.footerView()
+	}
+
+	return view
 }
 
 func (m Model) helpView() string {
 	m.help.ShowAll = true
 	helpText := m.help.View(keys)
 
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+	helpStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder(), true, false, false, false).
 		BorderForeground(lipgloss.Color("69")).
-		Padding(1, 2).
-		Align(lipgloss.Left)
+		Padding(1, 1).
+		Width(m.width)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("229")).
-		MarginBottom(1).
-		Render("Help Menu")
+		Render("HELP (WHICH-KEY)")
 
 	content := lipgloss.JoinVertical(lipgloss.Left, titleStyle, helpText)
-
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Align(lipgloss.Center, lipgloss.Center).
-		Render(boxStyle.Render(content))
+	return helpStyle.Render(content)
 }

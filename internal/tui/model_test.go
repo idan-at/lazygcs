@@ -173,19 +173,24 @@ func TestModel_ModernSelectionUI(t *testing.T) {
 }
 
 func TestModel_HelpMenu(t *testing.T) {
-	m := tui.NewModel([]string{"p1"}, mockGCSClient{}, "/tmp", false, false)
+	client := mockGCSClient{buckets: []string{"b1"}}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
 
 	// Assert help menu is not shown initially
 	view := m.View()
-	assert.Assert(t, !strings.Contains(view, "Help Menu"))
+	assert.Assert(t, !strings.Contains(view, "HELP (WHICH-KEY)"))
 
 	// Press '?' to show help
-	updatedM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
 	m = updatedM.(tui.Model)
 
 	view = m.View()
-	assert.Assert(t, strings.Contains(view, "Help Menu"), "View should contain 'Help Menu'")
+	// In 'Which Key' style, we should see both the main content AND the help at the bottom
+	assert.Assert(t, strings.Contains(view, "Buckets"), "Buckets column should still be visible")
+	assert.Assert(t, strings.Contains(view, "HELP (WHICH-KEY)"), "View should contain 'HELP (WHICH-KEY)' header")
 	assert.Assert(t, strings.Contains(view, "toggle help"), "View should list the help keybind")
 
 	// Press '?' again to hide help
@@ -193,7 +198,7 @@ func TestModel_HelpMenu(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	view = m.View()
-	assert.Assert(t, !strings.Contains(view, "Help Menu"), "View should no longer contain 'Help Menu'")
+	assert.Assert(t, !strings.Contains(view, "HELP (WHICH-KEY)"), "View should no longer contain 'HELP (WHICH-KEY)'")
 }
 
 func TestModel_InitialObjectPreview(t *testing.T) {
