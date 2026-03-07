@@ -537,8 +537,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == viewBuckets {
 				filtered := m.filteredBuckets()
 				if len(filtered) > 0 {
-					m.bucketCursor = m.cursor
 					m.currentBucket = filtered[m.cursor]
+					
+					// Save the absolute index in the unfiltered list so going back restores correctly
+					m.bucketCursor = 0
+					for i, b := range m.buckets {
+						if b == m.currentBucket {
+							m.bucketCursor = i
+							break
+						}
+					}
+					
 					m.currentPrefix = "" // Reset prefix when entering bucket
 					m.state = viewObjects
 					m.searchMode = false

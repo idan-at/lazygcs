@@ -1138,6 +1138,48 @@ func TestModel_CursorPersistsOnBack(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, " b2"), "Cursor should be on b2, view:\n%s", view)
 }
 
+func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"apple", "banana", "apricot", "blueberry"},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// 1. Initial state: Buckets loaded
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"apple", "banana", "apricot", "blueberry"}})
+	m = updatedM.(tui.Model)
+
+	// 2. Filter by 'b' -> [banana, blueberry]
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	m = updatedM.(tui.Model)
+	
+	// Exit search mode but keep query active
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	
+	// 3. Move cursor down to blueberry (index 1 in filtered list, index 3 in original list)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+	
+	// 4. Enter bucket blueberry
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	
+	// 5. Go back to bucket list
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m = updatedM.(tui.Model)
+
+	// Assertions:
+	// - Filter should be cleared
+	// - Cursor should be on blueberry
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "▶") && strings.Contains(view, "blueberry"), "Cursor should be on blueberry, view:\n%s", view)
+	// Alternatively, verify the exact substring that lipgloss outputs
+	assert.Assert(t, strings.Contains(view, "▶  blueberry") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mblueberry"), "Cursor should be on blueberry")
+}
+
 func TestModel_SearchFilter(t *testing.T) {
 	client := mockGCSClient{
 		buckets: []string{"apple", "banana", "apricot"},
