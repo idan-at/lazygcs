@@ -162,19 +162,11 @@ func (m Model) objectsView(width int) string {
 			start, end := visibleRange(m.cursor, totalItems, m.maxItemsVisible())
 
 			for i := start; i < end; i++ {
-				cursor := " "
-				if m.cursor == i {
-					cursor = ">"
-				}
-
-				var displayItem string
 				var originalName string
 				if i < len(currentPrefixes) {
 					originalName = currentPrefixes[i].Name
-					displayItem = originalName
 				} else {
 					originalName = currentObjects[i-len(currentPrefixes)].Name
-					displayItem = originalName
 				}
 
 				// Check if selected
@@ -183,21 +175,34 @@ func (m Model) objectsView(width int) string {
 					_, isSelected = m.selected[originalName]
 				}
 
-				selectionIndicator := "[ ]"
+				selectionIndicator := " "
 				if isSelected {
-					selectionIndicator = "[x]"
+					selectionIndicator = "✓"
 				}
 
+				displayItem := originalName
 				// Display relative path
 				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
-				// Truncate to fit column (account for cursor, selection indicator, and padding)
-				displayItem = truncate(displayItem, width-7)
 				
+				// Styles
+				rowStyle := lipgloss.NewStyle().Width(width)
+				if m.cursor == i {
+					rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
+				}
+				
+				textStyle := lipgloss.NewStyle()
 				if isSelected {
-					displayItem = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render(displayItem)
+					textStyle = textStyle.Foreground(lipgloss.Color("212")).Bold(true)
+				} else if m.cursor != i {
+					// Dim unselected items if not under cursor
+					textStyle = textStyle.Foreground(lipgloss.Color("250"))
 				}
 
-				s.WriteString(fmt.Sprintf("%s %s %s\n", cursor, selectionIndicator, displayItem))
+				// Truncate to fit column (account for selection indicator and padding)
+				truncatedItem := truncate(displayItem, width-4)
+				content := fmt.Sprintf("%s %s", selectionIndicator, textStyle.Render(truncatedItem))
+				
+				s.WriteString(rowStyle.Render(content) + "\n")
 			}
 			if totalItems == 0 {
 				s.WriteString("(empty)")
@@ -231,15 +236,22 @@ func (m Model) bucketsView(width int) string {
 		start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
 		for i := start; i < end; i++ {
 			bucket := filtered[i]
-			cursor := " "
+			
+			rowStyle := lipgloss.NewStyle().Width(width)
 			if m.state == viewBuckets && m.cursor == i {
-				cursor = ">"
-			} else if m.state != viewBuckets && bucket == m.currentBucket {
-				cursor = "*" // Indicate the currently selected bucket when focus is elsewhere
+				rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
 			}
-			// Truncate to fit column (account for cursor and padding)
-			truncatedBucket := truncate(bucket, width-2)
-			s.WriteString(fmt.Sprintf("%s %s\n", cursor, truncatedBucket))
+
+			indicator := " "
+			if m.state != viewBuckets && bucket == m.currentBucket {
+				indicator = "*" 
+			}
+
+			// Truncate to fit column
+			truncatedBucket := truncate(bucket, width-4)
+			content := fmt.Sprintf("%s %s", indicator, truncatedBucket)
+			
+			s.WriteString(rowStyle.Render(content) + "\n")
 		}
 	}
 	return s.String()
