@@ -20,14 +20,13 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 Ensure you have [Go](https://golang.org/doc/install) (v1.21+) installed, then run:
 
 ```bash
-go install github.com/yourusername/lazygcs@latest
+go install github.com/idan-at/lazygcs@latest
 ```
-*(Note: update the repository URL if hosting elsewhere)*
 
 Alternatively, clone the repository and build it manually:
 
 ```bash
-git clone https://github.com/yourusername/lazygcs.git
+git clone https://github.com/idan-at/lazygcs.git
 cd lazygcs
 go build -o lazygcs main.go
 sudo mv lazygcs /usr/local/bin/
