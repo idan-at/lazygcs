@@ -52,7 +52,6 @@ Inspired by `ranger` and `yazi`.
     *   `v`: Toggle Object Versions view in Right Pane.
 3.  **Search:**
     *   `/`: Filter current list.
-    *   `Ctrl+p`: Global Bucket Search (scan configured projects).
 4.  **System:**
     *   `?`: Toggle Help.
     *   `q`: Quit.
