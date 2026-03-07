@@ -20,6 +20,12 @@ const (
 	viewDownloadConfirm
 )
 
+type downloadTask struct {
+	bucket string
+	object string
+	dest   string
+}
+
 // Model maintains the state of the TUI application.
 type Model struct {
 	client      GCSClient
@@ -40,6 +46,7 @@ type Model struct {
 	pendingDownloadBucket string
 	pendingDownloadObject string
 	pendingDownloadDest   string
+	downloadQueue         []downloadTask
 
 	// Buckets View
 	buckets      []string
@@ -203,6 +210,28 @@ func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []
 	return filteredPrefixes, filteredObjects, originalPrefixIndices
 }
 
+func (m *Model) processDownloadQueue() tea.Cmd {
+	if len(m.downloadQueue) == 0 {
+		return nil
+	}
+
+	task := m.downloadQueue[0]
+	m.downloadQueue = m.downloadQueue[1:]
+
+	// Check if file already exists
+	if _, err := os.Stat(task.dest); err == nil {
+		m.state = viewDownloadConfirm
+		m.pendingDownloadBucket = task.bucket
+		m.pendingDownloadObject = task.object
+		m.pendingDownloadDest = task.dest
+		m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest))
+		return nil
+	}
+
+	m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
+	return m.fetchDownload(task.bucket, task.object, task.dest)
+}
+
 // Update processes terminal messages (key presses, window resizes) and async responses.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -271,6 +300,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded to %s", msg.Path))
 		}
+		
+		if len(m.downloadQueue) > 0 {
+			cmd := m.processDownloadQueue()
+			return m, cmd
+		}
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -313,6 +347,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "a", "q", "ctrl+c", "esc":
 				m.status = "Download aborted."
 				m.state = viewObjects
+				m.downloadQueue = nil // Clear the rest of the queue
 				return m, nil
 			case "r":
 				newDest := autoRename(m.pendingDownloadDest)
@@ -488,50 +523,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				if len(toDownload) > 0 {
-					var cmds []tea.Cmd
-					var hasConflicts bool
-
 					for _, objName := range toDownload {
 						dest := filepath.Join(m.downloadDir, filepath.Base(objName))
-						// Check if file already exists
-						if _, err := os.Stat(dest); err == nil {
-							// If there's a conflict and we are downloading multiple files,
-							// the confirmation state gets tricky.
-							// For simplicity right now, if there is a conflict on ANY file in a multi-select,
-							// we set the state for the FIRST conflict we find.
-							// A better approach would be an auto-rename or skip queue, but let's stick to the
-							// prompt for the first conflict found if any, or just prompt for it.
-							// Wait, handling conflicts for multiple files requires a queue.
-							// Since I didn't add a downloadQueue, I'll just prompt for the first one for now,
-							// or we can auto-rename all conflicts in batch mode.
-							// Let's implement a simple queue logic if needed, or if we have 1 file, do the confirm.
-							// If > 1 file, let's just auto-rename for conflicts to avoid complex UI states, or 
-							// prompt for each one.
-							
-							// Let's prompt for the first conflict and queue the rest? No, the user wants download to work.
-							// Actually, let's look at the current test. The test doesn't check conflict on multi-select.
-							// Let's just handle them as batch, and if conflict, we'll prompt for the first one.
-							
-							m.state = viewDownloadConfirm
-							m.pendingDownloadBucket = m.currentBucket
-							m.pendingDownloadObject = objName
-							m.pendingDownloadDest = dest
-							m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(dest))
-							hasConflicts = true
-							break // Only handle one conflict at a time for now
-						}
-						
-						cmds = append(cmds, m.fetchDownload(m.currentBucket, objName, dest))
+						m.downloadQueue = append(m.downloadQueue, downloadTask{
+							bucket: m.currentBucket,
+							object: objName,
+							dest:   dest,
+						})
 					}
-					
-					if !hasConflicts {
-						m.status = "Downloading..."
-						if len(cmds) == 1 {
-							return m, cmds[0]
-						}
-						return m, tea.Batch(cmds...)
-					}
-					return m, nil
+
+					// Clear selection after triggering download
+					m.selected = make(map[string]struct{})
+
+					cmd := m.processDownloadQueue()
+					return m, cmd
 				}
 			}
 		case "q", "ctrl+c":

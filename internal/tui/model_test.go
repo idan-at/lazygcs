@@ -732,8 +732,8 @@ func TestModel_DownloadAction(t *testing.T) {
 	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m = updatedM.(tui.Model)
 
-	assert.Assert(t, cmd != nil, "Cmd should be returned for download")
-	assert.Assert(t, strings.Contains(m.View(), "Downloading..."), "View should show downloading status")
+	assert.Assert(t, cmd != nil)
+	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."), "View should show downloading status with filename")
 
 	// Simulate download completion
 	updatedM, _ = m.Update(tui.DownloadMsg{Path: "/tmp/obj1"})
@@ -775,20 +775,20 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 
 	assert.Assert(t, cmd != nil, "Cmd should not be nil")
 	
-	// Process the command. If it's a tea.Batch, executing it will return a tea.BatchMsg.
+	// With the queue system, the first command is a single download fetch
 	msg := cmd()
-	batchMsg, ok := msg.(tea.BatchMsg)
-	assert.Assert(t, ok, "Expected a tea.BatchMsg for multiple downloads")
-	assert.Equal(t, len(batchMsg), 2, "Expected 2 download commands in the batch")
+	dl1, ok := msg.(tui.DownloadMsg)
+	assert.Assert(t, ok, "Expected a tui.DownloadMsg for the first item")
 
-	// We can execute each cmd in the batch to verify they are DownloadMsgs
-	msg1 := batchMsg[0]()
-	dl1, ok1 := msg1.(tui.DownloadMsg)
-	assert.Assert(t, ok1)
+	// Update model with the first download result, which should trigger the next item in the queue
+	updatedM, cmd2 := m.Update(dl1)
+	m = updatedM.(tui.Model)
 
-	msg2 := batchMsg[1]()
+	assert.Assert(t, cmd2 != nil, "Expected a second download command to be queued")
+
+	msg2 := cmd2()
 	dl2, ok2 := msg2.(tui.DownloadMsg)
-	assert.Assert(t, ok2)
+	assert.Assert(t, ok2, "Expected a tui.DownloadMsg for the second item")
 
 	// We expect the paths to be obj1 and obj2 in any order
 	paths := map[string]bool{
@@ -797,6 +797,11 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	}
 	assert.Assert(t, paths["obj1"], "obj1 should be downloaded")
 	assert.Assert(t, paths["obj2"], "obj2 should be downloaded")
+
+	// Verify the selection is cleared
+	view := m.View()
+	assert.Assert(t, !strings.Contains(view, "[x] obj1"), "obj1 should no longer be selected")
+	assert.Assert(t, !strings.Contains(view, "[x] obj2"), "obj2 should no longer be selected")
 }
 
 func TestModel_Truncation(t *testing.T) {
