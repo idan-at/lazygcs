@@ -112,6 +112,30 @@ func TestModel_ObjectPreview(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "content of obj1"))
 }
 
+func TestModel_HelpMenu(t *testing.T) {
+	m := tui.NewModel([]string{"p1"}, mockGCSClient{}, "/tmp", false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Assert help menu is not shown initially
+	view := m.View()
+	assert.Assert(t, !strings.Contains(view, "Help Menu"))
+
+	// Press '?' to show help
+	updatedM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m = updatedM.(tui.Model)
+
+	view = m.View()
+	assert.Assert(t, strings.Contains(view, "Help Menu"), "View should contain 'Help Menu'")
+	assert.Assert(t, strings.Contains(view, "Toggle Help"), "View should list the help keybind")
+
+	// Press '?' again to hide help
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m = updatedM.(tui.Model)
+
+	view = m.View()
+	assert.Assert(t, !strings.Contains(view, "Help Menu"), "View should no longer contain 'Help Menu'")
+}
+
 func TestModel_InitialObjectPreview(t *testing.T) {
 	client := mockGCSClient{
 		buckets: []string{"b1"},

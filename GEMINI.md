@@ -47,6 +47,7 @@ Before committing any code, MUST run:
     *   Refactored TUI View logic into smaller files (`views.go`, `types.go`).
     *   Added File Preview pane (3rd column) with binary detection and truncation.
     *   Added inline Search functionality (`/`).
+    *   Implemented Help Menu overlay (`?`).
 *   **Next Steps:**
     1.  Implement multi-select (`space`).
     2.  Implement Delete (`x`) action (with multi-select support).

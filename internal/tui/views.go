@@ -251,6 +251,10 @@ func (m Model) View() string {
 		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
 	}
 
+	if m.showHelp {
+		return m.helpView()
+	}
+
 	// Calculate column widths
 	// 30% | 35% | 35%
 	leftWidth := int(float64(m.width) * 0.3)
@@ -264,4 +268,31 @@ func (m Model) View() string {
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
 	return m.headerView() + "\n\n" + mainContent + m.footerView()
+}
+
+func (m Model) helpView() string {
+	helpText := `
+	Help Menu
+	---------
+
+	Navigation:
+	j / ↓       Move cursor down
+	k / ↑       Move cursor up
+	l / Enter / → Enter a bucket or directory
+	h / ←       Go back to the parent directory or bucket list
+
+	Actions:
+	space       Toggle selection of the highlighted item (Multi-select)
+	d           Download the currently highlighted item (or all selected items)
+	/           Start searching/filtering the current column
+	esc / Enter Exit search mode
+	?           Toggle Help (this menu)
+	q / Ctrl+c  Quit the application
+	`
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(helpText)
 }

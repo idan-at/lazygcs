@@ -80,7 +80,7 @@ gcloud auth application-default login
 
 *   [ ] Implement Delete (`x`) action for single and multi-selected objects.
 *   [ ] Add Object Versions view (`v`) to inspect historical versions of a file.
-*   [ ] Add a Help Menu overlay (`?`).
+*   [x] Add a Help Menu overlay (`?`).
 
 ## 🤝 Contributing
 

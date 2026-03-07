@@ -37,6 +37,7 @@ type Model struct {
 	height         int
 	state          viewState
 	previewContent string
+	showHelp       bool
 
 	// Search State
 	searchMode  bool
@@ -366,6 +367,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.showHelp {
+			switch msg.String() {
+			case "?", "esc", "q", "ctrl+c":
+				m.showHelp = false
+			}
+			return m, nil
+		}
+
 		if m.searchMode {
 			switch msg.Type {
 			case tea.KeyEsc:
@@ -412,6 +421,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "?":
+			m.showHelp = true
+			return m, nil
+
 		case "/":
 			m.searchMode = true
 			m.searchQuery = ""
