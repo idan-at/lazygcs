@@ -156,7 +156,7 @@ func TestModel_HelpMenu(t *testing.T) {
 
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "Help Menu"), "View should contain 'Help Menu'")
-	assert.Assert(t, strings.Contains(view, "Toggle Help"), "View should list the help keybind")
+	assert.Assert(t, strings.Contains(view, "toggle help"), "View should list the help keybind")
 
 	// Press '?' again to hide help
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
@@ -213,11 +213,11 @@ func TestModel_CursorNoop_PreviewNotReloaded(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
-	
+
 	// Process initial fetchContent
 	updatedM, _ = m.Update(cmd())
 	m = updatedM.(tui.Model)
-	
+
 	assert.Assert(t, strings.Contains(m.View(), "content of obj1"))
 
 	// 2. Press 'j' (down). Since there's only 1 item, cursor stays at 0.
@@ -535,12 +535,12 @@ func TestModel_SelectPrefix(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
-	
+
 	// Initial fetch for first item (prefix)
 	assert.Assert(t, cmd != nil)
 	msg := cmd()
 	metaMsg := msg.(tui.MetadataMsg)
-	
+
 	// Simulate metadata arrival
 	now := time.Now()
 	metaMsg.Metadata = &gcs.ObjectMetadata{
@@ -673,7 +673,7 @@ func TestModel_StaleObjectsMsg(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
-	
+
 	// Capture the fetch objects msg for b1
 	staleMsg := tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects}
 
@@ -761,7 +761,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 
 	assert.Assert(t, cmd != nil, "Cmd should not be nil")
 	assert.Assert(t, strings.Contains(m.View(), "Downloading 1/2"), "View should show batch downloading progress")
-	
+
 	// With the queue system, the first command is a single download fetch
 	msg := cmd()
 	dl1, ok := msg.(tui.DownloadMsg)
@@ -804,7 +804,7 @@ func TestModel_Truncation(t *testing.T) {
 		objects: simpleObjectList([]string{longName}, nil),
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false)
-	
+
 	// Set a specific width where we know it should truncate everywhere
 	// leftWidth = 40 * 0.3 = 12.
 	// Header width = 40 - 2 = 38.
@@ -814,7 +814,7 @@ func TestModel_Truncation(t *testing.T) {
 	// 1. Check Bucket truncation
 	updatedM, _ = m.Update(tui.BucketsMsg{Buckets: []string{longName}})
 	m = updatedM.(tui.Model)
-	
+
 	view := m.View()
 	// Should contain truncated version (usually ending in ...)
 	assert.Assert(t, strings.Contains(view, "..."), "View should contain ellipsis for truncated bucket name")
@@ -866,7 +866,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		longContent.WriteString(fmt.Sprintf("line %d\n", i))
 	}
-	
+
 	client := mockGCSClient{
 		buckets: []string{"b1"},
 		objects: simpleObjectList([]string{"obj1"}, nil),
@@ -874,7 +874,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	// override the content just for this test
 	client.contentError = nil
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false)
-	
+
 	// Set height to 50
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
@@ -885,7 +885,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	m = updatedM.(tui.Model)
 	updatedM, cmd := m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 	m = updatedM.(tui.Model)
-	
+
 	// Simulate receiving the content but with 100 lines
 	msg := cmd()
 	contentMsg := msg.(tui.ContentMsg)
@@ -904,7 +904,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	// Create a temp directory for downloads
 	downloadDir := t.TempDir()
-	
+
 	// Create a dummy file that already exists
 	existingFile := filepath.Join(downloadDir, "obj1")
 	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
@@ -946,7 +946,7 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 
 func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	downloadDir := t.TempDir()
-	
+
 	existingFile := filepath.Join(downloadDir, "obj1")
 	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
 	assert.NilError(t, err)
@@ -984,7 +984,7 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 
 func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	downloadDir := t.TempDir()
-	
+
 	existingFile := filepath.Join(downloadDir, "obj1")
 	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
 	assert.NilError(t, err)
@@ -1012,7 +1012,7 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, cmd != nil, "Cmd should be returned for rename")
-	
+
 	msg := cmd()
 	downloadMsg, ok := msg.(tui.DownloadMsg)
 	assert.Assert(t, ok, "Expected DownloadMsg")
@@ -1089,7 +1089,7 @@ func TestModel_CursorPersistsOnBack(t *testing.T) {
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updatedM.(tui.Model)
 	assert.Assert(t, strings.Contains(m.View(), "Objects in b2"))
-	
+
 	// 4. Go back to bucket list
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
 	m = updatedM.(tui.Model)
@@ -1129,13 +1129,13 @@ func TestModel_SearchFilter(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "apple"))
 	assert.Assert(t, strings.Contains(view, "apricot"))
 	assert.Assert(t, !strings.Contains(view, "banana"))
-	assert.Assert(t, strings.Contains(view, "Search: ap"))
+	assert.Assert(t, strings.Contains(view, "SEARCH: ap"))
 
 	// Exit search mode
 	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = updatedM.(tui.Model)
 	view = m.View()
-	assert.Assert(t, !strings.Contains(view, "Search: ap"))
+	assert.Assert(t, !strings.Contains(view, "SEARCH: ap"))
 }
 
 func TestModel_FuzzySearch(t *testing.T) {
@@ -1168,5 +1168,5 @@ func TestModel_FuzzySearch(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "banana"))
 	// Should not show 'apricot' because 'l' is not in 'apricot'
 	assert.Assert(t, !strings.Contains(view, "apricot"))
-	assert.Assert(t, strings.Contains(view, "Search: ale"))
+	assert.Assert(t, strings.Contains(view, "SEARCH: ale"))
 }

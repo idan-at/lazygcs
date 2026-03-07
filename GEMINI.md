@@ -67,7 +67,7 @@ To transition the UI from a functional text layout to a delightful, modern termi
     *   Style the metadata values with a bold or bright color.
     *   Implement a human-readable size formatter (e.g., convert `1048576 bytes` to `1.0 MB`).
     *   Add a distinct visual separator (using `lipgloss.BorderTop`) between the metadata block and the actual file content preview.
-*   **Task 4: Status Bar & Footer Polish**
+*   [x] **Task 4: Status Bar & Footer Polish**
     *   Replace the raw text footer with a structured bottom ribbon (similar to `vim` or `k9s`).
     *   Create a left-aligned context/status pill (e.g., `[ NORMAL ]`, `[ SEARCH ]`, `[ DOWNLOADING ]`) with solid background colors based on state.
     *   Integrate `github.com/charmbracelet/bubbles/help` to render the right-aligned keybind hints dynamically and cleanly.

@@ -21,16 +21,16 @@ func (m Model) previewView(width int) string {
 
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
-		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244")) // Dimmed text
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))           // Dimmed text
 		valStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")) // Bright white
 
 		if m.cursor < len(currentPrefixes) {
 			// Selected item is a prefix (folder)
 			prefix := currentPrefixes[m.cursor]
-			
+
 			s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-6))))
 			s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder")))
-			
+
 			if !prefix.Created.IsZero() {
 				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Created:"), valStyle.Render(prefix.Created.Format("2006-01-02 15:04:05"))))
 			}
@@ -47,27 +47,27 @@ func (m Model) previewView(width int) string {
 				obj := currentObjects[idx]
 				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-6))))
 				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size))))
-				
+
 				contentType := obj.ContentType
 				if contentType == "" {
 					contentType = "unknown"
 				}
 				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Type:"), valStyle.Render(contentType)))
-				
+
 				if !obj.Created.IsZero() {
 					s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05"))))
 				}
 				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05"))))
-				
+
 				if obj.Owner != "" {
 					s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(obj.Owner)))
 				}
-				
+
 				if m.previewContent != "" {
 					separator := lipgloss.NewStyle().
 						Foreground(lipgloss.Color("240")).
 						Render(strings.Repeat("─", width))
-					
+
 					s.WriteString("\n" + separator + "\n")
 
 					if isBinary(m.previewContent) {
@@ -105,17 +105,33 @@ func (m Model) headerView() string {
 
 func (m Model) footerView() string {
 	var s strings.Builder
-	if m.status != "" {
-		s.WriteString("\n" + m.status)
-	}
+	s.WriteString("\n") // Spacer
+
+	// Left side: Status Pill
+	statusText := " NORMAL "
+	statusStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("240")).
+		Foreground(lipgloss.Color("250"))
 
 	if m.searchMode {
-		s.WriteString(fmt.Sprintf("\nSearch: %s█\n\n(esc/enter: exit search)", m.searchQuery))
+		statusText = fmt.Sprintf(" SEARCH: %s█ ", m.searchQuery)
+		statusStyle = statusStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
 	} else if m.searchQuery != "" {
-		s.WriteString(fmt.Sprintf("\nSearch: %s\n\n(/: search, q: quit, h: back, l/enter: select, d: download)", m.searchQuery))
-	} else {
-		s.WriteString("\n\n(/: search, q: quit, h: back, l/enter: select, d: download)")
+		statusText = fmt.Sprintf(" FILTER: %s ", m.searchQuery)
+		statusStyle = statusStyle.Background(lipgloss.Color("61")).Foreground(lipgloss.Color("15"))
+	} else if m.status != "" {
+		statusText = fmt.Sprintf(" %s ", m.status)
+		statusStyle = statusStyle.Background(lipgloss.Color("130")).Foreground(lipgloss.Color("15"))
 	}
+
+	pill := statusStyle.Render(statusText)
+
+	// Right side: Help
+	m.help.ShowAll = false
+	helpView := m.help.View(keys)
+
+	// Combine
+	s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, pill, "  ", helpView))
 
 	return s.String()
 }
@@ -213,13 +229,13 @@ func (m Model) objectsView(width int) string {
 				displayItem := originalName
 				// Display relative path
 				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
-				
+
 				// Styles
 				rowStyle := lipgloss.NewStyle().Width(width)
 				if m.cursor == i {
 					rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
 				}
-				
+
 				textStyle := lipgloss.NewStyle()
 				if isSelected {
 					textStyle = textStyle.Foreground(lipgloss.Color("212")).Bold(true)
@@ -231,7 +247,7 @@ func (m Model) objectsView(width int) string {
 				// Truncate to fit column (account for selection indicator and padding)
 				truncatedItem := truncate(displayItem, width-4)
 				content := fmt.Sprintf("%s %s", selectionIndicator, textStyle.Render(truncatedItem))
-				
+
 				s.WriteString(rowStyle.Render(content) + "\n")
 			}
 			if totalItems == 0 {
@@ -249,7 +265,7 @@ func (m Model) bucketsView(width int) string {
 		s.WriteString("Loading...")
 	} else {
 		filtered := m.filteredBuckets()
-		
+
 		// Determine the active index for the buckets list
 		activeIdx := m.cursor
 		if m.state != viewBuckets {
@@ -266,7 +282,7 @@ func (m Model) bucketsView(width int) string {
 		start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
 		for i := start; i < end; i++ {
 			bucket := filtered[i]
-			
+
 			rowStyle := lipgloss.NewStyle().Width(width)
 			if m.state == viewBuckets && m.cursor == i {
 				rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
@@ -274,13 +290,13 @@ func (m Model) bucketsView(width int) string {
 
 			indicator := " "
 			if m.state != viewBuckets && bucket == m.currentBucket {
-				indicator = "*" 
+				indicator = "*"
 			}
 
 			// Truncate to fit column
 			truncatedBucket := truncate(bucket, width-4)
 			content := fmt.Sprintf("%s %s", indicator, truncatedBucket)
-			
+
 			s.WriteString(rowStyle.Render(content) + "\n")
 		}
 	}
@@ -306,7 +322,7 @@ func (m Model) View() string {
 	inactiveStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")). // Dimmed gray
-		Foreground(lipgloss.Color("244")).      // Dimmed text
+		Foreground(lipgloss.Color("244")).       // Dimmed text
 		Padding(0, 1)
 
 	// Calculate column widths
@@ -338,28 +354,26 @@ func (m Model) View() string {
 }
 
 func (m Model) helpView() string {
-	helpText := `
-	Help Menu
-	---------
+	m.help.ShowAll = true
+	helpText := m.help.View(keys)
 
-	Navigation:
-	j / ↓       Move cursor down
-	k / ↑       Move cursor up
-	l / Enter / → Enter a bucket or directory
-	h / ←       Go back to the parent directory or bucket list
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("69")).
+		Padding(1, 2).
+		Align(lipgloss.Left)
 
-	Actions:
-	space       Toggle selection of the highlighted item (Multi-select)
-	d           Download the currently highlighted item (or all selected items)
-	/           Start searching/filtering the current column
-	esc / Enter Exit search mode
-	?           Toggle Help (this menu)
-	q / Ctrl+c  Quit the application
-	`
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("229")).
+		MarginBottom(1).
+		Render("Help Menu")
+
+	content := lipgloss.JoinVertical(lipgloss.Left, titleStyle, helpText)
 
 	return lipgloss.NewStyle().
 		Width(m.width).
 		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
-		Render(helpText)
+		Render(boxStyle.Render(content))
 }

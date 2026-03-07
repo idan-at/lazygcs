@@ -284,7 +284,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 
 	// Select file1
 	tm.Type(" ")
-	
+
 	// Move to file2 and select it
 	tm.Type("j")
 	tm.Type(" ")
@@ -295,7 +295,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 	// Wait for download to finish
 	expectedPath1 := filepath.Join(downloadDir, "file1.txt")
 	expectedPath2 := filepath.Join(downloadDir, "file2.txt")
-	
+
 	assert.NilError(t, waitForFile(expectedPath1, 3*time.Second))
 	assert.NilError(t, waitForFile(expectedPath2, 3*time.Second))
 

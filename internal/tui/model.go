@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"lazygcs/internal/gcs"
@@ -67,6 +69,7 @@ type Model struct {
 	loading bool
 	status  string
 	err     error
+	help    help.Model
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
@@ -81,6 +84,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		state:       viewBuckets,
 		loading:     true,
 		selected:    make(map[string]struct{}),
+		help:        help.New(),
 	}
 }
 
@@ -110,7 +114,7 @@ func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
 
 func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
 	// Ensure we get the correct prefix name from the filtered list, but fetchPrefixMetadata
-	// is typically called with an index into the main list. 
+	// is typically called with an index into the main list.
 	// Wait, the index passed to this function might be the filtered index. Let's fix this
 	// to take the name directly to avoid issues.
 	return func() tea.Msg {
@@ -126,7 +130,6 @@ func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 		return MetadataMsg{Bucket: bucket, Prefix: prefix, PrefixIndex: originalIdx, Metadata: meta, Err: err}
 	}
 }
-
 
 func (m Model) fetchDownload(bucketName, objectName, dest string) tea.Cmd {
 	return func() tea.Msg {
@@ -222,11 +225,11 @@ func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []
 		}
 		return m.prefixes, m.objects, indices
 	}
-	
+
 	var filteredPrefixes []gcs.PrefixMetadata
 	var filteredObjects []gcs.ObjectMetadata
 	var originalPrefixIndices []int
-	
+
 	lowerQuery := strings.ToLower(m.searchQuery)
 
 	for i, p := range m.prefixes {
@@ -354,7 +357,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded to %s", msg.Path))
 			}
 		}
-		
+
 		if len(m.downloadQueue) > 0 {
 			cmd := m.processDownloadQueue()
 			return m, cmd
@@ -364,12 +367,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.help.Width = msg.Width
 		return m, nil
 
 	case tea.KeyMsg:
 		if m.showHelp {
-			switch msg.String() {
-			case "?", "esc", "q", "ctrl+c":
+			switch {
+			case key.Matches(msg, keys.Help), key.Matches(msg, keys.Quit), msg.String() == "esc":
 				m.showHelp = false
 			}
 			return m, nil
@@ -420,18 +424,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		switch msg.String() {
-		case "?":
+		switch {
+		case key.Matches(msg, keys.Help):
 			m.showHelp = true
 			return m, nil
 
-		case "/":
+		case key.Matches(msg, keys.Search):
 			m.searchMode = true
 			m.searchQuery = ""
 			m.cursor = 0
 			return m, nil
 
-		case " ":
+		case key.Matches(msg, keys.Select):
 			if m.state == viewObjects {
 				currentPrefixes, currentObjects, _ := m.filteredObjects()
 				if m.cursor < len(currentPrefixes) {
@@ -455,8 +459,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "j", "down":			m.status = ""
-			
+		case key.Matches(msg, keys.Down):
+			m.status = ""
+
 			var itemsCount int
 			var currentPrefixes []gcs.PrefixMetadata
 			var currentObjects []gcs.ObjectMetadata
@@ -468,7 +473,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				currentPrefixes, currentObjects, origIndices = m.filteredObjects()
 				itemsCount = len(currentObjects) + len(currentPrefixes)
 			}
-			
+
 			if itemsCount > 0 {
 				oldCursor := m.cursor
 				m.cursor = (m.cursor + 1) % itemsCount
@@ -489,9 +494,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case "k", "up":
+		case key.Matches(msg, keys.Up):
 			m.status = ""
-			
+
 			var itemsCount int
 			var currentPrefixes []gcs.PrefixMetadata
 			var currentObjects []gcs.ObjectMetadata
@@ -524,7 +529,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case "l", "right", "enter":
+		case key.Matches(msg, keys.Right):
 			if m.state == viewBuckets {
 				filtered := m.filteredBuckets()
 				if len(filtered) > 0 {
@@ -549,7 +554,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.fetchObjects()
 				}
 			}
-		case "h", "left":
+		case key.Matches(msg, keys.Left):
 			if m.state == viewObjects {
 				m.previewContent = ""
 				m.searchMode = false
@@ -566,10 +571,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.resetObjectsState()
 				return m, m.fetchObjects()
 			}
-		case "d":
+		case key.Matches(msg, keys.Download):
 			if m.state == viewObjects {
 				currentPrefixes, currentObjects, _ := m.filteredObjects()
-				
+
 				var toDownload []string
 				if len(m.selected) > 0 {
 					// Download all selected objects (ignore prefixes for now)
@@ -608,7 +613,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, cmd
 				}
 			}
-		case "q", "ctrl+c":
+		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
 		}
 	}
