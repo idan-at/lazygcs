@@ -1180,6 +1180,48 @@ func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "▶  blueberry") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mblueberry"), "Cursor should be on blueberry")
 }
 
+func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {
+	rootObjects := simpleObjectList([]string{"file1"}, []string{"folder1/", "folder2/"})
+	
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: rootObjects,
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket b1
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	
+	// Load root objects
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: rootObjects})
+	m = updatedM.(tui.Model)
+	
+	// Move cursor to folder2/ (index 1)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updatedM.(tui.Model)
+
+	// Enter folder2/
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedM.(tui.Model)
+	
+	// Go back using 'h'
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m = updatedM.(tui.Model)
+	
+	// Re-load root objects
+	updatedM, _ = m.Update(tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: rootObjects})
+	m = updatedM.(tui.Model)
+
+	// Assert cursor is restored to folder2/
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "▶") && strings.Contains(view, "folder2/"), "Cursor should be restored to folder2/, view:\n%s", view)
+	assert.Assert(t, strings.Contains(view, "▶  folder2/") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mfolder2/"), "Cursor should be specifically on folder2/")
+}
+
 func TestModel_SearchFilter(t *testing.T) {
 	client := mockGCSClient{
 		buckets: []string{"apple", "banana", "apricot"},

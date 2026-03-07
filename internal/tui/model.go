@@ -63,11 +63,12 @@ type Model struct {
 	bucketCursor int // stores the cursor position in the bucket list
 
 	// Objects View
-	currentBucket string
-	currentPrefix string
-	objects       []gcs.ObjectMetadata
-	prefixes      []gcs.PrefixMetadata
-	selected      map[string]struct{}
+	currentBucket      string
+	currentPrefix      string
+	targetPrefixCursor string
+	objects            []gcs.ObjectMetadata
+	prefixes           []gcs.PrefixMetadata
+	selected           map[string]struct{}
 
 	loading bool
 	status  string
@@ -312,6 +313,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.objects = msg.List.Objects
 		m.prefixes = msg.List.Prefixes
 		m.cursor = 0
+
+		// Restore cursor if we just navigated back from a prefix
+		if m.targetPrefixCursor != "" {
+			for i, p := range m.prefixes {
+				if p.Name == m.targetPrefixCursor {
+					m.cursor = i
+					break
+				}
+			}
+			m.targetPrefixCursor = "" // Clear it after use
+		}
 
 		var cmd tea.Cmd
 		if len(m.prefixes) > 0 {
@@ -579,6 +591,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.loading = false
 					return m, nil
 				}
+				
+				// Save the current prefix so we can highlight it in the parent directory
+				m.targetPrefixCursor = m.currentPrefix
+
 				// Go up one level
 				m.currentPrefix = parentPrefix(m.currentPrefix)
 				m.resetObjectsState()
