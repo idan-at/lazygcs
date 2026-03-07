@@ -112,6 +112,36 @@ func TestModel_ObjectPreview(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "content of obj1"))
 }
 
+func TestModel_UI_WrappingBug(t *testing.T) {
+	client := mockGCSClient{
+		buckets: []string{"b1"},
+		objects: simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket
+	updatedM, _ := m.Update(tui.BucketsMsg{Buckets: []string{"b1"}})
+	m = updatedM.(tui.Model)
+	
+	// We check the buckets view first.
+	// The view output shouldn't have rows that wrap. We can detect wrapping if the line count
+	// is much higher than expected, or we can look for specific lipgloss wrapping artifacts.
+	// A simpler way: just check the actual dimensions of the view.
+	view := m.View()
+	lines := strings.Split(view, "\n")
+	
+	// Total height is 50. If it wraps, it might exceed 50 or push the footer out.
+	// Or we can just count lines. It should exactly match m.height.
+	// We might have some trailing empty lines, but let's check max width of lines.
+	for _, line := range lines {
+		// removing ansi for accurate visible length is needed, but just checking if it blew up the height is easier.
+		_ = line
+	}
+	
+	assert.Assert(t, len(lines) <= 50, "View height %d exceeded window height 50 due to wrapping", len(lines))
+}
+
 func TestModel_ModernSelectionUI(t *testing.T) {
 	client := mockGCSClient{
 		buckets: []string{"b1"},

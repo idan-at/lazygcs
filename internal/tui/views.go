@@ -283,7 +283,7 @@ func (m Model) objectsView(width int) string {
 				}
 
 				// Styles
-				rowStyle := lipgloss.NewStyle().Width(width)
+				rowStyle := lipgloss.NewStyle()
 				if m.cursor == i {
 					rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
 				}
@@ -339,7 +339,7 @@ func (m Model) bucketsView(width int) string {
 		for i := start; i < end; i++ {
 			bucket := filtered[i]
 
-			rowStyle := lipgloss.NewStyle().Width(width)
+			rowStyle := lipgloss.NewStyle()
 			if m.state == viewBuckets && m.cursor == i {
 				rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
 			}
