@@ -1313,6 +1313,48 @@ func TestModel_CollapseProjectOnLeft(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "▶ p1") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mp1") || strings.Contains(view, "▶  \x1b[1m\x1b[38;5;69mp1"), "Project p1 should be collapsed")
 }
 
+func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
+	client := mockGCSClient{
+		projects: []gcs.ProjectBuckets{
+			{ProjectID: "apple-project", Buckets: []string{"banana"}},
+		},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Load buckets
+	updatedM, _ := m.Update(tui.BucketsMsg{Projects: client.projects})
+	m = updatedM.(tui.Model)
+
+	// Enter search mode and type "apple"
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = updatedM.(tui.Model)
+	for _, r := range "apple" {
+		updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updatedM.(tui.Model)
+	}
+
+	view := m.View()
+	// Should NOT show "apple-project" because none of its buckets match "apple"
+	assert.Assert(t, !strings.Contains(view, "apple-project"), "Should not match on project name")
+	assert.Assert(t, !strings.Contains(view, "banana"), "Should not show banana bucket")
+
+	// Now search for "banana"
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // Clear
+	m = updatedM.(tui.Model)
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = updatedM.(tui.Model)
+	for _, r := range "banana" {
+		updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updatedM.(tui.Model)
+	}
+
+	view = m.View()
+	// Should show both "apple-project" and "banana"
+	assert.Assert(t, strings.Contains(view, "apple-project"), "Should show project header when a bucket matches")
+	assert.Assert(t, strings.Contains(view, "banana"), "Should show matching bucket")
+}
+
 func TestModel_SearchFilter(t *testing.T) {
 	client := mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},

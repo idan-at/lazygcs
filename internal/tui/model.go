@@ -221,19 +221,7 @@ func (m Model) filteredBuckets() []BucketListItem {
 	isSearchActive := m.searchQuery != "" && m.state == viewBuckets
 
 	for _, p := range m.projects {
-		projectMatches := false
-		if isSearchActive {
-			if m.fuzzySearch {
-				projectMatches = fuzzyMatch(lowerQuery, p.ProjectID)
-			} else {
-				projectMatches = strings.Contains(strings.ToLower(p.ProjectID), lowerQuery)
-			}
-		}
-
 		// Determine if the project should be expanded.
-		// If searching, we expand the project automatically if it has matching buckets, 
-		// but let's keep it simple: if search is active, we expand to show matches.
-		// Otherwise, use the collapsedProjects map.
 		_, isCollapsed := m.collapsedProjects[p.ProjectID]
 		isExpanded := !isCollapsed
 		if isSearchActive {
@@ -255,14 +243,15 @@ func (m Model) filteredBuckets() []BucketListItem {
 				bMatch = strings.Contains(strings.ToLower(b), lowerQuery)
 			}
 			
-			// If bucket matches, or if project matches (show all buckets in matching project)
-			if bMatch || projectMatches {
+			// Only match against bucket name
+			if bMatch {
 				matchingBuckets = append(matchingBuckets, b)
 			}
 		}
 
-		// Add project header if project matches OR if it has matching buckets
-		if !isSearchActive || projectMatches || len(matchingBuckets) > 0 {
+		// Add project header only if we're not searching, OR if it has matching buckets.
+		// Note: We no longer match against projectMatches.
+		if !isSearchActive || len(matchingBuckets) > 0 {
 			items = append(items, BucketListItem{
 				IsProject: true,
 				ProjectID: p.ProjectID,
