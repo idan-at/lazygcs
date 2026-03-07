@@ -270,7 +270,7 @@ func (m Model) objectsView(width int) string {
 
 				selectionIndicator := " "
 				if isSelected {
-					selectionIndicator = "✓"
+					selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render("✓")
 				}
 
 				displayItem := originalName
@@ -282,29 +282,29 @@ func (m Model) objectsView(width int) string {
 					icon = getIcon(displayItem, isFolder, false)
 				}
 
-				// Styles
-				rowStyle := lipgloss.NewStyle()
+				cursorIndicator := " "
 				if m.cursor == i {
-					rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
+					cursorIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Render("▶")
 				}
 
 				textStyle := lipgloss.NewStyle()
-				if isSelected {
+				if m.cursor == i {
+					textStyle = textStyle.Foreground(lipgloss.Color("69")).Bold(true)
+				} else if isSelected {
 					textStyle = textStyle.Foreground(lipgloss.Color("212")).Bold(true)
-				} else if m.cursor != i {
-					// Dim unselected items if not under cursor
+				} else {
 					textStyle = textStyle.Foreground(lipgloss.Color("250"))
 				}
 
-				// Truncate to fit column (account for selection indicator, optional icon, and padding)
+				// Truncate to fit column (account for cursor, selection indicator, optional icon, and padding)
 				truncateLen := width - 4
 				if m.showIcons {
 					truncateLen -= 2 // Icon + space
 				}
 				truncatedItem := truncate(displayItem, truncateLen)
-				content := fmt.Sprintf("%s %s%s", selectionIndicator, icon, textStyle.Render(truncatedItem))
+				content := fmt.Sprintf("%s %s %s%s", cursorIndicator, selectionIndicator, icon, textStyle.Render(truncatedItem))
 
-				s.WriteString(rowStyle.Render(content) + "\n")
+				s.WriteString(content + "\n")
 			}
 			if totalItems == 0 {
 				s.WriteString("(empty)")
@@ -339,14 +339,23 @@ func (m Model) bucketsView(width int) string {
 		for i := start; i < end; i++ {
 			bucket := filtered[i]
 
-			rowStyle := lipgloss.NewStyle()
+			cursorIndicator := " "
 			if m.state == viewBuckets && m.cursor == i {
-				rowStyle = rowStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
+				cursorIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Render("▶")
 			}
 
 			indicator := " "
 			if m.state != viewBuckets && bucket == m.currentBucket {
-				indicator = "*"
+				indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Render("●")
+			}
+
+			textStyle := lipgloss.NewStyle()
+			if m.state == viewBuckets && m.cursor == i {
+				textStyle = textStyle.Foreground(lipgloss.Color("69")).Bold(true)
+			} else if m.state != viewBuckets && bucket == m.currentBucket {
+				textStyle = textStyle.Foreground(lipgloss.Color("69"))
+			} else {
+				textStyle = textStyle.Foreground(lipgloss.Color("250"))
 			}
 
 			icon := ""
@@ -360,13 +369,12 @@ func (m Model) bucketsView(width int) string {
 				truncateLen -= 2
 			}
 			truncatedBucket := truncate(bucket, truncateLen)
-			content := fmt.Sprintf("%s %s%s", indicator, icon, truncatedBucket)
+			content := fmt.Sprintf("%s %s %s%s", cursorIndicator, indicator, icon, textStyle.Render(truncatedBucket))
 
-			s.WriteString(rowStyle.Render(content) + "\n")
+			s.WriteString(content + "\n")
 		}
-	}
-	return s.String()
-}
+		}
+		return s.String()}
 
 // View renders the current state of the application as a string.
 func (m Model) View() string {
