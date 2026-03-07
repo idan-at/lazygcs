@@ -16,7 +16,7 @@ func (m Model) fullPath() string {
 
 func (m Model) previewView(width int) string {
 	var s strings.Builder
-	if m.state == viewObjects {
+	if m.state == viewObjects || m.state == viewDownloadConfirm {
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
 
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
@@ -150,7 +150,7 @@ func truncate(s string, maxLen int) string {
 
 func (m Model) objectsView(width int) string {
 	var s strings.Builder
-	if m.state == viewObjects {
+	if m.state == viewObjects || m.state == viewDownloadConfirm {
 		title := fmt.Sprintf("Objects in %s", m.currentBucket)
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(title, width)) + "\n\n")
 		if m.loading {
@@ -190,7 +190,7 @@ func (m Model) objectsView(width int) string {
 
 				// Display relative path
 				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
-				// Truncate to fit column (account for cursor, selection indicator, and padding: 1+1+3+1+padding = 6)
+				// Truncate to fit column (account for cursor, selection indicator, and padding)
 				displayItem = truncate(displayItem, width-7)
 				
 				if isSelected {
@@ -255,15 +255,40 @@ func (m Model) View() string {
 		return m.helpView()
 	}
 
+	// Styles
+	activeStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("69")). // Google Blue-ish
+		Padding(0, 1)
+
+	inactiveStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")). // Dimmed gray
+		Foreground(lipgloss.Color("244")).      // Dimmed text
+		Padding(0, 1)
+
 	// Calculate column widths
 	// 30% | 35% | 35%
-	leftWidth := int(float64(m.width) * 0.3)
-	midWidth := int(float64(m.width) * 0.35)
-	rightWidth := m.width - leftWidth - midWidth - 6 // account for borders/padding
+	totalWidth := m.width
+	leftWidth := int(float64(totalWidth) * 0.3)
+	midWidth := int(float64(totalWidth) * 0.35)
+	rightWidth := totalWidth - leftWidth - midWidth
 
-	leftCol := lipgloss.NewStyle().Width(leftWidth).PaddingRight(2).Render(m.bucketsView(leftWidth))
-	midCol := lipgloss.NewStyle().Width(midWidth).PaddingRight(2).Render(m.objectsView(midWidth))
-	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(m.previewView(rightWidth))
+	// Apply styles and render columns
+	leftStyle := inactiveStyle
+	if m.state == viewBuckets {
+		leftStyle = activeStyle
+	}
+	leftCol := leftStyle.Width(leftWidth - 4).Render(m.bucketsView(leftWidth - 4))
+
+	midStyle := inactiveStyle
+	if m.state == viewObjects || m.state == viewDownloadConfirm {
+		midStyle = activeStyle
+	}
+	midCol := midStyle.Width(midWidth - 4).Render(m.objectsView(midWidth - 4))
+
+	// Preview column is always "inactive" in terms of focus
+	rightCol := inactiveStyle.Width(rightWidth - 4).Render(m.previewView(rightWidth - 4))
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
