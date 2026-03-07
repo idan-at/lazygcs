@@ -39,7 +39,7 @@ func main() {
 	}
 
 	gcsClient := gcs.NewClient(storageClient)
-	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir)
+	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

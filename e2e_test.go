@@ -86,7 +86,7 @@ func setupTestApp(t *testing.T, server *fakestorage.Server, projectIDs []string,
 	assert.NilError(t, err)
 
 	gcsClient := gcs.NewClient(server.Client())
-	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir)
+	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch)
 
 	tm := teatest.NewTestModel(t, m)
 	return tm

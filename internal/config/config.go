@@ -15,12 +15,15 @@ type Config struct {
 	Projects []string
 	// DownloadDir is the directory where files will be downloaded.
 	DownloadDir string
+	// FuzzySearch enables fuzzy matching for filtering lists.
+	FuzzySearch bool
 }
 
 // tomlConfig represents the structure of the config.toml file.
 type tomlConfig struct {
 	Projects    []string `toml:"projects"`
 	DownloadDir string   `toml:"download_dir"`
+	FuzzySearch bool     `toml:"fuzzy_search"`
 }
 
 func defaultDownloadDir() string {
@@ -64,6 +67,7 @@ func Load(configPath string) (*Config, error) {
 	if tc.DownloadDir != "" {
 		cfg.DownloadDir = tc.DownloadDir
 	}
+	cfg.FuzzySearch = tc.FuzzySearch
 
 	return cfg, nil
 }

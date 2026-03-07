@@ -41,6 +41,7 @@ type Model struct {
 	// Search State
 	searchMode  bool
 	searchQuery string
+	fuzzySearch bool
 
 	// Download Confirm State
 	pendingDownloadBucket string
@@ -68,11 +69,12 @@ type Model struct {
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
-func NewModel(projectIDs []string, client GCSClient, downloadDir string) Model {
+func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool) Model {
 	return Model{
 		projectIDs:  projectIDs,
 		client:      client,
 		downloadDir: downloadDir,
+		fuzzySearch: fuzzySearch,
 		width:       120,
 		height:      40,
 		state:       viewBuckets,
@@ -168,6 +170,28 @@ func isBinary(s string) bool {
 	return strings.ContainsRune(s, '\x00')
 }
 
+func fuzzyMatch(query, target string) bool {
+	if len(query) == 0 {
+		return true
+	}
+	if len(query) > len(target) {
+		return false
+	}
+	queryRunes := []rune(strings.ToLower(query))
+	targetRunes := []rune(strings.ToLower(target))
+
+	i := 0
+	for _, r := range targetRunes {
+		if r == queryRunes[i] {
+			i++
+			if i == len(queryRunes) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (m Model) filteredBuckets() []string {
 	if m.searchQuery == "" || m.state != viewBuckets {
 		return m.buckets
@@ -175,7 +199,13 @@ func (m Model) filteredBuckets() []string {
 	var filtered []string
 	lowerQuery := strings.ToLower(m.searchQuery)
 	for _, b := range m.buckets {
-		if strings.Contains(strings.ToLower(b), lowerQuery) {
+		match := false
+		if m.fuzzySearch {
+			match = fuzzyMatch(lowerQuery, b)
+		} else {
+			match = strings.Contains(strings.ToLower(b), lowerQuery)
+		}
+		if match {
 			filtered = append(filtered, b)
 		}
 	}
@@ -199,13 +229,25 @@ func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []
 	lowerQuery := strings.ToLower(m.searchQuery)
 
 	for i, p := range m.prefixes {
-		if strings.Contains(strings.ToLower(p.Name), lowerQuery) {
+		match := false
+		if m.fuzzySearch {
+			match = fuzzyMatch(lowerQuery, p.Name)
+		} else {
+			match = strings.Contains(strings.ToLower(p.Name), lowerQuery)
+		}
+		if match {
 			filteredPrefixes = append(filteredPrefixes, p)
 			originalPrefixIndices = append(originalPrefixIndices, i)
 		}
 	}
 	for _, o := range m.objects {
-		if strings.Contains(strings.ToLower(o.Name), lowerQuery) {
+		match := false
+		if m.fuzzySearch {
+			match = fuzzyMatch(lowerQuery, o.Name)
+		} else {
+			match = strings.Contains(strings.ToLower(o.Name), lowerQuery)
+		}
+		if match {
 			filteredObjects = append(filteredObjects, o)
 		}
 	}

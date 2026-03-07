@@ -62,3 +62,23 @@ func TestLoad_OverrideDownloadDir(t *testing.T) {
 
 	assert.Equal(t, cfg.DownloadDir, "/tmp/custom_downloads")
 }
+
+func TestLoad_DefaultFuzzySearch(t *testing.T) {
+	configFile := createConfigFile(t, `projects = ["p1"]`)
+	cfg, err := config.Load(configFile)
+	assert.NilError(t, err)
+
+	assert.Equal(t, cfg.FuzzySearch, false)
+}
+
+func TestLoad_OverrideFuzzySearch(t *testing.T) {
+	configFile := createConfigFile(t, `
+projects = ["p1"]
+fuzzy_search = true
+`)
+
+	cfg, err := config.Load(configFile)
+	assert.NilError(t, err)
+
+	assert.Equal(t, cfg.FuzzySearch, true)
+}
