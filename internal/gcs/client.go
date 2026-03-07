@@ -100,6 +100,12 @@ func (c *Client) GetObjectMetadata(ctx context.Context, bucketName, objectName s
 	}, nil
 }
 
+// ProjectBuckets holds the buckets for a specific project.
+type ProjectBuckets struct {
+	ProjectID string
+	Buckets   []string
+}
+
 // ListBuckets retrieves the names of all buckets accessible within the given projects.
 //
 // Arguments:
@@ -107,12 +113,13 @@ func (c *Client) GetObjectMetadata(ctx context.Context, bucketName, objectName s
 //   - projectIDs: A list of Google Cloud Project IDs to scan for buckets.
 //
 // Returns:
-//   - []string: A combined list of bucket names from all projects.
+//   - []ProjectBuckets: A list of projects and their corresponding buckets.
 //   - error: If any underlying API call fails.
-func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]string, error) {
-	var allBuckets []string
+func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]ProjectBuckets, error) {
+	var allProjects []ProjectBuckets
 	for _, pID := range projectIDs {
 		it := c.storageClient.Buckets(ctx, pID)
+		var buckets []string
 		for {
 			bucketAttrs, err := it.Next()
 			if err == iterator.Done {
@@ -121,10 +128,11 @@ func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]string
 			if err != nil {
 				return nil, fmt.Errorf("failed to list buckets for project %q: %w", pID, err)
 			}
-			allBuckets = append(allBuckets, bucketAttrs.Name)
+			buckets = append(buckets, bucketAttrs.Name)
 		}
+		allProjects = append(allProjects, ProjectBuckets{ProjectID: pID, Buckets: buckets})
 	}
-	return allBuckets, nil
+	return allProjects, nil
 }
 
 // ListObjects retrieves object names and common prefixes (folders) for a specific bucket and prefix.

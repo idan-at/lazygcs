@@ -26,9 +26,10 @@ func TestClient_ListBuckets(t *testing.T) {
 	defer server.Stop()
 
 	client := gcs.NewClient(server.Client())
-	buckets, err := client.ListBuckets(context.Background(), []string{"test-project"})
+	projects, err := client.ListBuckets(context.Background(), []string{"test-project"})
 	assert.NilError(t, err)
-	assert.Assert(t, contains(buckets, "b1"))
+	assert.Equal(t, len(projects), 1)
+	assert.Assert(t, contains(projects[0].Buckets, "b1"))
 }
 
 func TestClient_ListObjects(t *testing.T) {

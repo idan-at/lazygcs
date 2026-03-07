@@ -9,8 +9,8 @@ import (
 // GCSClient defines the contract for interacting with Google Cloud Storage.
 // This interface allows for easy mocking in TUI unit tests.
 type GCSClient interface {
-	// ListBuckets returns names of buckets in the specified projects.
-	ListBuckets(ctx context.Context, projectIDs []string) ([]string, error)
+	// ListBuckets returns names of buckets grouped by project.
+	ListBuckets(ctx context.Context, projectIDs []string) ([]gcs.ProjectBuckets, error)
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
 	// GetObjectMetadata returns full metadata for a specific object or directory stub.
@@ -23,8 +23,8 @@ type GCSClient interface {
 
 // BucketsMsg is sent when bucket listing completes.
 type BucketsMsg struct {
-	Buckets []string
-	Err     error
+	Projects []gcs.ProjectBuckets
+	Err      error
 }
 
 // ObjectsMsg is sent when object listing completes.

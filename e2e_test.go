@@ -174,10 +174,13 @@ func TestDownloadObject_E2E(t *testing.T) {
 		teatest.WithDuration(3*time.Second),
 	)
 
+	// Move cursor down to first bucket
+	tm.Type("j")
+
 	// Enter bucket
 	tm.Type("l")
 
-	// Wait for object
+	// Wait for objects to load
 	teatest.WaitFor(
 		t,
 		tm.Output(),
@@ -235,9 +238,13 @@ func TestPreviewObject_E2E(t *testing.T) {
 	})
 
 	// Enter bucket
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") })
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	
+	// Move cursor down to first bucket
+	tm.Type("j")
 	tm.Type("l")
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") })
+	
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
 
 	// Move to second file and check for its preview
 	tm.Type("j")
@@ -276,6 +283,9 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 	// Wait for bucket
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "test-bucket-1") }, teatest.WithDuration(3*time.Second))
 
+	// Move cursor down to first bucket
+	tm.Type("j")
+
 	// Enter bucket
 	tm.Type("l")
 
@@ -284,7 +294,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 
 	// Select file1
 	tm.Type(" ")
-
+	
 	// Move to file2 and select it
 	tm.Type("j")
 	tm.Type(" ")
@@ -295,7 +305,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 	// Wait for download to finish
 	expectedPath1 := filepath.Join(downloadDir, "file1.txt")
 	expectedPath2 := filepath.Join(downloadDir, "file2.txt")
-
+	
 	assert.NilError(t, waitForFile(expectedPath1, 3*time.Second))
 	assert.NilError(t, waitForFile(expectedPath2, 3*time.Second))
 

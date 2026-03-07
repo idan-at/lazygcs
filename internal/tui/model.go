@@ -28,6 +28,12 @@ type downloadTask struct {
 	dest   string
 }
 
+type BucketListItem struct {
+	IsProject  bool
+	ProjectID  string
+	BucketName string
+}
+
 // Model maintains the state of the TUI application.
 type Model struct {
 	client      GCSClient
@@ -58,9 +64,10 @@ type Model struct {
 	downloadFinished      int
 
 	// Buckets View
-	buckets      []string
-	cursor       int // used for buckets or objects depending on state
-	bucketCursor int // stores the cursor position in the bucket list
+	projects          []gcs.ProjectBuckets
+	collapsedProjects map[string]struct{}
+	cursor            int // used for buckets or objects depending on state
+	bucketCursor      int // stores the cursor position in the bucket list
 
 	// Objects View
 	currentBucket      string
@@ -79,25 +86,26 @@ type Model struct {
 // NewModel creates a Model initialized with the provided projects and GCS client.
 func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showIcons bool) Model {
 	return Model{
-		projectIDs:  projectIDs,
-		client:      client,
-		downloadDir: downloadDir,
-		fuzzySearch: fuzzySearch,
-		showIcons:   showIcons,
-		width:       120,
-		height:      40,
-		state:       viewBuckets,
-		loading:     true,
-		selected:    make(map[string]struct{}),
-		help:        help.New(),
+		projectIDs:        projectIDs,
+		client:            client,
+		downloadDir:       downloadDir,
+		fuzzySearch:       fuzzySearch,
+		showIcons:         showIcons,
+		width:             120,
+		height:            40,
+		state:             viewBuckets,
+		loading:           true,
+		selected:          make(map[string]struct{}),
+		collapsedProjects: make(map[string]struct{}),
+		help:              help.New(),
 	}
 }
 
 // Init initializes the application by triggering the first bucket fetch.
 func (m Model) Init() tea.Cmd {
 	return func() tea.Msg {
-		buckets, err := m.client.ListBuckets(context.Background(), m.projectIDs)
-		return BucketsMsg{Buckets: buckets, Err: err}
+		projects, err := m.client.ListBuckets(context.Background(), m.projectIDs)
+		return BucketsMsg{Projects: projects, Err: err}
 	}
 }
 
@@ -201,24 +209,78 @@ func fuzzyMatch(query, target string) bool {
 	return false
 }
 
-func (m Model) filteredBuckets() []string {
-	if m.searchQuery == "" || m.state != viewBuckets {
-		return m.buckets
+func (m Model) filteredBuckets() []BucketListItem {
+	var items []BucketListItem
+	
+	if m.state != viewBuckets {
+		// Even if not in viewBuckets, we need to generate the list to find activeIdx
+		// But if not in viewBuckets, we ignore the search query to show the full tree context
 	}
-	var filtered []string
+
 	lowerQuery := strings.ToLower(m.searchQuery)
-	for _, b := range m.buckets {
-		match := false
-		if m.fuzzySearch {
-			match = fuzzyMatch(lowerQuery, b)
-		} else {
-			match = strings.Contains(strings.ToLower(b), lowerQuery)
+	isSearchActive := m.searchQuery != "" && m.state == viewBuckets
+
+	for _, p := range m.projects {
+		projectMatches := false
+		if isSearchActive {
+			if m.fuzzySearch {
+				projectMatches = fuzzyMatch(lowerQuery, p.ProjectID)
+			} else {
+				projectMatches = strings.Contains(strings.ToLower(p.ProjectID), lowerQuery)
+			}
 		}
-		if match {
-			filtered = append(filtered, b)
+
+		// Determine if the project should be expanded.
+		// If searching, we expand the project automatically if it has matching buckets, 
+		// but let's keep it simple: if search is active, we expand to show matches.
+		// Otherwise, use the collapsedProjects map.
+		_, isCollapsed := m.collapsedProjects[p.ProjectID]
+		isExpanded := !isCollapsed
+		if isSearchActive {
+			isExpanded = true // Always expand during search to show matches
+		}
+
+		// Filter buckets within the project
+		var matchingBuckets []string
+		for _, b := range p.Buckets {
+			if !isSearchActive {
+				matchingBuckets = append(matchingBuckets, b)
+				continue
+			}
+
+			bMatch := false
+			if m.fuzzySearch {
+				bMatch = fuzzyMatch(lowerQuery, b)
+			} else {
+				bMatch = strings.Contains(strings.ToLower(b), lowerQuery)
+			}
+			
+			// If bucket matches, or if project matches (show all buckets in matching project)
+			if bMatch || projectMatches {
+				matchingBuckets = append(matchingBuckets, b)
+			}
+		}
+
+		// Add project header if project matches OR if it has matching buckets
+		if !isSearchActive || projectMatches || len(matchingBuckets) > 0 {
+			items = append(items, BucketListItem{
+				IsProject: true,
+				ProjectID: p.ProjectID,
+			})
+			
+			if isExpanded {
+				for _, b := range matchingBuckets {
+					items = append(items, BucketListItem{
+						IsProject:  false,
+						ProjectID:  p.ProjectID,
+						BucketName: b,
+					})
+				}
+			}
 		}
 	}
-	return filtered
+
+	return items
 }
 
 func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []int) {
@@ -298,7 +360,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.Err
 			return m, nil
 		}
-		m.buckets = msg.Buckets
+		m.projects = msg.Projects
 		return m, nil
 
 	case ObjectsMsg:
@@ -327,7 +389,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var cmd tea.Cmd
 		if len(m.prefixes) > 0 {
-			cmd = m.fetchPrefixMetadataByName(m.prefixes[0].Name, 0)
+			// Fetch metadata for the current cursor (either 0 or restored)
+			cmd = m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor)
 		} else if len(m.objects) > 0 {
 			cmd = m.fetchContent(m.currentBucket, m.objects[0].Name)
 			m.previewContent = "Loading..."
@@ -549,17 +612,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == viewBuckets {
 				filtered := m.filteredBuckets()
 				if len(filtered) > 0 {
-					m.currentBucket = filtered[m.cursor]
-					
-					// Save the absolute index in the unfiltered list so going back restores correctly
-					m.bucketCursor = 0
-					for i, b := range m.buckets {
-						if b == m.currentBucket {
-							m.bucketCursor = i
-							break
+					item := filtered[m.cursor]
+
+					if item.IsProject {
+						// Toggle project expansion
+						if _, ok := m.collapsedProjects[item.ProjectID]; ok {
+							delete(m.collapsedProjects, item.ProjectID)
+						} else {
+							m.collapsedProjects[item.ProjectID] = struct{}{}
 						}
+						// Don't change state, just re-render
+						return m, nil
 					}
-					
+
+					m.currentBucket = item.BucketName
+
+					// Save the index in the filtered list to restore later.
+					// Note: Since expanding/collapsing can change the absolute index,
+					// restoring exact cursor might require matching by bucket name.
+					m.bucketCursor = m.cursor
+
 					m.currentPrefix = "" // Reset prefix when entering bucket
 					m.state = viewObjects
 					m.searchMode = false
@@ -567,8 +639,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.resetObjectsState()
 					return m, m.fetchObjects()
 				}
-			} else if m.state == viewObjects {
-				m.previewContent = ""
+			} else if m.state == viewObjects {				m.previewContent = ""
 				currentPrefixes, _, _ := m.filteredObjects()
 				// Check if selected item is a prefix
 				if m.cursor < len(currentPrefixes) {
@@ -586,8 +657,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searchQuery = ""
 				if m.currentPrefix == "" {
 					m.state = viewBuckets
+					
+					// Find the bucket in the current filtered view to restore cursor correctly
+					filtered := m.filteredBuckets()
+					m.cursor = 0
+					for i, item := range filtered {
+						if !item.IsProject && item.BucketName == m.currentBucket {
+							m.cursor = i
+							break
+						}
+					}
+					
 					m.currentBucket = ""
-					m.cursor = m.bucketCursor
 					m.loading = false
 					return m, nil
 				}

@@ -330,8 +330,8 @@ func (m Model) bucketsView(width int) string {
 		if m.state != viewBuckets {
 			// Find the index of the current bucket to keep it in view
 			activeIdx = 0
-			for i, b := range filtered {
-				if b == m.currentBucket {
+			for i, item := range filtered {
+				if !item.IsProject && item.BucketName == m.currentBucket {
 					activeIdx = i
 					break
 				}
@@ -340,7 +340,7 @@ func (m Model) bucketsView(width int) string {
 
 		start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
 		for i := start; i < end; i++ {
-			bucket := filtered[i]
+			item := filtered[i]
 
 			cursorIndicator := " "
 			if m.state == viewBuckets && m.cursor == i {
@@ -348,33 +348,55 @@ func (m Model) bucketsView(width int) string {
 			}
 
 			indicator := " "
-			if m.state != viewBuckets && bucket == m.currentBucket {
+			if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
 				indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Render("●")
 			}
 
 			textStyle := lipgloss.NewStyle()
 			if m.state == viewBuckets && m.cursor == i {
 				textStyle = textStyle.Foreground(lipgloss.Color("69")).Bold(true)
-			} else if m.state != viewBuckets && bucket == m.currentBucket {
+			} else if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
 				textStyle = textStyle.Foreground(lipgloss.Color("69"))
 			} else {
 				textStyle = textStyle.Foreground(lipgloss.Color("250"))
 			}
 
-			icon := ""
-			if m.showIcons {
-				icon = getIcon(bucket, false, true)
-			}
+			if item.IsProject {
+				// Project Header
+				icon := "▼ "
+				if _, collapsed := m.collapsedProjects[item.ProjectID]; collapsed {
+					icon = "▶ "
+				}
+				
+				// Make project titles bold and a different color
+				projectStyle := textStyle.Copy()
+				if m.state == viewBuckets && m.cursor != i {
+					projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
+				} else {
+					projectStyle = projectStyle.Bold(true)
+				}
+				
+				truncateLen := width - 4
+				truncatedProject := truncate(item.ProjectID, truncateLen)
+				content := fmt.Sprintf("%s%s%s", cursorIndicator, icon, projectStyle.Render(truncatedProject))
+				s.WriteString(content + "\n")
+			} else {
+				// Bucket Item
+				icon := ""
+				if m.showIcons {
+					icon = getIcon(item.BucketName, false, true)
+				}
 
-			// Truncate to fit column
-			truncateLen := width - 4
-			if m.showIcons {
-				truncateLen -= 2
-			}
-			truncatedBucket := truncate(bucket, truncateLen)
-			content := fmt.Sprintf("%s%s %s%s", cursorIndicator, indicator, icon, textStyle.Render(truncatedBucket))
+				// Truncate to fit column, account for indentation
+				truncateLen := width - 6
+				if m.showIcons {
+					truncateLen -= 2
+				}
+				truncatedBucket := truncate(item.BucketName, truncateLen)
+				content := fmt.Sprintf("%s%s  %s%s", cursorIndicator, indicator, icon, textStyle.Render(truncatedBucket))
 
-			s.WriteString(content + "\n")
+				s.WriteString(content + "\n")
+			}
 		}
 	}
 	return s.String()
