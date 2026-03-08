@@ -162,7 +162,9 @@ func (m *Model) resetObjectsState() {
 	m.prefixes = nil
 	m.cursor = 0
 	m.loading = true
-	m.status = ""
+	if !strings.HasPrefix(m.status, "Downloading") {
+		m.status = ""
+	}
 	m.selected = make(map[string]struct{})
 }
 
@@ -217,7 +219,7 @@ func fuzzyMatch(query, target string) bool {
 
 func (m Model) filteredBuckets() []BucketListItem {
 	var items []BucketListItem
-	
+
 	if m.state != viewBuckets {
 		// Even if not in viewBuckets, we need to generate the list to find activeIdx
 		// But if not in viewBuckets, we ignore the search query to show the full tree context
@@ -248,7 +250,7 @@ func (m Model) filteredBuckets() []BucketListItem {
 			} else {
 				bMatch = strings.Contains(strings.ToLower(b), lowerQuery)
 			}
-			
+
 			// Only match against bucket name
 			if bMatch {
 				matchingBuckets = append(matchingBuckets, b)
@@ -262,7 +264,7 @@ func (m Model) filteredBuckets() []BucketListItem {
 				IsProject: true,
 				ProjectID: p.ProjectID,
 			})
-			
+
 			if isExpanded {
 				for _, b := range matchingBuckets {
 					items = append(items, BucketListItem{
@@ -535,7 +537,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, keys.Down):
-			m.status = ""
+			if !strings.HasPrefix(m.status, "Downloading") {
+				m.status = ""
+			}
 
 			var itemsCount int
 			var currentPrefixes []gcs.PrefixMetadata
@@ -570,7 +574,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, keys.Up):
-			m.status = ""
+			if !strings.HasPrefix(m.status, "Downloading") {
+				m.status = ""
+			}
 
 			var itemsCount int
 			var currentPrefixes []gcs.PrefixMetadata
@@ -635,7 +641,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.resetObjectsState()
 					return m, m.fetchObjects()
 				}
-			} else if m.state == viewObjects {				m.previewContent = ""
+			} else if m.state == viewObjects {
+				m.previewContent = ""
 				currentPrefixes, _, _ := m.filteredObjects()
 				// Check if selected item is a prefix
 				if m.cursor < len(currentPrefixes) {
@@ -672,7 +679,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searchQuery = ""
 				if m.currentPrefix == "" {
 					m.state = viewBuckets
-					
+
 					// Find the bucket in the current filtered view to restore cursor correctly
 					filtered := m.filteredBuckets()
 					m.cursor = 0
@@ -682,12 +689,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							break
 						}
 					}
-					
+
 					m.currentBucket = ""
 					m.loading = false
 					return m, nil
 				}
-				
+
 				// Save the current prefix so we can highlight it in the parent directory
 				m.targetPrefixCursor = m.currentPrefix
 
@@ -705,7 +712,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Download all selected objects and prefixes
 					for _, p := range m.prefixes {
 						if _, ok := m.selected[p.Name]; ok {
-							dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(p.Name), "/") + ".zip")
+							dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(p.Name), "/")+".zip")
 							toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: p.Name, dest: dest, isPrefix: true})
 						}
 					}
@@ -719,7 +726,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Fallback to downloading the currently highlighted item
 					if m.cursor < len(currentPrefixes) {
 						name := currentPrefixes[m.cursor].Name
-						dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(name), "/") + ".zip")
+						dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(name), "/")+".zip")
 						toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: true})
 					} else if m.cursor >= len(currentPrefixes) {
 						idx := m.cursor - len(currentPrefixes)

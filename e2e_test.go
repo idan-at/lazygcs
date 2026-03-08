@@ -255,11 +255,11 @@ func TestPreviewObject_E2E(t *testing.T) {
 
 	// Enter bucket
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
-	
+
 	// Move cursor down to first bucket
 	tm.Type("j")
 	tm.Type("l")
-	
+
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
 
 	// Move to second file and check for its preview
@@ -310,7 +310,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 
 	// Select folder1/ (which is first because prefixes are shown before objects)
 	tm.Type(" ")
-	
+
 	// Move to file1.txt and select it
 	tm.Type("j")
 	tm.Type(" ")
@@ -321,7 +321,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 	// Wait for download to finish
 	expectedPath1 := filepath.Join(downloadDir, "file1.txt")
 	expectedPathZip := filepath.Join(downloadDir, "folder1.zip")
-	
+
 	assert.NilError(t, waitForFile(expectedPath1, 3*time.Second))
 	assert.NilError(t, waitForFile(expectedPathZip, 3*time.Second))
 

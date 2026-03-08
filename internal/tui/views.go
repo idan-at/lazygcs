@@ -367,7 +367,7 @@ func (m Model) bucketsView(width int) string {
 				if _, collapsed := m.collapsedProjects[item.ProjectID]; collapsed {
 					icon = "▶ "
 				}
-				
+
 				// Make project titles bold and a different color
 				projectStyle := textStyle.Copy()
 				if m.state == viewBuckets && m.cursor != i {
@@ -375,7 +375,7 @@ func (m Model) bucketsView(width int) string {
 				} else {
 					projectStyle = projectStyle.Bold(true)
 				}
-				
+
 				truncateLen := width - 4
 				truncatedProject := truncate(item.ProjectID, truncateLen)
 				content := fmt.Sprintf("%s%s%s", cursorIndicator, icon, projectStyle.Render(truncatedProject))
