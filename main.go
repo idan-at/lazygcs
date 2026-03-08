@@ -28,12 +28,6 @@ func main() {
 
 	ctx := context.Background()
 
-	storageClient, err := storage.NewClient(ctx)
-	if err != nil {
-		log.Fatalf("Failed to create GCS client: %v", err)
-	}
-	defer func() { _ = storageClient.Close() }()
-
 	// Determine config path: LAZYGCS_CONFIG env var or ~/.config/lazygcs/config.toml
 	configPath := os.Getenv("LAZYGCS_CONFIG")
 	if configPath == "" {
@@ -49,6 +43,12 @@ func main() {
 	if len(cfg.Projects) == 0 {
 		log.Fatal("No project IDs found in config file. Please configure them in ~/.config/lazygcs/config.toml")
 	}
+
+	storageClient, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Failed to create GCS client: %v", err)
+	}
+	defer func() { _ = storageClient.Close() }()
 
 	gcsClient := gcs.NewClient(storageClient)
 	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.Icons)
