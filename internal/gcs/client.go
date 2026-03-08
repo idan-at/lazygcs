@@ -1,10 +1,12 @@
 package gcs
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -62,6 +64,59 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 
 	if _, err := io.Copy(f, rc); err != nil {
 		return fmt.Errorf("failed to copy content to %q: %w", destPath, err)
+	}
+
+	return nil
+}
+
+// DownloadPrefixAsZip downloads all objects under a prefix into a local zip file.
+func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error {
+	f, err := os.Create(destZipPath)
+	if err != nil {
+		return fmt.Errorf("failed to create zip file %q: %w", destZipPath, err)
+	}
+	defer f.Close()
+
+	zipWriter := zip.NewWriter(f)
+	defer zipWriter.Close()
+
+	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error listing objects under prefix %q: %w", prefix, err)
+		}
+
+		// Skip directory markers
+		if strings.HasSuffix(attrs.Name, "/") {
+			continue
+		}
+
+		rc, err := c.storageClient.Bucket(bucketName).Object(attrs.Name).NewReader(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to open reader for %q: %w", attrs.Name, err)
+		}
+
+		// Keep relative path structure inside the zip
+		relPath := strings.TrimPrefix(attrs.Name, prefix)
+		if relPath == "" {
+			relPath = attrs.Name // Fallback
+		}
+
+		w, err := zipWriter.Create(relPath)
+		if err != nil {
+			rc.Close()
+			return fmt.Errorf("failed to create entry %q in zip: %w", relPath, err)
+		}
+
+		if _, err := io.Copy(w, rc); err != nil {
+			rc.Close()
+			return fmt.Errorf("failed to copy content for %q into zip: %w", relPath, err)
+		}
+		rc.Close()
 	}
 
 	return nil

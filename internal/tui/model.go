@@ -23,9 +23,10 @@ const (
 )
 
 type downloadTask struct {
-	bucket string
-	object string
-	dest   string
+	bucket   string
+	object   string
+	dest     string
+	isPrefix bool
 }
 
 type BucketListItem struct {
@@ -56,12 +57,13 @@ type Model struct {
 	showIcons bool
 
 	// Download Confirm State
-	pendingDownloadBucket string
-	pendingDownloadObject string
-	pendingDownloadDest   string
-	downloadQueue         []downloadTask
-	downloadTotal         int
-	downloadFinished      int
+	pendingDownloadBucket   string
+	pendingDownloadObject   string
+	pendingDownloadDest     string
+	pendingDownloadIsPrefix bool
+	downloadQueue           []downloadTask
+	downloadTotal           int
+	downloadFinished        int
 
 	// Buckets View
 	projects          []gcs.ProjectBuckets
@@ -144,8 +146,12 @@ func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	}
 }
 
-func (m Model) fetchDownload(bucketName, objectName, dest string) tea.Cmd {
+func (m Model) fetchDownload(bucketName, objectName, dest string, isPrefix bool) tea.Cmd {
 	return func() tea.Msg {
+		if isPrefix {
+			err := m.client.DownloadPrefixAsZip(context.Background(), bucketName, objectName, dest)
+			return DownloadMsg{Path: dest, Err: err}
+		}
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
 		return DownloadMsg{Path: dest, Err: err}
 	}
@@ -328,6 +334,7 @@ func (m *Model) processDownloadQueue() tea.Cmd {
 		m.pendingDownloadBucket = task.bucket
 		m.pendingDownloadObject = task.object
 		m.pendingDownloadDest = task.dest
+		m.pendingDownloadIsPrefix = task.isPrefix
 		m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest))
 		return nil
 	}
@@ -337,7 +344,7 @@ func (m *Model) processDownloadQueue() tea.Cmd {
 	} else {
 		m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
 	}
-	return m.fetchDownload(task.bucket, task.object, task.dest)
+	return m.fetchDownload(task.bucket, task.object, task.dest, task.isPrefix)
 }
 
 // Update processes terminal messages (key presses, window resizes) and async responses.
@@ -477,7 +484,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "o":
 				m.status = "Downloading (overwriting)..."
 				m.state = viewObjects
-				return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, m.pendingDownloadDest)
+				return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, m.pendingDownloadDest, m.pendingDownloadIsPrefix)
 			case "a", "q", "ctrl+c", "esc":
 				m.status = "Download aborted."
 				m.state = viewObjects
@@ -487,7 +494,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				newDest := autoRename(m.pendingDownloadDest)
 				m.status = fmt.Sprintf("Downloading as %s...", filepath.Base(newDest))
 				m.state = viewObjects
-				return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, newDest)
+				return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, newDest, m.pendingDownloadIsPrefix)
 			}
 			return m, nil
 		}
@@ -693,20 +700,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == viewObjects {
 				currentPrefixes, currentObjects, _ := m.filteredObjects()
 
-				var toDownload []string
+				var toDownload []downloadTask
 				if len(m.selected) > 0 {
-					// Download all selected objects (ignore prefixes for now)
+					// Download all selected objects and prefixes
+					for _, p := range m.prefixes {
+						if _, ok := m.selected[p.Name]; ok {
+							dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(p.Name), "/") + ".zip")
+							toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: p.Name, dest: dest, isPrefix: true})
+						}
+					}
 					for _, obj := range m.objects {
 						if _, ok := m.selected[obj.Name]; ok {
-							toDownload = append(toDownload, obj.Name)
+							dest := filepath.Join(m.downloadDir, filepath.Base(obj.Name))
+							toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: obj.Name, dest: dest, isPrefix: false})
 						}
 					}
 				} else {
-					// Fallback to downloading the currently highlighted object
-					if m.cursor >= len(currentPrefixes) {
+					// Fallback to downloading the currently highlighted item
+					if m.cursor < len(currentPrefixes) {
+						name := currentPrefixes[m.cursor].Name
+						dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(name), "/") + ".zip")
+						toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: true})
+					} else if m.cursor >= len(currentPrefixes) {
 						idx := m.cursor - len(currentPrefixes)
 						if idx < len(currentObjects) {
-							toDownload = append(toDownload, currentObjects[idx].Name)
+							name := currentObjects[idx].Name
+							dest := filepath.Join(m.downloadDir, filepath.Base(name))
+							toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: false})
 						}
 					}
 				}
@@ -715,14 +735,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.downloadTotal = len(toDownload)
 					m.downloadFinished = 0
 
-					for _, objName := range toDownload {
-						dest := filepath.Join(m.downloadDir, filepath.Base(objName))
-						m.downloadQueue = append(m.downloadQueue, downloadTask{
-							bucket: m.currentBucket,
-							object: objName,
-							dest:   dest,
-						})
-					}
+					m.downloadQueue = append(m.downloadQueue, toDownload...)
 
 					// Clear selection after triggering download
 					m.selected = make(map[string]struct{})

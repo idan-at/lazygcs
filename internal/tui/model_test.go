@@ -65,6 +65,10 @@ func (f mockGCSClient) DownloadObject(ctx context.Context, bucketName, objectNam
 	return nil
 }
 
+func (f mockGCSClient) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error {
+	return nil
+}
+
 // Helper to create simple object list from names
 func simpleObjectList(names []string, prefixes []string) *gcs.ObjectList {
 	var objects []gcs.ObjectMetadata

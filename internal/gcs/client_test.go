@@ -1,7 +1,9 @@
 package gcs_test
 
 import (
+	"archive/zip"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +14,61 @@ import (
 	"gotest.tools/v3/assert"
 	"lazygcs/internal/gcs"
 )
+
+func TestClient_DownloadPrefixAsZip(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"},
+				Content:     []byte("content1"),
+			},
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/sub/file2.txt"},
+				Content:     []byte("content2"),
+			},
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "other.txt"},
+				Content:     []byte("other"),
+			},
+		},
+		Host:   "127.0.0.1",
+		Port:   8088,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	client := gcs.NewClient(server.Client())
+	dest := filepath.Join(t.TempDir(), "folder1.zip")
+
+	err = client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest)
+	assert.NilError(t, err)
+
+	// Verify zip contents
+	r, err := zip.OpenReader(dest)
+	assert.NilError(t, err)
+	defer r.Close()
+
+	expectedFiles := map[string]string{
+		"file1.txt":     "content1",
+		"sub/file2.txt": "content2",
+	}
+
+	assert.Equal(t, len(r.File), len(expectedFiles))
+
+	for _, f := range r.File {
+		expectedContent, ok := expectedFiles[f.Name]
+		assert.Assert(t, ok, "Unexpected file in zip: %s", f.Name)
+
+		rc, err := f.Open()
+		assert.NilError(t, err)
+		content, err := io.ReadAll(rc)
+		assert.NilError(t, err)
+		rc.Close()
+
+		assert.Equal(t, string(content), expectedContent)
+	}
+}
 
 func TestClient_ListBuckets(t *testing.T) {
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{

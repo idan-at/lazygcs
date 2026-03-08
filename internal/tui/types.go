@@ -19,6 +19,8 @@ type GCSClient interface {
 	GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error)
 	// DownloadObject downloads the content of a GCS object to a local file.
 	DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error
+	// DownloadPrefixAsZip downloads all objects under a prefix into a local zip file.
+	DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error
 }
 
 // BucketsMsg is sent when bucket listing completes.

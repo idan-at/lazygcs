@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"os"
@@ -276,7 +277,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 				Content:     []byte("content1"),
 			},
 			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "file2.txt"},
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "folder1/file2.txt"},
 				Content:     []byte("content2"),
 			},
 		},
@@ -305,12 +306,12 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 	tm.Type("l")
 
 	// Wait for objects to load
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder1/") }, teatest.WithDuration(3*time.Second))
 
-	// Select file1
+	// Select folder1/ (which is first because prefixes are shown before objects)
 	tm.Type(" ")
 	
-	// Move to file2 and select it
+	// Move to file1.txt and select it
 	tm.Type("j")
 	tm.Type(" ")
 
@@ -319,16 +320,25 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 
 	// Wait for download to finish
 	expectedPath1 := filepath.Join(downloadDir, "file1.txt")
-	expectedPath2 := filepath.Join(downloadDir, "file2.txt")
+	expectedPathZip := filepath.Join(downloadDir, "folder1.zip")
 	
 	assert.NilError(t, waitForFile(expectedPath1, 3*time.Second))
-	assert.NilError(t, waitForFile(expectedPath2, 3*time.Second))
+	assert.NilError(t, waitForFile(expectedPathZip, 3*time.Second))
 
 	b1, err := os.ReadFile(expectedPath1)
 	assert.NilError(t, err)
 	assert.Equal(t, string(b1), "content1")
 
-	b2, err := os.ReadFile(expectedPath2)
+	// Check zip
+	r, err := zip.OpenReader(expectedPathZip)
 	assert.NilError(t, err)
-	assert.Equal(t, string(b2), "content2")
+	defer r.Close()
+
+	var foundFile2 bool
+	for _, f := range r.File {
+		if f.Name == "file2.txt" {
+			foundFile2 = true
+		}
+	}
+	assert.Assert(t, foundFile2, "file2.txt should be in the zip")
 }
