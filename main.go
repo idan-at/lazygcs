@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,7 +15,17 @@ import (
 	"lazygcs/internal/tui"
 )
 
+const version = "v0.1.0"
+
 func main() {
+	versionFlag := flag.Bool("version", false, "Print version and exit")
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("lazygcs %s\n", version)
+		os.Exit(0)
+	}
+
 	ctx := context.Background()
 
 	storageClient, err := storage.NewClient(ctx)

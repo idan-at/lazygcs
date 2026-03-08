@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -37,6 +38,20 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(m.Run())
+}
+
+func TestVersionFlag(t *testing.T) {
+	// Run with --version with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binaryPath, "--version")
+	output, err := cmd.CombinedOutput()
+
+	// Should succeed and not hang
+	assert.NilError(t, err)
+	// Should contain a version string (e.g. v0.1.0)
+	assert.Assert(t, strings.Contains(string(output), "lazygcs v"), "Output should contain version string, got: %s", string(output))
 }
 
 func TestMain_NoConfig(t *testing.T) {

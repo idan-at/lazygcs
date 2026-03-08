@@ -32,6 +32,13 @@ go build -o lazygcs main.go
 sudo mv lazygcs /usr/local/bin/
 ```
 
+### Usage
+Run `lazygcs` to start the application.
+You can use the `--version` flag to print the current version:
+```bash
+lazygcs --version
+```
+
 ## ⚙️ Configuration
 
 `lazygcs` is configured entirely via a TOML file. 
