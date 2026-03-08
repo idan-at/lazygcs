@@ -15,7 +15,7 @@ import (
 	"lazygcs/internal/tui"
 )
 
-const version = "v0.1.0"
+var version = "dev"
 
 func main() {
 	versionFlag := flag.Bool("version", false, "Print version and exit")

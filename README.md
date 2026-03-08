@@ -99,4 +99,4 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 
 ## 📝 License
 
-[MIT License](LICENSE)
+[MIT License](https://github.com/idan-at/lazygcs/blob/main/LICENSE)
