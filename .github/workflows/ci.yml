@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Verify Dependencies
+        run: |
+          go mod tidy
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "go.mod or go.sum is not tidy. Please run 'go mod tidy' and commit the changes."
+            git status
+            git diff
+            exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Run Tests with Race Detector
+        run: go test -v -race ./...
+
+      - name: Build
+        run: go build -v -o lazygcs main.go
