@@ -54,13 +54,13 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 	if err != nil {
 		return fmt.Errorf("failed to open reader for %q in %q: %w", objectName, bucketName, err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	f, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create local file %q: %w", destPath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := io.Copy(f, rc); err != nil {
 		return fmt.Errorf("failed to copy content to %q: %w", destPath, err)
@@ -75,10 +75,10 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 	if err != nil {
 		return fmt.Errorf("failed to create zip file %q: %w", destZipPath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	zipWriter := zip.NewWriter(f)
-	defer zipWriter.Close()
+	defer func() { _ = zipWriter.Close() }()
 
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
 	for {
@@ -108,15 +108,15 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 
 		w, err := zipWriter.Create(relPath)
 		if err != nil {
-			rc.Close()
+			_ = rc.Close()
 			return fmt.Errorf("failed to create entry %q in zip: %w", relPath, err)
 		}
 
 		if _, err := io.Copy(w, rc); err != nil {
-			rc.Close()
+			_ = rc.Close()
 			return fmt.Errorf("failed to copy content for %q into zip: %w", relPath, err)
 		}
-		rc.Close()
+		_ = rc.Close()
 	}
 
 	return nil
@@ -128,7 +128,7 @@ func (c *Client) GetObjectContent(ctx context.Context, bucketName, objectName st
 	if err != nil {
 		return "", fmt.Errorf("failed to create reader for %q in %q: %w", objectName, bucketName, err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	bytes, err := io.ReadAll(rc)
 	if err != nil {

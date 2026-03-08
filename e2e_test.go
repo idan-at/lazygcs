@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 		fmt.Printf("failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	binaryPath = filepath.Join(tmpDir, "lazygcs")
 	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
@@ -139,7 +139,7 @@ func TestListBuckets(t *testing.T) {
 
 	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
 	t.Cleanup(func() {
-		tm.Quit()
+		_ = tm.Quit()
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
 	})
 
@@ -176,7 +176,7 @@ func TestDownloadObject_E2E(t *testing.T) {
 
 	tm := setupTestApp(t, server, []string{"test-project-1"}, downloadDir)
 	t.Cleanup(func() {
-		tm.Quit()
+		_ = tm.Quit()
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
 	})
 
@@ -249,7 +249,7 @@ func TestPreviewObject_E2E(t *testing.T) {
 
 	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
 	t.Cleanup(func() {
-		tm.Quit()
+		_ = tm.Quit()
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
 	})
 
@@ -292,7 +292,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 
 	tm := setupTestApp(t, server, []string{"test-project-1"}, downloadDir)
 	t.Cleanup(func() {
-		tm.Quit()
+		_ = tm.Quit()
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
 	})
 
@@ -332,7 +332,7 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 	// Check zip
 	r, err := zip.OpenReader(expectedPathZip)
 	assert.NilError(t, err)
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	var foundFile2 bool
 	for _, f := range r.File {

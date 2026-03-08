@@ -127,16 +127,6 @@ func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
 	}
 }
 
-func (m Model) fetchPrefixMetadata(idx int) tea.Cmd {
-	// Ensure we get the correct prefix name from the filtered list, but fetchPrefixMetadata
-	// is typically called with an index into the main list.
-	// Wait, the index passed to this function might be the filtered index. Let's fix this
-	// to take the name directly to avoid issues.
-	return func() tea.Msg {
-		return nil // Replaced by fetchPrefixMetadataByName
-	}
-}
-
 func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
@@ -203,10 +193,9 @@ func fuzzyMatch(query, target string) bool {
 		return false
 	}
 	queryRunes := []rune(strings.ToLower(query))
-	targetRunes := []rune(strings.ToLower(target))
 
 	i := 0
-	for _, r := range targetRunes {
+	for _, r := range strings.ToLower(target) {
 		if r == queryRunes[i] {
 			i++
 			if i == len(queryRunes) {
@@ -219,11 +208,6 @@ func fuzzyMatch(query, target string) bool {
 
 func (m Model) filteredBuckets() []BucketListItem {
 	var items []BucketListItem
-
-	if m.state != viewBuckets {
-		// Even if not in viewBuckets, we need to generate the list to find activeIdx
-		// But if not in viewBuckets, we ignore the search query to show the full tree context
-	}
 
 	lowerQuery := strings.ToLower(m.searchQuery)
 	isSearchActive := m.searchQuery != "" && m.state == viewBuckets
@@ -546,9 +530,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var currentObjects []gcs.ObjectMetadata
 			var origIndices []int
 
-			if m.state == viewBuckets {
+			switch m.state {
+			case viewBuckets:
 				itemsCount = len(m.filteredBuckets())
-			} else if m.state == viewObjects {
+			case viewObjects:
 				currentPrefixes, currentObjects, origIndices = m.filteredObjects()
 				itemsCount = len(currentObjects) + len(currentPrefixes)
 			}
@@ -583,9 +568,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var currentObjects []gcs.ObjectMetadata
 			var origIndices []int
 
-			if m.state == viewBuckets {
+			switch m.state {
+			case viewBuckets:
 				itemsCount = len(m.filteredBuckets())
-			} else if m.state == viewObjects {
+			case viewObjects:
 				currentPrefixes, currentObjects, origIndices = m.filteredObjects()
 				itemsCount = len(currentObjects) + len(currentPrefixes)
 			}
@@ -611,7 +597,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, keys.Right):
-			if m.state == viewBuckets {
+			switch m.state {
+			case viewBuckets:
 				filtered := m.filteredBuckets()
 				if len(filtered) > 0 {
 					item := filtered[m.cursor]
@@ -641,7 +628,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.resetObjectsState()
 					return m, m.fetchObjects()
 				}
-			} else if m.state == viewObjects {
+			case viewObjects:
 				m.previewContent = ""
 				currentPrefixes, _, _ := m.filteredObjects()
 				// Check if selected item is a prefix

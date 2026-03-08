@@ -47,7 +47,7 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 	// Verify zip contents
 	r, err := zip.OpenReader(dest)
 	assert.NilError(t, err)
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	expectedFiles := map[string]string{
 		"file1.txt":     "content1",
@@ -64,7 +64,7 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 		assert.NilError(t, err)
 		content, err := io.ReadAll(rc)
 		assert.NilError(t, err)
-		rc.Close()
+		_ = rc.Close()
 
 		assert.Equal(t, string(content), expectedContent)
 	}

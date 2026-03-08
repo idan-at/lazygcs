@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create GCS client: %v", err)
 	}
-	defer storageClient.Close()
+	defer func() { _ = storageClient.Close() }()
 
 	// Determine config path: LAZYGCS_CONFIG env var or ~/.config/lazygcs/config.toml
 	configPath := os.Getenv("LAZYGCS_CONFIG")

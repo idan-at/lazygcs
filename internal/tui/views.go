@@ -29,39 +29,39 @@ func (m Model) previewView(width int) string {
 			// Selected item is a prefix (folder)
 			prefix := currentPrefixes[m.cursor]
 
-			s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-6))))
-			s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder")))
+			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-6)))
+			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
 
 			if !prefix.Created.IsZero() {
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Created:"), valStyle.Render(prefix.Created.Format("2006-01-02 15:04:05"))))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(prefix.Created.Format("2006-01-02 15:04:05")))
 			}
 			if !prefix.Updated.IsZero() {
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(prefix.Updated.Format("2006-01-02 15:04:05"))))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(prefix.Updated.Format("2006-01-02 15:04:05")))
 			}
 			if prefix.Owner != "" {
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(prefix.Owner)))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(prefix.Owner))
 			}
 		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
 			// Selected item is an object (not a prefix)
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-6))))
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size))))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-6)))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
 
 				contentType := obj.ContentType
 				if contentType == "" {
 					contentType = "unknown"
 				}
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Type:"), valStyle.Render(contentType)))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(contentType))
 
 				if !obj.Created.IsZero() {
-					s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05"))))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05")))
 				}
-				s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05"))))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05")))
 
 				if obj.Owner != "" {
-					s.WriteString(fmt.Sprintf("%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(obj.Owner)))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(obj.Owner))
 				}
 
 				if m.previewContent != "" {
@@ -369,7 +369,7 @@ func (m Model) bucketsView(width int) string {
 				}
 
 				// Make project titles bold and a different color
-				projectStyle := textStyle.Copy()
+				projectStyle := textStyle
 				if m.state == viewBuckets && m.cursor != i {
 					projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
 				} else {

@@ -950,7 +950,7 @@ func TestModel_PreviewBinaryContent(t *testing.T) {
 func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	var longContent strings.Builder
 	for i := 0; i < 100; i++ {
-		longContent.WriteString(fmt.Sprintf("line %d\n", i))
+		fmt.Fprintf(&longContent, "line %d\n", i)
 	}
 
 	client := mockGCSClient{
@@ -1058,11 +1058,11 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	// Press 'd' to download
-	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m = updatedM.(tui.Model)
 
 	// Press 'o' to overwrite
-	updatedM, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, cmd != nil, "Cmd should be returned for overwrite")
@@ -1098,11 +1098,11 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	// Press 'd' to download
-	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	updatedM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m = updatedM.(tui.Model)
 
 	// Press 'r' to rename
-	updatedM, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	updatedM, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, cmd != nil, "Cmd should be returned for rename")
