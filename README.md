@@ -8,16 +8,16 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 
 ## ✨ Features
 
-*   **Miller Column Navigation:** Instantly see your buckets, the current directory's contents, and a preview of the selected file all at once.
+*   **Miller Column Navigation:** Instantly see your buckets (grouped by project), the current directory's contents, and a preview of the selected file all at once.
 *   **Lightning Fast:** Keyboard-centric workflow means your hands never have to leave the home row.
 *   **File Previews:** Peek at file contents and metadata (size, type, created/updated dates) without downloading them. Safely ignores binary files to prevent terminal corruption!
 *   **Inline Search:** Instantly filter your buckets or objects. Supports exact matching or configurable **fuzzy search**.
-*   **Multi-Select & Batch Downloads:** Select multiple files and download them all concurrently. `lazygcs` will politely ask you what to do if a file already exists on your machine (Overwrite, Abort, or Auto-rename).
+*   **Multi-Select & Batch Downloads:** Select multiple files or entire directories and download them all concurrently. Directories are automatically packaged into `.zip` archives!
 *   **Vim-like Keybindings:** `j`/`k` for vertical movement, `h`/`l` for entering and exiting directories.
 
 ## 🚀 Installation
 
-Ensure you have [Go](https://golang.org/doc/install) (v1.21+) installed, then run:
+Ensure you have [Go](https://golang.org/doc/install) (v1.24+) installed, then run:
 
 ```bash
 go install github.com/idan-at/lazygcs@latest
@@ -77,13 +77,14 @@ gcloud auth application-default login
 ### Navigation
 *   `j` or `↓`: Move cursor down
 *   `k` or `↑`: Move cursor up
-*   `l` or `Enter` or `→`: Enter a bucket or directory
-*   `h` or `←`: Go back to the parent directory or bucket list
+*   `l` or `Enter` or `→`: Enter a bucket, directory, or expand/collapse a project header.
+*   `h` or `←`: Go back to the parent directory, bucket list, or collapse a project header.
 
 ### Actions
 *   `space`: Toggle selection of the highlighted item (Multi-select)
-*   `d`: Download the currently highlighted item (or all selected items)
+*   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.
 *   `/`: Start searching/filtering the current column
+*   `?`: Toggle the Help Menu overlay
 *   `esc` or `Enter`: Exit search mode
 *   `q` or `Ctrl+c`: Quit the application
 
@@ -91,11 +92,10 @@ gcloud auth application-default login
 
 *   [ ] Implement Delete (`x`) action for single and multi-selected objects.
 *   [ ] Add Object Versions view (`v`) to inspect historical versions of a file.
-*   [x] Add a Help Menu overlay (`?`).
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](#).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/idan-at/lazygcs/issues).
 
 ## 📝 License
 
