@@ -32,9 +32,9 @@ jobs:
           fi
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.11.2
+          version: latest
           args: --timeout=5m
 
       - name: Run Tests with Race Detector
