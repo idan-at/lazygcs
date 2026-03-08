@@ -51,8 +51,8 @@ func TestVersionFlag(t *testing.T) {
 
 	// Should succeed and not hang
 	assert.NilError(t, err)
-	// Should contain a version string (e.g. v0.1.0)
-	assert.Assert(t, strings.Contains(string(output), "lazygcs v"), "Output should contain version string, got: %s", string(output))
+	// Should contain the default version string "dev" for local builds
+	assert.Assert(t, strings.Contains(string(output), "lazygcs dev"), "Output should contain version string, got: %s", string(output))
 }
 
 func TestMain_NoConfig(t *testing.T) {
