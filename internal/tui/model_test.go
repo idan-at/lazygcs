@@ -87,19 +87,42 @@ func updateModel(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
 	return updatedM.(tui.Model), cmd
 }
 
-func TestModel_ObjectPreview(t *testing.T) {
+func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, downloadDir string) (tui.Model, mockGCSClient) {
 	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, []string{"folder1/"}),
+		projects: projects,
+		objects:  objects,
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
+	return m, client
+}
+
+func enterBucket(m tui.Model, projects []gcs.ProjectBuckets, bucket string, objects *gcs.ObjectList) tui.Model {
+	m, _ = updateModel(m, tui.BucketsMsg{Projects: projects})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
+	if objects != nil {
+		m, _ = updateModel(m, tui.ObjectsMsg{Bucket: bucket, Prefix: "", List: objects})
+	}
+	return m
+}
+
+func pressKey(m tui.Model, key rune) (tui.Model, tea.Cmd) {
+	return updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+}
+
+func pressKeyType(m tui.Model, keyType tea.KeyType) (tui.Model, tea.Cmd) {
+	return updateModel(m, tea.KeyMsg{Type: keyType})
+}
+
+func TestModel_ObjectPreview(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, []string{"folder1/"})
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Move cursor down to obj1 (index 1)
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
@@ -118,12 +141,10 @@ func TestModel_ObjectPreview(t *testing.T) {
 }
 
 func TestModel_UI_WrappingBug(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
@@ -147,18 +168,13 @@ func TestModel_UI_WrappingBug(t *testing.T) {
 }
 
 func TestModel_ModernSelectionUI(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	view := m.View()
 	// Old indicators should be gone
@@ -166,7 +182,7 @@ func TestModel_ModernSelectionUI(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "[ ]"), "View should not contain old unselected indicator '[ ]'")
 
 	// Select the item
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m, _ = pressKey(m, ' ')
 
 	view = m.View()
 	assert.Assert(t, !strings.Contains(view, "[x]"), "View should not contain old selected indicator '[x]'")
@@ -174,9 +190,9 @@ func TestModel_ModernSelectionUI(t *testing.T) {
 }
 
 func TestModel_HelpMenu(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	m, client := setupTestModel(projects, nil, "/tmp")
+	_ = client
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
 
 	// Assert help menu is not shown initially
@@ -184,7 +200,7 @@ func TestModel_HelpMenu(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "HELP"))
 
 	// Press '?' to show help
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m, _ = pressKey(m, '?')
 
 	view = m.View()
 	// In 'Which Key' style, we should see both the main content AND the help at the bottom
@@ -194,24 +210,22 @@ func TestModel_HelpMenu(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "toggle help"), "View should list the help keybind")
 
 	// Press '?' again to hide help
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m, _ = pressKey(m, '?')
 
 	view = m.View()
 	assert.Assert(t, !strings.Contains(view, "HELP"), "View should no longer contain 'HELP'")
 }
 
 func TestModel_InitialObjectPreview(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket and load objects
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// Process ObjectsMsg - this should trigger initial fetchContent
 	msg := tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects}
@@ -230,17 +244,13 @@ func TestModel_InitialObjectPreview(t *testing.T) {
 }
 
 func TestModel_CursorNoop_PreviewNotReloaded(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// 1. Setup: In bucket, obj1 loaded and previewed
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", nil)
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Process initial fetchContent
@@ -249,7 +259,7 @@ func TestModel_CursorNoop_PreviewNotReloaded(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "content of obj1"))
 
 	// 2. Press 'j' (down). Since there's only 1 item, cursor stays at 0.
-	m, cmd = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, cmd = pressKey(m, 'j')
 
 	// Assertions:
 	// - No command should be returned (no new fetch)
@@ -270,9 +280,7 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", nil)
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Simulate receiving the error message
@@ -285,25 +293,20 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 }
 
 func TestModel_StalePreviewContent(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Setup: In bucket, objects loaded
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// 1. Move to obj1, triggering a fetch. Capture the command.
 	_, cmdForObj1 := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	msgForObj1 := cmdForObj1()
 
 	// 2. Before the content for obj1 arrives, move to obj2.
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	// 3. Now, the stale message for obj1 arrives.
 	m, _ = updateModel(m, msgForObj1)
@@ -337,13 +340,13 @@ func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(m.View(), " p1"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRight})
+	m, _ = pressKeyType(m, tea.KeyRight)
 	assert.Assert(t, strings.Contains(m.View(), "Objects in b1"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m, _ = pressKeyType(m, tea.KeyLeft)
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 }
 
@@ -354,10 +357,10 @@ func TestModel_Update_CursorNavigation(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 	assert.Assert(t, strings.Contains(m.View(), " b2"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = pressKey(m, 'k')
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 }
 
@@ -369,11 +372,11 @@ func TestModel_Update_CursorCycle(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 
 	// Up from top -> bottom
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = pressKeyType(m, tea.KeyUp)
 	assert.Assert(t, strings.Contains(m.View(), " b3"))
 
 	// Down from bottom -> top
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = pressKeyType(m, tea.KeyDown)
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 }
 
@@ -396,7 +399,7 @@ func TestModel_EnterBucket(t *testing.T) {
 
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
 
@@ -417,26 +420,22 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// First item is obj1
 	assert.Assert(t, strings.Contains(m.View(), " obj1"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = pressKeyType(m, tea.KeyUp)
 	assert.Assert(t, strings.Contains(m.View(), " obj2"))
 
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = pressKeyType(m, tea.KeyDown)
 	assert.Assert(t, strings.Contains(m.View(), " obj1"))
 }
 
 func TestModel_Resize(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-
-	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	m, client := setupTestModel(projects, nil, "/tmp")
+	_ = client
 
 	view := m.View()
 	assert.Assert(t, len(view) > 0)
@@ -459,8 +458,8 @@ func TestModel_EnterPrefix(t *testing.T) {
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
 
 	// Enter bucket b1
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Verify we are at root
@@ -501,10 +500,7 @@ func TestModel_SelectObject(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	view := m.View()
 	// Should show metadata in preview
@@ -528,9 +524,7 @@ func TestModel_SelectPrefix(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// 1. Enter bucket
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b"}}}, "b", nil)
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b", Prefix: "", List: client.objects})
 
 	// Initial fetch for first item (prefix)
@@ -568,7 +562,7 @@ func TestModel_Pagination_Buckets(t *testing.T) {
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 10})
 
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	view := m.View()
 	// Should not show all 50 buckets
@@ -589,11 +583,7 @@ func TestModel_Pagination_Objects(t *testing.T) {
 
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 10})
 
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "obj-00"))
@@ -615,13 +605,10 @@ func TestModel_CursorBug_SingleItem(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Press Down - should not crash or change cursor
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = pressKeyType(m, tea.KeyDown)
 
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "obj1"))
@@ -637,39 +624,37 @@ func TestModel_HeaderClearedOnBack(t *testing.T) {
 
 	// Enter bucket
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
 	assert.Assert(t, strings.Contains(m.View(), "gs://b1/"))
 
 	// Go back to bucket list
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = pressKey(m, 'h')
 
 	// Header should be cleared back to gs://
 	assert.Assert(t, strings.Contains(m.View(), "gs:// "))
 }
 
 func TestModel_StaleObjectsMsg(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2"}}},
-		objects:  simpleObjectList([]string{"obj-from-b1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2"}}}
+	objects := simpleObjectList([]string{"obj-from-b1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter b1
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// Capture the fetch objects msg for b1
 	staleMsg := tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects}
 
 	// Go back to bucket list
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = pressKey(m, 'h')
 
 	// Move to b2 and enter it
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKeyType(m, tea.KeyDown)
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// Now the STALE msg from b1 arrives
 	m, _ = updateModel(m, staleMsg)
@@ -682,18 +667,13 @@ func TestModel_StaleObjectsMsg(t *testing.T) {
 }
 
 func TestModel_DownloadAction(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Press 'd' to download
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -717,17 +697,14 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Select obj1
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m, _ = pressKey(m, ' ')
 
 	// Move to obj2 and select it
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKey(m, ' ')
 
 	// Press 'd' to download
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -784,14 +761,14 @@ func TestModel_Truncation(t *testing.T) {
 
 	// 1. Check Bucket truncation
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{longName}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	view := m.View()
 	// Should contain truncated version (usually ending in ...)
 	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long bucket name")
 
 	// 2. Check Object truncation
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKeyType(m, tea.KeyEnter)
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: longName, Prefix: "", List: client.objects})
 
 	view = m.View()
@@ -808,9 +785,7 @@ func TestModel_PreviewBinaryContent(t *testing.T) {
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", nil)
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Simulate receiving binary content
@@ -844,9 +819,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", nil)
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Simulate receiving the content but with 100 lines
@@ -880,10 +853,7 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Press 'd' to download
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -896,7 +866,7 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "(r)ename"), "View should present rename option")
 
 	// Press 'a' to abort
-	m, cmd = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m, cmd = pressKey(m, 'a')
 
 	assert.Assert(t, cmd == nil, "No command should be returned after abort")
 	assert.Assert(t, strings.Contains(m.View(), "Download aborted"), "View should indicate abortion")
@@ -916,13 +886,10 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Press 'd' to download
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m, _ = pressKey(m, 'd')
 
 	// Press 'o' to overwrite
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
@@ -950,13 +917,10 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Press 'd' to download
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m, _ = pressKey(m, 'd')
 
 	// Press 'r' to rename
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
@@ -972,41 +936,36 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 }
 
 func TestModel_MultiSelect(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Initially, obj1 is at cursor but not selected
 	view := m.View()
 	assert.Assert(t, !strings.Contains(view, "✓ obj1"))
 
 	// Press space to select obj1
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m, _ = pressKey(m, ' ')
 
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "✓ obj1"), "obj1 should be selected")
 
 	// Move cursor down to obj2
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	// Press space to select obj2
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m, _ = pressKey(m, ' ')
 
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "✓ obj1"), "obj1 should still be selected")
 	assert.Assert(t, strings.Contains(view, "✓ obj2"), "obj2 should be selected")
 
 	// Press space again to deselect obj2
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m, _ = pressKey(m, ' ')
 
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "✓ obj1"), "obj1 should still be selected")
@@ -1022,18 +981,18 @@ func TestModel_CursorPersistsOnBack(t *testing.T) {
 
 	// 1. Initial state: Buckets loaded, cursor at 0 (b1)
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	// 2. Move cursor down to b2 (index 1)
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 	assert.Assert(t, strings.Contains(m.View(), " b2"))
 
 	// 3. Enter bucket b2
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKeyType(m, tea.KeyEnter)
 	assert.Assert(t, strings.Contains(m.View(), "Objects in b2"))
 
 	// 4. Go back to bucket list
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = pressKey(m, 'h')
 
 	// Assertions:
 	// - Should be back in buckets view (has "Buckets" header and no "Objects in")
@@ -1053,24 +1012,24 @@ func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
 
 	// 1. Initial state: Buckets loaded
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot", "blueberry"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	// 2. Filter by 'b' -> [banana, blueberry]
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	m, _ = pressKey(m, '/')
+	m, _ = pressKey(m, 'b')
 
 	// Exit search mode but keep query active
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// 3. Move cursor down to blueberry (index 2 in filtered list: [p1, banana, blueberry])
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKey(m, 'j')
 
 	// 4. Enter bucket blueberry
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// 5. Go back to bucket list
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = pressKey(m, 'h')
 
 	// Assertions:
 	// - Filter should be cleared
@@ -1081,30 +1040,27 @@ func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
 
 func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {
 	rootObjects := simpleObjectList([]string{"file1"}, []string{"folder1/", "folder2/"})
-
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  rootObjects,
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := rootObjects
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket b1
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// Load root objects
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: rootObjects})
 
 	// Move cursor to folder2/ (index 1)
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	// Enter folder2/
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = pressKeyType(m, tea.KeyEnter)
 
 	// Go back using 'h'
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = pressKey(m, 'h')
 
 	// Re-load root objects
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: rootObjects})
@@ -1131,7 +1087,7 @@ func TestModel_CollapseProjectOnLeft(t *testing.T) {
 
 	// Ensure cursor is on p1 (index 0)
 	// Press 'h' (Left) to collapse it
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = pressKey(m, 'h')
 
 	// Assertions:
 	// - The project should be collapsed (▶ p1)
@@ -1154,7 +1110,7 @@ func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: client.projects})
 
 	// Enter search mode and type "apple"
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m, _ = pressKey(m, '/')
 	for _, r := range "apple" {
 		m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
@@ -1165,8 +1121,8 @@ func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "banana"), "Should not show banana bucket")
 
 	// Now search for "banana"
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEsc}) // Clear
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m, _ = pressKeyType(m, tea.KeyEsc) // Clear
+	m, _ = pressKey(m, '/')
 	for _, r := range "banana" {
 		m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
@@ -1188,11 +1144,11 @@ func TestModel_SearchFilter(t *testing.T) {
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}}})
 
 	// Enter search mode
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m, _ = pressKey(m, '/')
 
 	// Type 'a', 'p'
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	m, _ = pressKey(m, 'a')
+	m, _ = pressKey(m, 'p')
 
 	view := m.View()
 	// Should show 'apple' and 'apricot', but not 'banana'
@@ -1202,7 +1158,7 @@ func TestModel_SearchFilter(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "SEARCH: ap"))
 
 	// Exit search mode
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, _ = pressKeyType(m, tea.KeyEsc)
 	view = m.View()
 	assert.Assert(t, !strings.Contains(view, "SEARCH: ap"))
 }
@@ -1218,12 +1174,12 @@ func TestModel_FuzzySearch(t *testing.T) {
 	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}}})
 
 	// Enter search mode
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m, _ = pressKey(m, '/')
 
 	// Type 'a', 'l', 'e' -> should match 'apple', but not 'apricot'
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m, _ = pressKey(m, 'a')
+	m, _ = pressKey(m, 'l')
+	m, _ = pressKey(m, 'e')
 
 	view := m.View()
 	// Should show 'apple'
@@ -1236,25 +1192,20 @@ func TestModel_FuzzySearch(t *testing.T) {
 }
 
 func TestModel_DownloadStatusPersistence(t *testing.T) {
-	client := mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
 
 	// Enter bucket and load objects
-	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 	// Trigger download status
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m, _ = pressKey(m, 'd')
 	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."))
 
 	// Move cursor down
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = pressKey(m, 'j')
 
 	// Status should PERSIST
 	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."), "Download status should persist after navigation")
@@ -1264,7 +1215,7 @@ func TestModel_DownloadStatusPersistence(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"))
 
 	// Move cursor up
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = pressKey(m, 'k')
 
 	// Normal status should be CLEARED
 	assert.Assert(t, !strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "Normal status should be cleared after navigation")
