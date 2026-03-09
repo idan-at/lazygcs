@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -146,99 +145,6 @@ func (m Model) maxItemsVisible() int {
 		v = 1
 	}
 	return v
-}
-
-func visibleRange(cursor, totalItems, maxVisible int) (start, end int) {
-	if maxVisible <= 0 {
-		return 0, 0
-	}
-	if totalItems <= maxVisible {
-		return 0, totalItems
-	}
-
-	start = cursor - maxVisible/2
-	if start < 0 {
-		start = 0
-	}
-	end = start + maxVisible
-	if end > totalItems {
-		end = totalItems
-		start = end - maxVisible
-		if start < 0 {
-			start = 0
-		}
-	}
-	return start, end
-}
-
-func truncate(s string, maxLen int) string {
-	if maxLen <= 0 {
-		return ""
-	}
-	r := []rune(s)
-	if len(r) > maxLen {
-		if maxLen > 3 {
-			return string(r[:maxLen-3]) + "..."
-		}
-		return string(r[:maxLen])
-	}
-	return s
-}
-
-func humanizeSize(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
-
-func getIcon(name string, isFolder bool, isBucket bool) string {
-	if isBucket {
-		return "🪣 " // Bucket icon
-	}
-	if isFolder {
-		return " " // Folder icon
-	}
-
-	ext := strings.ToLower(filepath.Ext(name))
-	switch ext {
-	case ".go":
-		return "󰟓 "
-	case ".md":
-		return " "
-	case ".json":
-		return " "
-	case ".txt":
-		return " "
-	case ".csv":
-		return "󰈙 "
-	case ".yaml", ".yml", ".toml":
-		return " "
-	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
-		return " "
-	case ".pdf":
-		return " "
-	case ".zip", ".tar", ".gz", ".tgz":
-		return " "
-	case ".sh", ".bash", ".zsh":
-		return " "
-	case ".py":
-		return " "
-	case ".js", ".ts", ".jsx", ".tsx":
-		return " "
-	case ".html", ".htm":
-		return " "
-	case ".css":
-		return " "
-	default:
-		return " " // Default file icon
-	}
 }
 
 func (m Model) objectsView(width int) string {
