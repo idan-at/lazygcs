@@ -53,9 +53,9 @@ func (m Model) fetchDownload(bucketName, objectName, dest string, isPrefix bool)
 	}
 }
 
-func (m *Model) processDownloadQueue() tea.Cmd {
+func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 	if len(m.downloadQueue) == 0 {
-		return nil
+		return m, nil
 	}
 
 	task := m.downloadQueue[0]
@@ -69,7 +69,7 @@ func (m *Model) processDownloadQueue() tea.Cmd {
 		m.pendingDownloadDest = task.dest
 		m.pendingDownloadIsPrefix = task.isPrefix
 		m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest))
-		return nil
+		return m, nil
 	}
 
 	if m.downloadTotal > 1 {
@@ -77,5 +77,5 @@ func (m *Model) processDownloadQueue() tea.Cmd {
 	} else {
 		m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
 	}
-	return m.fetchDownload(task.bucket, task.object, task.dest, task.isPrefix)
+	return m, m.fetchDownload(task.bucket, task.object, task.dest, task.isPrefix)
 }

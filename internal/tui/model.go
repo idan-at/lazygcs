@@ -96,7 +96,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	}
 }
 
-func (m *Model) resetObjectsState() {
+func (m Model) resetObjectsState() Model {
 	m.objects = nil
 	m.prefixes = nil
 	m.cursor = 0
@@ -105,6 +105,7 @@ func (m *Model) resetObjectsState() {
 		m.status = ""
 	}
 	m.selected = make(map[string]struct{})
+	return m
 }
 
 func (m Model) filteredBuckets() []BucketListItem {

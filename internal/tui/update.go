@@ -123,7 +123,7 @@ func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if len(m.downloadQueue) > 0 {
-		cmd := m.processDownloadQueue()
+		m, cmd := m.processDownloadQueue()
 		return m, cmd
 	}
 	return m, nil
@@ -360,7 +360,7 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 			m.state = viewObjects
 			m.searchMode = false
 			m.searchQuery = ""
-			m.resetObjectsState()
+			m = m.resetObjectsState()
 			return m, m.fetchObjects()
 		}
 	case viewObjects:
@@ -371,7 +371,7 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 			m.currentPrefix = currentPrefixes[m.cursor].Name
 			m.searchMode = false
 			m.searchQuery = ""
-			m.resetObjectsState()
+			m = m.resetObjectsState()
 			return m, m.fetchObjects()
 		}
 	}
@@ -424,7 +424,7 @@ func (m Model) handleLeftKey() (tea.Model, tea.Cmd) {
 
 		// Go up one level
 		m.currentPrefix = parentPrefix(m.currentPrefix)
-		m.resetObjectsState()
+		m = m.resetObjectsState()
 		return m, m.fetchObjects()
 	}
 	return m, nil
@@ -474,7 +474,7 @@ func (m Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 			// Clear selection after triggering download
 			m.selected = make(map[string]struct{})
 
-			cmd := m.processDownloadQueue()
+			m, cmd := m.processDownloadQueue()
 			return m, cmd
 		}
 	}
