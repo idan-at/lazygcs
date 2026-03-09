@@ -12,21 +12,13 @@ import (
 // Config represents the application's runtime configuration.
 type Config struct {
 	// Projects is a list of Google Cloud Project IDs to operate on.
-	Projects []string
+	Projects []string `toml:"projects"`
 	// DownloadDir is the directory where files will be downloaded.
-	DownloadDir string
+	DownloadDir string `toml:"download_dir"`
 	// FuzzySearch enables fuzzy matching for filtering lists.
-	FuzzySearch bool
+	FuzzySearch bool `toml:"fuzzy_search"`
 	// Icons enables rendering of Nerd Font icons next to items.
-	Icons bool
-}
-
-// tomlConfig represents the structure of the config.toml file.
-type tomlConfig struct {
-	Projects    []string `toml:"projects"`
-	DownloadDir string   `toml:"download_dir"`
-	FuzzySearch bool     `toml:"fuzzy_search"`
-	Icons       bool     `toml:"icons"`
+	Icons bool `toml:"icons"`
 }
 
 func defaultDownloadDir() string {
@@ -59,19 +51,16 @@ func Load(configPath string) (*Config, error) {
 		DownloadDir: defaultDownloadDir(),
 	}
 
-	var tc tomlConfig
-	if _, err := toml.DecodeFile(configPath, &tc); err != nil {
+	if _, err := toml.DecodeFile(configPath, cfg); err != nil {
 		return nil, err
 	}
 
-	if len(tc.Projects) > 0 {
-		cfg.Projects = trimProjects(tc.Projects)
+	if len(cfg.Projects) > 0 {
+		cfg.Projects = trimProjects(cfg.Projects)
 	}
-	if tc.DownloadDir != "" {
-		cfg.DownloadDir = tc.DownloadDir
+	if cfg.DownloadDir == "" {
+		cfg.DownloadDir = defaultDownloadDir()
 	}
-	cfg.FuzzySearch = tc.FuzzySearch
-	cfg.Icons = tc.Icons
 
 	return cfg, nil
 }
