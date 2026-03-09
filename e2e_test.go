@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"gotest.tools/v3/assert"
@@ -101,7 +102,10 @@ func setupTestApp(t *testing.T, server *fakestorage.Server, projectIDs []string,
 	cfg, err := config.Load(configPath)
 	assert.NilError(t, err)
 
-	gcsClient := gcs.NewClient(server.Client())
+	var gcsClient *gcs.Client
+	if server != nil {
+		gcsClient = gcs.NewClient(server.Client())
+	}
 	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.Icons)
 
 	tm := teatest.NewTestModel(t, m)
@@ -253,7 +257,7 @@ func TestPreviewObject_E2E(t *testing.T) {
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
 	})
 
-	// Enter bucket
+	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
 
 	// Move cursor down to first bucket
@@ -341,4 +345,268 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 		}
 	}
 	assert.Assert(t, foundFile2, "file2.txt should be in the zip")
+}
+
+func TestSearch_E2E(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
+		},
+		Host:   "127.0.0.1",
+		Port:   8091,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
+	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+
+	// Wait for buckets
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "test-bucket-1") && strings.Contains(string(bts), "test-bucket-2")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Search for test-bucket-1
+	tm.Type("/")
+	time.Sleep(100 * time.Millisecond) // UI transition to search
+	tm.Type("bucket-1")
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter}) // Enter to finish search mode
+
+	// Force a full redraw so teatest can capture the entire screen state
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Verify only test-bucket-1 is visible
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "test-bucket-1") && !strings.Contains(s, "test-bucket-2")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestNavigationUp_E2E(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("hi")},
+		},
+		Host:   "127.0.0.1",
+		Port:   8092,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
+	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+
+	// Wait for b1
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket b1 (it's the second item after project header)
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder1/") }, teatest.WithDuration(3*time.Second))
+
+	// Enter folder1/
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
+
+	// Go back to bucket root
+	tm.Type("h")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder1/") }, teatest.WithDuration(3*time.Second))
+
+	// Go back to bucket list
+	tm.Type("h")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "Buckets") }, teatest.WithDuration(3*time.Second))
+}
+
+func TestDownloadOverwrite_E2E(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
+				Content:     []byte("new content"),
+			},
+		},
+		Host:   "127.0.0.1",
+		Port:   8093,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	downloadDir := t.TempDir()
+	filePath := filepath.Join(downloadDir, "file1.txt")
+	err = os.WriteFile(filePath, []byte("old content"), 0644)
+	assert.NilError(t, err)
+
+	tm := setupTestApp(t, server, []string{"p1"}, downloadDir)
+	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+
+	// Wait for b1
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
+
+	// Attempt download
+	tm.Type("d")
+	time.Sleep(100 * time.Millisecond) // Give time for state transition
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Wait for overwrite prompt
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "(o)verwrite")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Confirm overwrite
+	tm.Type("o")
+
+	// Verify content
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		b, _ := os.ReadFile(filePath)
+		if string(b) == "new content" {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("file was not overwritten with new content")
+}
+
+func TestHelpMenu_E2E(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
+		},
+		Host:   "127.0.0.1",
+		Port:   8098,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
+	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+
+	// Toggle help
+	tm.Type("?")
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "HELP") }, teatest.WithDuration(3*time.Second))
+
+	// Toggle help off
+	tm.Type("?")
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return !strings.Contains(string(bts), "HELP") }, teatest.WithDuration(3*time.Second))
+}
+
+func TestPreviewEdgeCases_E2E(t *testing.T) {
+	largeContent := strings.Repeat("line\n", 100)
+	binaryContent := []byte{0x00, 0x01, 0x02}
+
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "large.txt"},
+				Content:     []byte(largeContent),
+			},
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "binary.bin"},
+				Content:     binaryContent,
+			},
+		},
+		Host:   "127.0.0.1",
+		Port:   8094,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
+	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+
+	// Wait for b1
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Check binary preview
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "binary.bin") && strings.Contains(string(bts), "(binary content)")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Check large file truncation
+	tm.Type("j")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "large.txt") && strings.Contains(s, "...")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestNavigationCycle_E2E(t *testing.T) {
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: []fakestorage.Object{
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b2", Name: "init"}, Content: []byte("hi")},
+		},
+		Host:   "127.0.0.1",
+		Port:   8095,
+		Scheme: "http",
+	})
+	assert.NilError(t, err)
+	defer server.Stop()
+
+	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
+	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+
+	// Wait for buckets
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "b1") && strings.Contains(string(bts), "b2")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Position 0: p1 header
+	// Position 1: b1
+	// Position 2: b2
+	// Move to b2 (2 times 'j')
+	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	time.Sleep(100 * time.Millisecond)
+	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	time.Sleep(100 * time.Millisecond)
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Assert we are on either b1 or b2
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "b1") && strings.Contains(s, "b2") && strings.Contains(s, "▶")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Move one more to cycle back to project header
+	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	time.Sleep(100 * time.Millisecond)
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// Check that project header is selected (has cursor)
+		return strings.Contains(s, "▶▼ p1")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Move back up (cycle from top to bottom)
+	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	time.Sleep(100 * time.Millisecond)
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "b1") && strings.Contains(s, "b2") && strings.Contains(s, "▶")
+	}, teatest.WithDuration(3*time.Second))
 }
