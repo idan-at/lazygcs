@@ -171,6 +171,7 @@ func TestClient_GetObjectContent(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			content, err := client.GetObjectContent(context.Background(), "b1", tt.objectName)

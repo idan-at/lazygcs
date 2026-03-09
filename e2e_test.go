@@ -95,20 +95,31 @@ func createConfigFile(t *testing.T, projects []string, downloadDir string) strin
 	return path
 }
 
-func setupTestApp(t *testing.T, server *fakestorage.Server, projectIDs []string, downloadDir string) *teatest.TestModel {
+func setupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16, projectIDs []string, downloadDir string) *teatest.TestModel {
 	t.Helper()
+
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: initialObjects,
+		Host:           "127.0.0.1",
+		Port:           port,
+		Scheme:         "http",
+	})
+	assert.NilError(t, err)
+	t.Cleanup(server.Stop)
 
 	configPath := createConfigFile(t, projectIDs, downloadDir)
 	cfg, err := config.Load(configPath)
 	assert.NilError(t, err)
 
-	var gcsClient *gcs.Client
-	if server != nil {
-		gcsClient = gcs.NewClient(server.Client())
-	}
+	gcsClient := gcs.NewClient(server.Client())
 	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.Icons)
 
 	tm := teatest.NewTestModel(t, m)
+	t.Cleanup(func() {
+		_ = tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
+
 	return tm
 }
 
@@ -124,28 +135,16 @@ func waitForFile(path string, timeout time.Duration) error {
 }
 
 func TestListBuckets(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{
-					BucketName: "test-bucket-1",
-					Name:       "init",
-				},
-				Content: []byte("hi"),
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "test-bucket-1",
+				Name:       "init",
 			},
+			Content: []byte("hi"),
 		},
-		Host:   "127.0.0.1",
-		Port:   8081,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
+	}
+	tm := setupTestApp(t, objects, 8081, []string{"test-project-1"}, t.TempDir())
 
 	teatest.WaitFor(
 		t,
@@ -159,30 +158,17 @@ func TestListBuckets(t *testing.T) {
 
 func TestDownloadObject_E2E(t *testing.T) {
 	content := []byte("download test content")
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{
-					BucketName: "test-bucket-1",
-					Name:       "file_to_dl.txt",
-				},
-				Content: content,
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "test-bucket-1",
+				Name:       "file_to_dl.txt",
 			},
+			Content: content,
 		},
-		Host:   "127.0.0.1",
-		Port:   8088,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
+	}
 	downloadDir := t.TempDir()
-
-	tm := setupTestApp(t, server, []string{"test-project-1"}, downloadDir)
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
+	tm := setupTestApp(t, objects, 8088, []string{"test-project-1"}, downloadDir)
 
 	// Wait for bucket
 	teatest.WaitFor(
@@ -233,29 +219,17 @@ func TestDownloadObject_E2E(t *testing.T) {
 }
 
 func TestPreviewObject_E2E(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
-				Content:     []byte("content1"),
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file2.txt"},
-				Content:     []byte("content2"),
-			},
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
+			Content:     []byte("content1"),
 		},
-		Host:   "127.0.0.1",
-		Port:   8089,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file2.txt"},
+			Content:     []byte("content2"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8089, []string{"test-project-1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -274,31 +248,18 @@ func TestPreviewObject_E2E(t *testing.T) {
 }
 
 func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "file1.txt"},
-				Content:     []byte("content1"),
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "folder1/file2.txt"},
-				Content:     []byte("content2"),
-			},
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "file1.txt"},
+			Content:     []byte("content1"),
 		},
-		Host:   "127.0.0.1",
-		Port:   8090,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "folder1/file2.txt"},
+			Content:     []byte("content2"),
+		},
+	}
 	downloadDir := t.TempDir()
-
-	tm := setupTestApp(t, server, []string{"test-project-1"}, downloadDir)
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
+	tm := setupTestApp(t, objects, 8090, []string{"test-project-1"}, downloadDir)
 
 	// Wait for bucket
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "test-bucket-1") }, teatest.WithDuration(3*time.Second))
@@ -348,20 +309,11 @@ func TestDownloadObject_E2E_MultiSelect(t *testing.T) {
 }
 
 func TestSearch_E2E(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
-		},
-		Host:   "127.0.0.1",
-		Port:   8091,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"test-project-1"}, t.TempDir())
-	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
+	}
+	tm := setupTestApp(t, objects, 8091, []string{"test-project-1"}, t.TempDir())
 
 	// Wait for buckets
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -385,19 +337,10 @@ func TestSearch_E2E(t *testing.T) {
 }
 
 func TestNavigationUp_E2E(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("hi")},
-		},
-		Host:   "127.0.0.1",
-		Port:   8092,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
-	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("hi")},
+	}
+	tm := setupTestApp(t, objects, 8092, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -425,27 +368,18 @@ func TestNavigationUp_E2E(t *testing.T) {
 }
 
 func TestDownloadOverwrite_E2E(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
-				Content:     []byte("new content"),
-			},
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
+			Content:     []byte("new content"),
 		},
-		Host:   "127.0.0.1",
-		Port:   8093,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
+	}
 	downloadDir := t.TempDir()
 	filePath := filepath.Join(downloadDir, "file1.txt")
-	err = os.WriteFile(filePath, []byte("old content"), 0644)
+	err := os.WriteFile(filePath, []byte("old content"), 0644)
 	assert.NilError(t, err)
 
-	tm := setupTestApp(t, server, []string{"p1"}, downloadDir)
-	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+	tm := setupTestApp(t, objects, 8093, []string{"p1"}, downloadDir)
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -482,19 +416,10 @@ func TestDownloadOverwrite_E2E(t *testing.T) {
 }
 
 func TestHelpMenu_E2E(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
-		},
-		Host:   "127.0.0.1",
-		Port:   8098,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
-	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
+	}
+	tm := setupTestApp(t, objects, 8098, []string{"p1"}, t.TempDir())
 
 	// Toggle help
 	tm.Type("?")
@@ -509,26 +434,17 @@ func TestPreviewEdgeCases_E2E(t *testing.T) {
 	largeContent := strings.Repeat("line\n", 100)
 	binaryContent := []byte{0x00, 0x01, 0x02}
 
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "large.txt"},
-				Content:     []byte(largeContent),
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "binary.bin"},
-				Content:     binaryContent,
-			},
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "large.txt"},
+			Content:     []byte(largeContent),
 		},
-		Host:   "127.0.0.1",
-		Port:   8094,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
-	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "binary.bin"},
+			Content:     binaryContent,
+		},
+	}
+	tm := setupTestApp(t, objects, 8094, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -553,20 +469,11 @@ func TestPreviewEdgeCases_E2E(t *testing.T) {
 }
 
 func TestNavigationCycle_E2E(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b2", Name: "init"}, Content: []byte("hi")},
-		},
-		Host:   "127.0.0.1",
-		Port:   8095,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	tm := setupTestApp(t, server, []string{"p1"}, t.TempDir())
-	t.Cleanup(func() { _ = tm.Quit(); tm.WaitFinished(t) })
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b2", Name: "init"}, Content: []byte("hi")},
+	}
+	tm := setupTestApp(t, objects, 8095, []string{"p1"}, t.TempDir())
 
 	// Wait for buckets
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
