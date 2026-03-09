@@ -29,17 +29,26 @@ func defaultDownloadDir() string {
 	return filepath.Join(home, "Downloads")
 }
 
+func DefaultPath() string {
+	configPath := os.Getenv("LAZYGCS_CONFIG")
+	if configPath != "" {
+		return configPath
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "lazygcs", "config.toml")
+}
+
 // Load resolves the configuration from the specified TOML file.
 //
 // Arguments:
-//   - configPath: Absolute path to the TOML configuration file.
+//   - configPath: Absolute path to the TOML configuration file. If empty, uses DefaultPath().
 //
 // Returns:
 //   - *Config: The resolved configuration.
 //   - error: If the config file does not exist, or cannot be parsed.
 func Load(configPath string) (*Config, error) {
 	if configPath == "" {
-		return nil, os.ErrNotExist
+		configPath = DefaultPath()
 	}
 
 	if _, err := os.Stat(configPath); err != nil {

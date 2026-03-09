@@ -64,7 +64,7 @@ func TestMain_NoConfig(t *testing.T) {
 
 	// Should fail
 	assert.Assert(t, err != nil)
-	assert.Assert(t, strings.Contains(string(output), "Failed to load config"))
+	assert.Assert(t, strings.Contains(string(output), "failed to load config"))
 }
 
 func TestMain_EmptyProjects(t *testing.T) {
@@ -78,7 +78,7 @@ func TestMain_EmptyProjects(t *testing.T) {
 
 	// Should fail
 	assert.Assert(t, err != nil)
-	assert.Assert(t, strings.Contains(string(output), "No project IDs found in config file"))
+	assert.Assert(t, strings.Contains(string(output), "no project IDs found in config file"))
 }
 
 func createConfigFile(t *testing.T, projects []string, downloadDir string) string {
