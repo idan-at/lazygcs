@@ -66,6 +66,10 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 		return fmt.Errorf("failed to copy content to %q: %w", destPath, err)
 	}
 
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close local file %q: %w", destPath, err)
+	}
+
 	return nil
 }
 
@@ -75,10 +79,9 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 	if err != nil {
 		return fmt.Errorf("failed to create zip file %q: %w", destZipPath, err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() { _ = f.Close() }() // Ensure file is closed on early returns
 
 	zipWriter := zip.NewWriter(f)
-	defer func() { _ = zipWriter.Close() }()
 
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
 	for {
@@ -95,28 +98,41 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 			continue
 		}
 
-		rc, err := c.storageClient.Bucket(bucketName).Object(attrs.Name).NewReader(ctx)
+		err = func() error {
+			rc, err := c.storageClient.Bucket(bucketName).Object(attrs.Name).NewReader(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to open reader for %q: %w", attrs.Name, err)
+			}
+			defer func() { _ = rc.Close() }()
+
+			// Keep relative path structure inside the zip
+			relPath := strings.TrimPrefix(attrs.Name, prefix)
+			if relPath == "" {
+				relPath = attrs.Name // Fallback
+			}
+
+			w, err := zipWriter.Create(relPath)
+			if err != nil {
+				return fmt.Errorf("failed to create entry %q in zip: %w", relPath, err)
+			}
+
+			if _, err := io.Copy(w, rc); err != nil {
+				return fmt.Errorf("failed to copy content for %q into zip: %w", relPath, err)
+			}
+			return nil
+		}()
+
 		if err != nil {
-			return fmt.Errorf("failed to open reader for %q: %w", attrs.Name, err)
+			return err
 		}
+	}
 
-		// Keep relative path structure inside the zip
-		relPath := strings.TrimPrefix(attrs.Name, prefix)
-		if relPath == "" {
-			relPath = attrs.Name // Fallback
-		}
+	if err := zipWriter.Close(); err != nil {
+		return fmt.Errorf("failed to finalize zip file: %w", err)
+	}
 
-		w, err := zipWriter.Create(relPath)
-		if err != nil {
-			_ = rc.Close()
-			return fmt.Errorf("failed to create entry %q in zip: %w", relPath, err)
-		}
-
-		if _, err := io.Copy(w, rc); err != nil {
-			_ = rc.Close()
-			return fmt.Errorf("failed to copy content for %q into zip: %w", relPath, err)
-		}
-		_ = rc.Close()
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close zip file: %w", err)
 	}
 
 	return nil
@@ -171,7 +187,7 @@ type ProjectBuckets struct {
 //   - []ProjectBuckets: A list of projects and their corresponding buckets.
 //   - error: If any underlying API call fails.
 func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]ProjectBuckets, error) {
-	var allProjects []ProjectBuckets
+	allProjects := make([]ProjectBuckets, 0, len(projectIDs))
 	for _, pID := range projectIDs {
 		it := c.storageClient.Buckets(ctx, pID)
 		var buckets []string
