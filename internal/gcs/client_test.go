@@ -2,10 +2,12 @@ package gcs_test
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -15,33 +17,29 @@ import (
 	"lazygcs/internal/gcs"
 )
 
-func TestClient_DownloadPrefixAsZip(t *testing.T) {
+func setupTestServer(t *testing.T, objects []fakestorage.Object) (*fakestorage.Server, *gcs.Client) {
+	t.Helper()
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"},
-				Content:     []byte("content1"),
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/sub/file2.txt"},
-				Content:     []byte("content2"),
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "other.txt"},
-				Content:     []byte("other"),
-			},
-		},
-		Host:   "127.0.0.1",
-		Port:   8088,
-		Scheme: "http",
+		InitialObjects: objects,
+		Host:           "127.0.0.1",
+		Port:           0,
+		Scheme:         "http",
 	})
 	assert.NilError(t, err)
-	defer server.Stop()
+	t.Cleanup(func() { server.Stop() })
+	return server, gcs.NewClient(server.Client())
+}
 
-	client := gcs.NewClient(server.Client())
+func TestClient_DownloadPrefixAsZip(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("content1")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/sub/file2.txt"}, Content: []byte("content2")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "other.txt"}, Content: []byte("other")},
+	}
+	_, client := setupTestServer(t, objects)
+
 	dest := filepath.Join(t.TempDir(), "folder1.zip")
-
-	err = client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest)
+	err := client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest)
 	assert.NilError(t, err)
 
 	// Verify zip contents
@@ -71,119 +69,70 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 }
 
 func TestClient_ListBuckets(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "o1"}},
-		},
-		Host:   "127.0.0.1",
-		Port:   8082,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "o1"}},
+	}
+	_, client := setupTestServer(t, objects)
 
-	client := gcs.NewClient(server.Client())
 	projects, err := client.ListBuckets(context.Background(), []string{"test-project"})
 	assert.NilError(t, err)
 	assert.Equal(t, len(projects), 1)
-	assert.Assert(t, contains(projects[0].Buckets, "b1"))
+
+	assert.Assert(t, slices.Contains(projects[0].Buckets, "b1"), "b1 not found in buckets")
 }
 
 func TestClient_ListObjects(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt", Size: 100}},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}}, // Directory stub
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file2.txt"}},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/subfolder/file3.txt"}},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder2/file4.txt"}},
-		},
-		Host:   "127.0.0.1",
-		Port:   8083,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
-
-	client := gcs.NewClient(server.Client())
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt", Size: 100}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}}, // Directory stub
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file2.txt"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/subfolder/file3.txt"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder2/file4.txt"}},
+	}
+	_, client := setupTestServer(t, objects)
 
 	t.Run("Root level", func(t *testing.T) {
+		t.Parallel()
 		list, err := client.ListObjects(context.Background(), "b1", "")
 		assert.NilError(t, err)
 
 		// Should have file1.txt as object
-		assert.Assert(t, containsObject(list.Objects, "file1.txt"))
+		assert.Assert(t, slices.ContainsFunc(list.Objects, func(o gcs.ObjectMetadata) bool { return o.Name == "file1.txt" }))
 		assert.Assert(t, list.Objects[0].Size == 100)
 
 		// Should have folder1/ and folder2/ as prefixes
-		assert.Assert(t, containsPrefix(list.Prefixes, "folder1/"))
-		assert.Assert(t, containsPrefix(list.Prefixes, "folder2/"))
+		assert.Assert(t, slices.ContainsFunc(list.Prefixes, func(p gcs.PrefixMetadata) bool { return p.Name == "folder1/" }))
+		assert.Assert(t, slices.ContainsFunc(list.Prefixes, func(p gcs.PrefixMetadata) bool { return p.Name == "folder2/" }))
 
 		// Should NOT have objects from subfolders
-		assert.Assert(t, !containsObject(list.Objects, "file2.txt"))
+		assert.Assert(t, !slices.ContainsFunc(list.Objects, func(o gcs.ObjectMetadata) bool { return o.Name == "file2.txt" }))
 	})
 
 	t.Run("Inside folder1", func(t *testing.T) {
+		t.Parallel()
 		list, err := client.ListObjects(context.Background(), "b1", "folder1/")
 		assert.NilError(t, err)
 
 		// Should have folder1/file2.txt
-		assert.Assert(t, containsObject(list.Objects, "folder1/file2.txt"))
-		assert.Assert(t, containsPrefix(list.Prefixes, "folder1/subfolder/"))
+		assert.Assert(t, slices.ContainsFunc(list.Objects, func(o gcs.ObjectMetadata) bool { return o.Name == "folder1/file2.txt" }))
+		assert.Assert(t, slices.ContainsFunc(list.Prefixes, func(p gcs.PrefixMetadata) bool { return p.Name == "folder1/subfolder/" }))
 
 		// Should NOT contain the current prefix "folder1/" itself as a prefix or an object
-		assert.Assert(t, !containsPrefix(list.Prefixes, "folder1/"))
-		assert.Assert(t, !containsObject(list.Objects, "folder1/"))
+		assert.Assert(t, !slices.ContainsFunc(list.Prefixes, func(p gcs.PrefixMetadata) bool { return p.Name == "folder1/" }))
+		assert.Assert(t, !slices.ContainsFunc(list.Objects, func(o gcs.ObjectMetadata) bool { return o.Name == "folder1/" }))
 	})
-}
-
-func contains(slice []string, val string) bool {
-	for _, s := range slice {
-		if s == val {
-			return true
-		}
-	}
-	return false
-}
-
-func containsPrefix(slice []gcs.PrefixMetadata, val string) bool {
-	for _, s := range slice {
-		if s.Name == val {
-			return true
-		}
-	}
-	return false
-}
-
-func containsObject(slice []gcs.ObjectMetadata, name string) bool {
-	for _, o := range slice {
-		if o.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 func TestClient_DownloadObject(t *testing.T) {
 	content := []byte("hello gcs")
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
-				Content:     content,
-			},
-		},
-		Host:   "127.0.0.1",
-		Port:   8086,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"}, Content: content},
+	}
+	_, client := setupTestServer(t, objects)
 
-	client := gcs.NewClient(server.Client())
 	dest := filepath.Join(t.TempDir(), "downloaded.txt")
 
-	err = client.DownloadObject(context.Background(), "b1", "file1.txt", dest)
+	err := client.DownloadObject(context.Background(), "b1", "file1.txt", dest)
 	assert.NilError(t, err)
 
 	got, err := os.ReadFile(dest)
@@ -192,63 +141,60 @@ func TestClient_DownloadObject(t *testing.T) {
 }
 
 func TestClient_GetObjectContent(t *testing.T) {
-	longContent := make([]byte, 2048)
-	for i := range longContent {
-		longContent[i] = 'a'
-	}
+	longContent := bytes.Repeat([]byte("a"), 2048)
 	shortContent := []byte("hello")
 
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "long.txt"},
-				Content:     longContent,
-			},
-			{
-				ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "short.txt"},
-				Content:     shortContent,
-			},
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "long.txt"}, Content: longContent},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "short.txt"}, Content: shortContent},
+	}
+	_, client := setupTestServer(t, objects)
+
+	tests := []struct {
+		name        string
+		objectName  string
+		expectedLen int
+		expectedStr string
+	}{
+		{
+			name:        "Content > 1KB (truncated)",
+			objectName:  "long.txt",
+			expectedLen: 1024,
+			expectedStr: string(longContent[:1024]),
 		},
-		Host:   "127.0.0.1",
-		Port:   8087,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
+		{
+			name:        "Content < 1KB (full)",
+			objectName:  "short.txt",
+			expectedLen: len(shortContent),
+			expectedStr: string(shortContent),
+		},
+	}
 
-	client := gcs.NewClient(server.Client())
-
-	// Test case 1: Content is longer than 1KB, should be truncated
-	content, err := client.GetObjectContent(context.Background(), "b1", "long.txt")
-	assert.NilError(t, err)
-	assert.Equal(t, len(content), 1024, "Content should be truncated to 1024 bytes")
-	assert.Equal(t, content, string(longContent[:1024]))
-
-	// Test case 2: Content is shorter than 1KB, should be returned as is
-	content, err = client.GetObjectContent(context.Background(), "b1", "short.txt")
-	assert.NilError(t, err)
-	assert.Equal(t, len(content), len(shortContent))
-	assert.Equal(t, content, string(shortContent))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			content, err := client.GetObjectContent(context.Background(), "b1", tt.objectName)
+			assert.NilError(t, err)
+			assert.Equal(t, len(content), tt.expectedLen)
+			assert.Equal(t, content, tt.expectedStr)
+		})
+	}
 }
 
 func TestFakestorage_Behavior(t *testing.T) {
-	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
-		InitialObjects: []fakestorage.Object{
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}},
-		},
-		Host:   "127.0.0.1",
-		Port:   8085,
-		Scheme: "http",
-	})
-	assert.NilError(t, err)
-	defer server.Stop()
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}},
+	}
+	server, _ := setupTestServer(t, objects)
 
 	ctx := context.Background()
-	client := server.Client()
+	sc := server.Client()
 
 	t.Run("With delimiter", func(t *testing.T) {
-		it := client.Bucket("b1").Objects(ctx, &storage.Query{Delimiter: "/"})
+		t.Parallel()
+		it := sc.Bucket("b1").Objects(ctx, &storage.Query{Delimiter: "/"})
+		foundPrefix := false
 		for {
 			attrs, err := it.Next()
 			if err == iterator.Done {
@@ -256,22 +202,26 @@ func TestFakestorage_Behavior(t *testing.T) {
 			}
 			assert.NilError(t, err)
 			if attrs.Prefix != "" {
-				t.Logf("Prefix: %q", attrs.Prefix)
-			} else {
-				t.Logf("Object: %q", attrs.Name)
+				foundPrefix = true
 			}
 		}
+		assert.Assert(t, foundPrefix)
 	})
 
 	t.Run("Without delimiter", func(t *testing.T) {
-		it := client.Bucket("b1").Objects(ctx, &storage.Query{})
+		t.Parallel()
+		it := sc.Bucket("b1").Objects(ctx, &storage.Query{})
+		foundObject := false
 		for {
 			attrs, err := it.Next()
 			if err == iterator.Done {
 				break
 			}
 			assert.NilError(t, err)
-			t.Logf("Object: %q", attrs.Name)
+			if attrs.Name != "" {
+				foundObject = true
+			}
 		}
+		assert.Assert(t, foundObject)
 	})
 }

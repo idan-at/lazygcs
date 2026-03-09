@@ -9,96 +9,103 @@ import (
 	"lazygcs/internal/config"
 )
 
-// Helper to create a temp config file
 func createConfigFile(t *testing.T, content string) string {
 	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.toml")
+	path := filepath.Join(t.TempDir(), "config.toml")
 	err := os.WriteFile(path, []byte(content), 0644)
 	assert.NilError(t, err)
 	return path
 }
 
-func TestLoad_NoFile(t *testing.T) {
-	_, err := config.Load("non-existent.toml")
-	assert.Assert(t, err != nil)
-}
-
-func TestLoad_ConfigFile(t *testing.T) {
-	configFile := createConfigFile(t, `projects = ["p1", "p2"]`)
-
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
-	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
-}
-
-func TestLoad_ConfigFileWithWhitespace(t *testing.T) {
-	configFile := createConfigFile(t, `projects = [" p1 ", " p2 "]`)
-
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
-	assert.DeepEqual(t, cfg.Projects, []string{"p1", "p2"})
-}
-
-func TestLoad_DefaultDownloadDir(t *testing.T) {
-	configFile := createConfigFile(t, `projects = ["p1"]`)
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
+func TestLoad(t *testing.T) {
 	home, err := os.UserHomeDir()
 	assert.NilError(t, err)
-	expectedDir := filepath.Join(home, "Downloads")
+	defaultDownload := filepath.Join(home, "Downloads")
 
-	assert.Equal(t, cfg.DownloadDir, expectedDir)
-}
-
-func TestLoad_OverrideDownloadDir(t *testing.T) {
-	configFile := createConfigFile(t, `download_dir = "/tmp/custom_downloads"`)
-
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
-	assert.Equal(t, cfg.DownloadDir, "/tmp/custom_downloads")
-}
-
-func TestLoad_DefaultFuzzySearch(t *testing.T) {
-	configFile := createConfigFile(t, `projects = ["p1"]`)
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
-	assert.Equal(t, cfg.FuzzySearch, false)
-}
-
-func TestLoad_OverrideFuzzySearch(t *testing.T) {
-	configFile := createConfigFile(t, `
+	tests := []struct {
+		name        string
+		content     string
+		fileMissing bool
+		wantErr     bool
+		expected    *config.Config
+	}{
+		{
+			name:        "NoFile",
+			fileMissing: true,
+			wantErr:     true,
+		},
+		{
+			name:    "BasicProjects",
+			content: `projects = ["p1", "p2"]`,
+			expected: &config.Config{
+				Projects:    []string{"p1", "p2"},
+				DownloadDir: defaultDownload,
+			},
+		},
+		{
+			name:    "ProjectsWithWhitespace",
+			content: `projects = [" p1 ", " p2 "]`,
+			expected: &config.Config{
+				Projects:    []string{"p1", "p2"},
+				DownloadDir: defaultDownload,
+			},
+		},
+		{
+			name:    "OverrideDownloadDir",
+			content: `download_dir = "/tmp/custom_downloads"`,
+			expected: &config.Config{
+				Projects:    []string{},
+				DownloadDir: "/tmp/custom_downloads",
+			},
+		},
+		{
+			name: "OverrideFuzzySearch",
+			content: `
 projects = ["p1"]
 fuzzy_search = true
-`)
-
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
-	assert.Equal(t, cfg.FuzzySearch, true)
-}
-
-func TestLoad_DefaultIcons(t *testing.T) {
-	configFile := createConfigFile(t, `projects = ["p1"]`)
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
-
-	assert.Equal(t, cfg.Icons, false)
-}
-
-func TestLoad_OverrideIcons(t *testing.T) {
-	configFile := createConfigFile(t, `
+`,
+			expected: &config.Config{
+				Projects:    []string{"p1"},
+				DownloadDir: defaultDownload,
+				FuzzySearch: true,
+			},
+		},
+		{
+			name: "OverrideIcons",
+			content: `
 projects = ["p1"]
 icons = true
-`)
+`,
+			expected: &config.Config{
+				Projects:    []string{"p1"},
+				DownloadDir: defaultDownload,
+				Icons:       true,
+			},
+		},
+	}
 
-	cfg, err := config.Load(configFile)
-	assert.NilError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			path := "non-existent.toml"
+			if !tt.fileMissing {
+				path = createConfigFile(t, tt.content)
+			}
 
-	assert.Equal(t, cfg.Icons, true)
+			cfg, err := config.Load(path)
+			if tt.wantErr {
+				assert.Assert(t, err != nil)
+				return
+			}
+			assert.NilError(t, err)
+			if len(tt.expected.Projects) == 0 {
+				assert.Equal(t, len(cfg.Projects), 0)
+			} else {
+				assert.DeepEqual(t, cfg.Projects, tt.expected.Projects)
+			}
+			assert.Equal(t, cfg.DownloadDir, tt.expected.DownloadDir)
+			assert.Equal(t, cfg.FuzzySearch, tt.expected.FuzzySearch)
+			assert.Equal(t, cfg.Icons, tt.expected.Icons)
+		})
+	}
 }
