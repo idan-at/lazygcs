@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -29,13 +30,16 @@ func defaultDownloadDir() string {
 	return filepath.Join(home, "Downloads")
 }
 
-func DefaultPath() string {
+func DefaultPath() (string, error) {
 	configPath := os.Getenv("LAZYGCS_CONFIG")
 	if configPath != "" {
-		return configPath
+		return configPath, nil
 	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "lazygcs", "config.toml")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine home directory: %w", err)
+	}
+	return filepath.Join(home, ".config", "lazygcs", "config.toml"), nil
 }
 
 // Load resolves the configuration from the specified TOML file.
@@ -48,7 +52,11 @@ func DefaultPath() string {
 //   - error: If the config file does not exist, or cannot be parsed.
 func Load(configPath string) (*Config, error) {
 	if configPath == "" {
-		configPath = DefaultPath()
+		var err error
+		configPath, err = DefaultPath()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err := os.Stat(configPath); err != nil {
