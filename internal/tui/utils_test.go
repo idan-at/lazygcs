@@ -21,7 +21,9 @@ func TestAutoRename_PermissionError(t *testing.T) {
 	err = os.Chmod(restrictedDir, 0000)
 	assert.NilError(t, err)
 
-	defer os.Chmod(restrictedDir, 0755)
+	defer func() {
+		_ = os.Chmod(restrictedDir, 0755)
+	}()
 
 	done := make(chan error)
 
