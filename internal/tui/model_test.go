@@ -1217,6 +1217,67 @@ func TestModel_DownloadStatusPersistence(t *testing.T) {
 	// Move cursor up
 	m, _ = pressKey(m, 'k')
 
-	// Normal status should be CLEARED
+	// Status should CLEARED
 	assert.Assert(t, !strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "Normal status should be cleared after navigation")
-}
+	}
+
+	func TestModel_LongBucketList_EnterBucket_ObjectsVisible(t *testing.T) {
+	var buckets []string
+	for i := 0; i < 100; i++ {
+		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
+	}
+	client := mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
+		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20}) // maxVisible = 10
+	m, _ = updateModel(m, tui.BucketsMsg{Projects: client.projects})
+
+	// Scroll to bucket-90. 
+	// The list has: [p1 (0), bucket-00 (1), ..., bucket-90 (91), ...]
+	for i := 0; i < 91; i++ {
+		m, _ = pressKeyType(m, tea.KeyDown)
+	}
+
+	// Verify we are on bucket-90
+	viewBefore := m.View()
+	assert.Assert(t, strings.Contains(viewBefore, "bucket-90"))
+
+	// Enter bucket
+	m, _ = pressKeyType(m, tea.KeyEnter)
+
+	// Simulate objects arrival
+	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "bucket-90", Prefix: "", List: client.objects})
+
+	view := m.View()
+	// Check if obj1 is visible in the view
+	assert.Assert(t, strings.Contains(view, "obj1"), "Objects should be visible even after scrolling deep in buckets list. View:\n%s", view)
+	}
+
+	func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
+	// This test specifically checks if the rendered columns have the expected height.
+	// If wrapping occurs, the number of lines will exceed columnHeight.
+	m := tui.NewModel([]string{"p1"}, nil, "/tmp", false, false)
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20})
+
+	// maxVisible = 10. columnHeight = 12.
+	// We'll add 10 buckets.
+	var buckets []string
+	for i := 0; i < 10; i++ {
+		buckets = append(buckets, "a_fairly_long_bucket_name_to_trigger_wrapping")
+	}
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}}
+	m, _ = updateModel(m, tui.BucketsMsg{Projects: projects})
+
+	view := m.View()
+	lines := strings.Split(view, "\n")
+
+	// The view height should be around 17-18 lines.
+	// Header(3) + Column(12) + Footer(2) = 17.
+	// If wrapping occurs in the left column (Buckets), the column height will increase
+	// and JoinHorizontal will make the whole mainContent taller.
+
+	t.Logf("Total lines in view: %d", len(lines))
+	assert.Assert(t, len(lines) <= 20, "View height %d exceeded terminal height 20. Wrapping likely occurred!", len(lines))
+	}

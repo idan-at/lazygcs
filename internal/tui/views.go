@@ -342,16 +342,16 @@ func (m Model) View() string {
 	if m.state == viewBuckets {
 		leftStyle = activeStyle
 	}
-	leftCol := leftStyle.Width(leftWidth - 4).Render(m.bucketsView(leftWidth - 4))
+	leftCol := leftStyle.Width(leftWidth).Render(m.bucketsView(leftWidth - 4))
 
 	midStyle := inactiveStyle
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
 		midStyle = activeStyle
 	}
-	midCol := midStyle.Width(midWidth - 4).Render(m.objectsView(midWidth - 4))
+	midCol := midStyle.Width(midWidth).Render(m.objectsView(midWidth - 4))
 
 	// Preview column is always "inactive" in terms of focus
-	rightCol := inactiveStyle.Width(rightWidth - 4).Render(m.previewView(rightWidth - 4))
+	rightCol := inactiveStyle.Width(rightWidth).Render(m.previewView(rightWidth - 4))
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
