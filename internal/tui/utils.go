@@ -15,7 +15,7 @@ func parentPrefix(p string) string {
 	return ""
 }
 
-func autoRename(path string) string {
+func autoRename(path string) (string, error) {
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
@@ -23,8 +23,12 @@ func autoRename(path string) string {
 
 	for i := 1; ; i++ {
 		newPath := filepath.Join(dir, fmt.Sprintf("%s_%d%s", name, i, ext))
-		if _, err := os.Stat(newPath); os.IsNotExist(err) {
-			return newPath
+		_, err := os.Stat(newPath)
+		if os.IsNotExist(err) {
+			return newPath, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to check path %q: %w", newPath, err)
 		}
 	}
 }

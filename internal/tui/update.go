@@ -223,7 +223,13 @@ func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.downloadQueue = nil // Clear the rest of the queue
 		return m, nil
 	case "r":
-		newDest := autoRename(m.pendingDownloadDest)
+		newDest, err := autoRename(m.pendingDownloadDest)
+		if err != nil {
+			m.status = fmt.Sprintf("Rename failed: %v", err)
+			m.state = viewObjects
+			m.downloadQueue = nil
+			return m, nil
+		}
 		m.status = fmt.Sprintf("Downloading as %s...", filepath.Base(newDest))
 		m.state = viewObjects
 		return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, newDest, m.pendingDownloadIsPrefix)
