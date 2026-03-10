@@ -1191,7 +1191,7 @@ func TestModel_FuzzySearch(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "SEARCH: ale"))
 }
 
-func TestModel_DownloadStatusPersistence(t *testing.T) {
+func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
 	m, client := setupTestModel(projects, objects, "/tmp")
@@ -1207,19 +1207,24 @@ func TestModel_DownloadStatusPersistence(t *testing.T) {
 	// Move cursor down
 	m, _ = pressKey(m, 'j')
 
-	// Status should PERSIST
+	// Status should PERSIST during navigation while downloading
 	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."), "Download status should persist after navigation")
 
-	// Trigger a different status (e.g. download success)
-	m, _ = updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1"})
+	// Trigger download success
+	m, cmd := updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1"})
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"))
+	
+	// Command to clear status should be returned
+	assert.Assert(t, cmd != nil, "Expected a command to clear the status")
+	
+	// Execute the command (simulate timer firing)
+	msg := cmd()
+	m, _ = updateModel(m, msg)
 
-	// Move cursor up
-	m, _ = pressKey(m, 'k')
-
-	// Status should CLEARED
-	assert.Assert(t, !strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "Normal status should be cleared after navigation")
-	}
+	// Status should be CLEARED
+	assert.Assert(t, !strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "Status should be cleared after timer fires")
+	assert.Assert(t, strings.Contains(m.View(), " NORMAL "), "Status should be NORMAL again")
+}
 
 	func TestModel_LongBucketList_EnterBucket_ObjectsVisible(t *testing.T) {
 	var buckets []string

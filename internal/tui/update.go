@@ -24,6 +24,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleContentMsg(msg)
 	case DownloadMsg:
 		return m.handleDownloadMsg(msg)
+	case ClearStatusMsg:
+		if !strings.HasPrefix(m.status, "Downloading") {
+			m.status = ""
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -126,7 +131,7 @@ func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
 		m, cmd := m.processDownloadQueue()
 		return m, cmd
 	}
-	return m, nil
+	return m, clearStatusCmd()
 }
 
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

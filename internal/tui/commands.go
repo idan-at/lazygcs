@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -78,4 +79,11 @@ func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 		m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
 	}
 	return m, m.fetchDownload(task.bucket, task.object, task.dest, task.isPrefix)
+}
+
+// clearStatusCmd returns a command that clears the status after a short delay.
+func clearStatusCmd() tea.Cmd {
+	return tea.Tick(time.Second*3, func(time.Time) tea.Msg {
+		return ClearStatusMsg{}
+	})
 }

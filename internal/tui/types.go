@@ -58,3 +58,6 @@ type DownloadMsg struct {
 	Path string
 	Err  error
 }
+
+// ClearStatusMsg is sent to clear the status bar.
+type ClearStatusMsg struct{}
