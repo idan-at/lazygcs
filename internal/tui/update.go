@@ -94,10 +94,13 @@ func (m Model) handleMetadataMsg(msg MetadataMsg) (tea.Model, tea.Cmd) {
 	if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
 		return m, nil
 	}
-	if msg.Err == nil && msg.PrefixIndex >= 0 && msg.PrefixIndex < len(m.prefixes) {
-		m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
-		m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated
-		m.prefixes[msg.PrefixIndex].Owner = msg.Metadata.Owner
+	if msg.PrefixIndex >= 0 && msg.PrefixIndex < len(m.prefixes) {
+		m.prefixes[msg.PrefixIndex].Fetched = true
+		if msg.Err == nil {
+			m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
+			m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated
+			m.prefixes[msg.PrefixIndex].Owner = msg.Metadata.Owner
+		}
 	}
 	return m, nil
 }
@@ -216,7 +219,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		currentPrefixes, currentObjects, origIndices := m.filteredObjects()
 		if m.cursor < len(currentPrefixes) {
 			origIdx := origIndices[m.cursor]
-			if m.prefixes[origIdx].Created.IsZero() {
+			if !m.prefixes[origIdx].Fetched {
 				return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
 			}
 		} else if m.cursor >= len(currentPrefixes) {
@@ -308,7 +311,7 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 			if m.state == viewObjects {
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
-					if m.prefixes[origIdx].Created.IsZero() {
+					if !m.prefixes[origIdx].Fetched {
 						return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
 					}
 				} else if m.cursor >= len(currentPrefixes) {
@@ -349,7 +352,7 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 			if m.state == viewObjects {
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
-					if m.prefixes[origIdx].Created.IsZero() {
+					if !m.prefixes[origIdx].Fetched {
 						return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
 					}
 				} else if m.cursor >= len(currentPrefixes) {
