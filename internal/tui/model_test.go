@@ -1144,6 +1144,36 @@ func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "banana"), "Should show matching bucket")
 }
 
+func TestModel_SearchFetchesMetadata(t *testing.T) {
+	rootObjects := simpleObjectList([]string{"file1"}, []string{"folder1/", "folder2/"})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := rootObjects
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
+
+	// Enter bucket b1
+	m, _ = updateModel(m, tui.BucketsMsg{Projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}})
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKeyType(m, tea.KeyEnter)
+
+	// Load root objects
+	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: rootObjects})
+
+	// Enter search mode
+	m, _ = pressKey(m, '/')
+
+	// Type '2' to filter down to "folder2/"
+	m, cmd := pressKey(m, '2')
+	
+	// The cmd returned should be the fetchPrefixMetadataByName command
+	assert.Assert(t, cmd != nil, "A command should be returned to fetch metadata for the newly focused item")
+	
+	// Let's actually execute the command to see if it yields a MetadataMsg
+	msg := cmd()
+	_, ok := msg.(tui.MetadataMsg)
+	assert.Assert(t, ok, "Expected a MetadataMsg to be returned")
+}
+
 func TestModel_SearchFilter(t *testing.T) {
 	client := mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},

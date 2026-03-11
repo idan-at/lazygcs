@@ -192,12 +192,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	oldQuery := m.searchQuery
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.searchMode = false
 		m.searchQuery = ""
 		m.cursor = 0
-		return m, nil
 	case tea.KeyEnter:
 		m.searchMode = false
 		return m, nil
@@ -207,11 +207,26 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.searchQuery = string(runes[:len(runes)-1])
 			m.cursor = 0
 		}
-		return m, nil
 	case tea.KeyRunes, tea.KeySpace:
 		m.searchQuery += msg.String()
 		m.cursor = 0
-		return m, nil
+	}
+
+	if oldQuery != m.searchQuery && m.state == viewObjects {
+		currentPrefixes, currentObjects, origIndices := m.filteredObjects()
+		if m.cursor < len(currentPrefixes) {
+			origIdx := origIndices[m.cursor]
+			if m.prefixes[origIdx].Created.IsZero() {
+				return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
+			}
+		} else if m.cursor >= len(currentPrefixes) {
+			idx := m.cursor - len(currentPrefixes)
+			if idx < len(currentObjects) {
+				obj := currentObjects[idx]
+				m.previewContent = "Loading..."
+				return m, m.fetchContent(m.currentBucket, obj.Name)
+			}
+		}
 	}
 	return m, nil
 }
