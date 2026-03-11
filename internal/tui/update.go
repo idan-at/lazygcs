@@ -380,10 +380,10 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 			return m, m.fetchObjects()
 		}
 	case viewObjects:
-		m.previewContent = ""
 		currentPrefixes, _, _ := m.filteredObjects()
 		// Check if selected item is a prefix
 		if m.cursor < len(currentPrefixes) {
+			m.previewContent = ""
 			m.currentPrefix = currentPrefixes[m.cursor].Name
 			m.searchMode = false
 			m.searchQuery = ""
