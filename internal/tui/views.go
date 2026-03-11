@@ -76,7 +76,7 @@ func (m Model) previewView(width int) string {
 					if isBinary(m.previewContent) {
 						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
 					} else if m.previewContent == "Loading..." {
-						s.WriteString(fmt.Sprintf("%s Loading...", m.spinner.View()))
+						fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 					} else {
 						// Leave room for the metadata lines and the "..." truncation indicator
 						maxContentLines := m.maxItemsVisible() - 14
@@ -165,7 +165,7 @@ func (m Model) objectsView(width int) string {
 		title := fmt.Sprintf("Objects in %s", m.currentBucket)
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(title, width)) + "\n\n")
 		if m.loading {
-			s.WriteString(fmt.Sprintf("%s Loading...", m.spinner.View()))
+			fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 		} else {
 			currentPrefixes, currentObjects, _ := m.filteredObjects()
 			totalItems := len(currentPrefixes) + len(currentObjects)
@@ -237,7 +237,7 @@ func (m Model) bucketsView(width int) string {
 	var s strings.Builder
 	s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width)) + "\n\n")
 	if m.state == viewBuckets && m.loading {
-		s.WriteString(fmt.Sprintf("%s Loading...", m.spinner.View()))
+		fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 	} else {
 		filtered := m.filteredBuckets()
 
