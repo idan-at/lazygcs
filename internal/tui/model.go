@@ -96,6 +96,11 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	}
 }
 
+// Cursor returns the current cursor position.
+func (m Model) Cursor() int {
+	return m.cursor
+}
+
 func (m Model) resetObjectsState() Model {
 	m.objects = nil
 	m.prefixes = nil

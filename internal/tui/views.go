@@ -191,27 +191,25 @@ func (m Model) objectsView(width int) string {
 					icon = getIcon(displayItem, isFolder, false)
 				}
 
-				cursorIndicator := " "
-				if m.cursor == i {
-					cursorIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Render("▶")
-				}
-
 				textStyle := lipgloss.NewStyle()
-				if m.cursor == i {
-					textStyle = textStyle.Foreground(lipgloss.Color("69")).Bold(true)
+				isFocused := m.cursor == i
+				if isFocused {
+					textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
 				} else if isSelected {
 					textStyle = textStyle.Foreground(lipgloss.Color("212")).Bold(true)
 				} else {
 					textStyle = textStyle.Foreground(lipgloss.Color("250"))
 				}
 
-				// Truncate to fit column (account for cursor, selection indicator, optional icon, and padding)
-				truncateLen := width - 4
+				// Truncate to fit column (account for selection indicator, optional icon, and padding)
+				truncateLen := width - 3
 				if m.showIcons {
 					truncateLen -= 2 // Icon + space
 				}
 				truncatedItem := truncate(displayItem, truncateLen)
-				content := fmt.Sprintf("%s%s %s%s", cursorIndicator, selectionIndicator, icon, textStyle.Render(truncatedItem))
+				
+				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, icon, truncatedItem)
+				content := textStyle.Width(width).Render(itemContent)
 
 				s.WriteString(content + "\n")
 			}
@@ -248,20 +246,18 @@ func (m Model) bucketsView(width int) string {
 		for i := start; i < end; i++ {
 			item := filtered[i]
 
-			cursorIndicator := " "
-			if m.state == viewBuckets && m.cursor == i {
-				cursorIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Render("▶")
-			}
-
 			indicator := " "
 			if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
 				indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Render("●")
 			}
 
 			textStyle := lipgloss.NewStyle()
-			if m.state == viewBuckets && m.cursor == i {
-				textStyle = textStyle.Foreground(lipgloss.Color("69")).Bold(true)
-			} else if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
+			isFocused := m.state == viewBuckets && m.cursor == i
+			isActiveBucket := m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket
+
+			if isFocused {
+				textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
+			} else if isActiveBucket {
 				textStyle = textStyle.Foreground(lipgloss.Color("69"))
 			} else {
 				textStyle = textStyle.Foreground(lipgloss.Color("250"))
@@ -276,15 +272,15 @@ func (m Model) bucketsView(width int) string {
 
 				// Make project titles bold and a different color
 				projectStyle := textStyle
-				if m.state == viewBuckets && m.cursor != i {
+				if !isFocused {
 					projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
-				} else {
-					projectStyle = projectStyle.Bold(true)
 				}
 
-				truncateLen := width - 4
+				truncateLen := width - 3
 				truncatedProject := truncate(item.ProjectID, truncateLen)
-				content := fmt.Sprintf("%s%s%s", cursorIndicator, icon, projectStyle.Render(truncatedProject))
+				
+				itemContent := fmt.Sprintf("%s%s", icon, truncatedProject)
+				content := projectStyle.Width(width).Render(itemContent)
 				s.WriteString(content + "\n")
 			} else {
 				// Bucket Item
@@ -294,13 +290,14 @@ func (m Model) bucketsView(width int) string {
 				}
 
 				// Truncate to fit column, account for indentation
-				truncateLen := width - 6
+				truncateLen := width - 5
 				if m.showIcons {
 					truncateLen -= 2
 				}
 				truncatedBucket := truncate(item.BucketName, truncateLen)
-				content := fmt.Sprintf("%s%s  %s%s", cursorIndicator, indicator, icon, textStyle.Render(truncatedBucket))
-
+				
+				itemContent := fmt.Sprintf("%s  %s%s", indicator, icon, truncatedBucket)
+				content := textStyle.Width(width).Render(itemContent)
 				s.WriteString(content + "\n")
 			}
 		}
@@ -331,10 +328,10 @@ func (m Model) View() string {
 		Height(columnHeight)
 
 	// Calculate column widths
-	// 30% | 35% | 35%
+	// 25% | 30% | 45%
 	totalWidth := m.width
-	leftWidth := int(float64(totalWidth) * 0.3)
-	midWidth := int(float64(totalWidth) * 0.35)
+	leftWidth := int(float64(totalWidth) * 0.25)
+	midWidth := int(float64(totalWidth) * 0.30)
 	rightWidth := totalWidth - leftWidth - midWidth
 
 	// Apply styles and render columns

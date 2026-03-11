@@ -431,7 +431,7 @@ func TestNavigationCycle(t *testing.T) {
 	// Assert we are on either b1 or b2
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
-		return strings.Contains(s, "b1") && strings.Contains(s, "b2") && strings.Contains(s, "▶")
+		return strings.Contains(s, "b1") && strings.Contains(s, "b2")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Move one more to cycle back to project header
@@ -441,8 +441,8 @@ func TestNavigationCycle(t *testing.T) {
 
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
-		// Check that project header is selected (has cursor)
-		return strings.Contains(s, "▶▼ p1")
+		// Check that project header is present
+		return strings.Contains(s, "▼ p1")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Move back up (cycle from top to bottom)
@@ -452,6 +452,6 @@ func TestNavigationCycle(t *testing.T) {
 
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
-		return strings.Contains(s, "b1") && strings.Contains(s, "b2") && strings.Contains(s, "▶")
+		return strings.Contains(s, "b1") && strings.Contains(s, "b2")
 	}, teatest.WithDuration(3*time.Second))
 }

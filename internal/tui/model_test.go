@@ -1035,7 +1035,9 @@ func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
 	// - Filter should be cleared
 	// - Cursor should be on blueberry
 	view := m.View()
-	assert.Assert(t, strings.Contains(view, "▶") && strings.Contains(view, "blueberry"), "Cursor should be on blueberry, view:\n%s", view)
+	assert.Assert(t, strings.Contains(view, "blueberry"), "Should contain blueberry")
+	// Index 3 in full list: p1, apple, banana, apricot, blueberry -> [0, 1, 2, 3, 4]
+	assert.Equal(t, m.Cursor(), 4, "Cursor should be on blueberry (index 4)")
 }
 
 func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {
@@ -1066,9 +1068,8 @@ func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: rootObjects})
 
 	// Assert cursor is restored to folder2/
-	view := m.View()
-	assert.Assert(t, strings.Contains(view, "▶") && strings.Contains(view, "folder2/"), "Cursor should be restored to folder2/, view:\n%s", view)
-	assert.Assert(t, strings.Contains(view, "▶  folder2/") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mfolder2/"), "Cursor should be specifically on folder2/")
+	assert.Equal(t, m.Cursor(), 1, "Cursor should be restored to folder2/ (index 1)")
+	assert.Assert(t, strings.Contains(m.View(), "folder2/"), "View should contain folder2/")
 }
 
 func TestModel_CollapseProjectOnLeft(t *testing.T) {
@@ -1094,7 +1095,7 @@ func TestModel_CollapseProjectOnLeft(t *testing.T) {
 	// - The bucket (b1) should not be visible
 	view := m.View()
 	assert.Assert(t, !strings.Contains(view, " b1"), "Bucket b1 should be hidden")
-	assert.Assert(t, strings.Contains(view, "▶ p1") || strings.Contains(view, "▶ \x1b[1m\x1b[38;5;69mp1") || strings.Contains(view, "▶  \x1b[1m\x1b[38;5;69mp1"), "Project p1 should be collapsed")
+	assert.Assert(t, strings.Contains(view, "▶") && strings.Contains(view, "p1"), "Project p1 should be collapsed")
 }
 
 func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
