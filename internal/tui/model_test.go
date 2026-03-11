@@ -1193,7 +1193,7 @@ func TestModel_SearchFetchesMetadata(t *testing.T) {
 	m, _ = pressKey(m, '/')
 
 	// Type '2' to filter down to "folder2/"
-	m, cmd := pressKey(m, '2')
+	_, cmd := pressKey(m, '2')
 	
 	// The cmd returned should be the fetchPrefixMetadataByName command
 	assert.Assert(t, cmd != nil, "A command should be returned to fetch metadata for the newly focused item")
