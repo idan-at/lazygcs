@@ -96,6 +96,7 @@ func (m Model) handleMetadataMsg(msg MetadataMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.PrefixIndex >= 0 && msg.PrefixIndex < len(m.prefixes) {
 		m.prefixes[msg.PrefixIndex].Fetched = true
+		m.prefixes[msg.PrefixIndex].Err = msg.Err
 		if msg.Err == nil {
 			m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
 			m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated

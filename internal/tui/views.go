@@ -29,16 +29,28 @@ func (m Model) previewView(width int) string {
 			prefix := currentPrefixes[m.cursor]
 
 			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-6)))
-			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
+			if !prefix.Fetched {
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
+				fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.spinner.View())
+			} else {
+				folderType := "Folder"
+				if prefix.Err != nil {
+					folderType = "Virtual Directory"
+				}
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(folderType))
 
-			if !prefix.Created.IsZero() {
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(prefix.Created.Format("2006-01-02 15:04:05")))
-			}
-			if !prefix.Updated.IsZero() {
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(prefix.Updated.Format("2006-01-02 15:04:05")))
-			}
-			if prefix.Owner != "" {
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(prefix.Owner))
+				if !prefix.Created.IsZero() {
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(prefix.Created.Format("2006-01-02 15:04:05")))
+				}
+				if !prefix.Updated.IsZero() {
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(prefix.Updated.Format("2006-01-02 15:04:05")))
+				}
+				if prefix.Owner != "" {
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(prefix.Owner))
+				}
+				if prefix.Err != nil && !strings.Contains(prefix.Err.Error(), "object doesn't exist") && !strings.Contains(prefix.Err.Error(), "not found") {
+					fmt.Fprintf(&s, "\n%s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(fmt.Sprintf("Metadata Error: %v", prefix.Err)))
+				}
 			}
 		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
 			// Selected item is an object (not a prefix)

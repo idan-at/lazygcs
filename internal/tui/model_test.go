@@ -292,6 +292,36 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "Error: permission denied"))
 }
 
+func TestModel_PrefixMetadata_VirtualDirectory(t *testing.T) {
+	client := mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects: &gcs.ObjectList{
+			Prefixes: []gcs.PrefixMetadata{{Name: "folder1/"}},
+		},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", nil)
+	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+
+	// Should be loading metadata for the prefix
+	assert.Assert(t, cmd != nil)
+	assert.Assert(t, strings.Contains(m.View(), "Loading metadata..."))
+
+	// Simulate receiving the error message (virtual directory)
+	msg := cmd()
+	metaMsg := msg.(tui.MetadataMsg)
+	metaMsg.Err = fmt.Errorf("object doesn't exist")
+	m, _ = updateModel(m, metaMsg)
+
+	// Verify view shows Virtual Directory and no loading indicator
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "Virtual Directory"))
+	assert.Assert(t, !strings.Contains(view, "Loading metadata..."))
+}
+
 func TestModel_StalePreviewContent(t *testing.T) {
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)

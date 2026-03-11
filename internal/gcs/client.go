@@ -36,6 +36,7 @@ type PrefixMetadata struct {
 	Created time.Time
 	Owner   string
 	Fetched bool // Indicates if a metadata fetch has been attempted
+	Err     error
 }
 
 // ObjectList holds the list of objects and prefixes (folders) returned by ListObjects.
