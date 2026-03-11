@@ -129,7 +129,7 @@ func TestModel_ObjectPreview(t *testing.T) {
 
 	// Verify we got a command and view shows loading
 	assert.Assert(t, cmd != nil)
-	assert.Assert(t, strings.Contains(m.View(), "Loading..."))
+	assert.Assert(t, strings.Contains(m.View(), "Loading"))
 
 	// Simulate receiving the content
 	msg := cmd()
@@ -233,7 +233,7 @@ func TestModel_InitialObjectPreview(t *testing.T) {
 
 	// Verify fetchContent was triggered automatically
 	assert.Assert(t, cmd != nil)
-	assert.Assert(t, strings.Contains(m.View(), "Loading..."))
+	assert.Assert(t, strings.Contains(m.View(), "Loading"))
 
 	// Simulate receiving the content
 	contentMsg := cmd()

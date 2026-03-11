@@ -88,7 +88,7 @@ func (m Model) previewView(width int) string {
 					if isBinary(m.previewContent) {
 						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
 					} else if m.previewContent == "Loading..." {
-						fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
+						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.spinner.View())
 					} else {
 						// Leave room for the metadata lines and the "..." truncation indicator
 						maxContentLines := m.maxItemsVisible() - 14
@@ -103,7 +103,12 @@ func (m Model) previewView(width int) string {
 						} else {
 							preview = m.previewContent
 						}
-						s.WriteString(preview)
+
+						if strings.HasPrefix(preview, "Error:") {
+							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(preview))
+						} else {
+							s.WriteString(preview)
+						}
 					}
 				}
 			}
