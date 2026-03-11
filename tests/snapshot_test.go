@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 8096, []string{"prod-project"}, t.TempDir())
+	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load and appear on screen
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -32,10 +33,14 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 
 	// Move cursor down to 'assets'
 	tm.Type("j")
-	
+
 	// Force a specific dimension for consistent snapshots
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
-	time.Sleep(200 * time.Millisecond) // Give Bubble Tea time to render
+
+	// Wait for the terminal to resize and render
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "assets")
+	}, teatest.WithDuration(2*time.Second))
 
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
@@ -60,7 +65,13 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 8097, []string{"prod-project"}, t.TempDir())
+	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return s != "" && s != "Loading..."
+	}, teatest.WithDuration(3*time.Second))
 
 	// Force terminal size
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -71,20 +82,16 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 
 	// Wait for README.md to be visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		return string(bts) != ""
+		return strings.Contains(string(bts), "README.md")
 	}, teatest.WithDuration(3*time.Second))
-	
-	time.Sleep(500 * time.Millisecond) // Ensure the list is fully loaded
-	
+
 	// Move down to README.md
 	tm.Type("j")
 
 	// Wait for the preview content to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		return string(bts) != "" // This should match the content
+		return strings.Contains(string(bts), "# Hello World")
 	}, teatest.WithDuration(3*time.Second))
-
-	time.Sleep(200 * time.Millisecond) // Final settling before snapshot
 
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
@@ -105,13 +112,24 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 8099, []string{"prod-project"}, t.TempDir())
+	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return s != "" && s != "Loading..."
+	}, teatest.WithDuration(3*time.Second))
 
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
-	
+
 	// Open help menu
 	tm.Type("?")
-	time.Sleep(200 * time.Millisecond) // Give Bubble Tea time to render the overlay
+
+	// Wait for help menu to appear
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		out := string(bts)
+		return strings.Contains(out, "HELP") || strings.Contains(out, "quit")
+	}, teatest.WithDuration(2*time.Second))
 
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
@@ -123,3 +141,4 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 	}
 	teatest.RequireEqualOutput(t, out)
 }
+

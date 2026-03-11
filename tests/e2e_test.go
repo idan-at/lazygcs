@@ -87,7 +87,7 @@ download_dir = "/tmp"
 	// As long as it started running BubbleTea (which clears screen etc) or failed cleanly on GCS auth, it's a pass.
 	// Since we passed /dev/null for creds, it will likely return a known error:
 	assert.Assert(t, err != nil)
-	assert.Assert(t, strings.Contains(output, "failed to load config") == false)
+	assert.Check(t, !strings.Contains(output, "failed to load config"))
 	assert.Assert(t, strings.Contains(output, "no project IDs found") == false)
 }
 
