@@ -65,27 +65,31 @@ func (m Model) previewView(width int) string {
 
 				if m.previewContent != "" {
 					separator := lipgloss.NewStyle().
-						Foreground(lipgloss.Color("240")).
-						Render(strings.Repeat("─", width))
+						Border(lipgloss.NormalBorder(), true, false, false, false).
+						BorderForeground(lipgloss.Color("240")).
+						Width(width).
+						MarginTop(1).
+						Render("")
 
-					s.WriteString("\n" + separator + "\n")
+					s.WriteString(separator)
 
 					if isBinary(m.previewContent) {
 						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
 					} else {
 						// Leave room for the metadata lines and the "..." truncation indicator
-						maxContentLines := m.maxItemsVisible() - 14 // adjusted for the new border
+						maxContentLines := m.maxItemsVisible() - 14
 						if maxContentLines < 1 {
 							maxContentLines = 1
 						}
 
 						lines := strings.Split(m.previewContent, "\n")
+						var preview string
 						if len(lines) > maxContentLines {
-							s.WriteString(strings.Join(lines[:maxContentLines], "\n"))
-							s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("..."))
+							preview = strings.Join(lines[:maxContentLines], "\n") + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("...")
 						} else {
-							s.WriteString(m.previewContent)
+							preview = m.previewContent
 						}
+						s.WriteString(preview)
 					}
 				}
 			}
