@@ -10,12 +10,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Init initializes the application by triggering the first bucket fetch.
+// Init initializes the application by triggering the first bucket fetch and the spinner.
 func (m Model) Init() tea.Cmd {
-	return func() tea.Msg {
+	fetchCmd := func() tea.Msg {
 		projects, err := m.client.ListBuckets(context.Background(), m.projectIDs)
 		return BucketsMsg{Projects: projects, Err: err}
 	}
+	return tea.Batch(fetchCmd, m.spinner.Tick)
 }
 
 func (m Model) fetchObjects() tea.Cmd {

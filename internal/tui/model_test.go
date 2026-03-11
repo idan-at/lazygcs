@@ -327,7 +327,17 @@ func TestModel_AsyncLoading(t *testing.T) {
 	cmd := m.Init()
 	assert.Assert(t, cmd != nil)
 
-	m, _ = updateModel(m, cmd())
+	msg := cmd()
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batchMsg {
+			if c != nil {
+				m, _ = updateModel(m, c())
+			}
+		}
+	} else {
+		m, _ = updateModel(m, msg)
+	}
+
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "async-b1"))
 	assert.Assert(t, !strings.Contains(view, "Loading"))

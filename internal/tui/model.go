@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
 	"lazygcs/internal/gcs"
 )
 
@@ -76,10 +78,15 @@ type Model struct {
 	status  string
 	err     error
 	help    help.Model
+	spinner spinner.Model
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
 func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showIcons bool) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
+
 	return Model{
 		projectIDs:        projectIDs,
 		client:            client,
@@ -93,6 +100,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		selected:          make(map[string]struct{}),
 		collapsedProjects: make(map[string]struct{}),
 		help:              help.New(),
+		spinner:           s,
 	}
 }
 
