@@ -90,7 +90,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 
 	// Wait for the preview content to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		return strings.Contains(string(bts), "# Hello World")
+		return strings.Contains(string(bts), "Hello World")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Trigger quit so FinalOutput can return

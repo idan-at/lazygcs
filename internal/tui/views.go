@@ -108,12 +108,11 @@ func (m Model) headerView() string {
 }
 
 func (m Model) footerView() string {
-	var s strings.Builder
-	s.WriteString("\n") // Spacer
-
 	// Left side: Status Pill
 	statusText := " NORMAL "
 	statusStyle := lipgloss.NewStyle().
+		Bold(true).
+		Padding(0, 1).
 		Background(lipgloss.Color("240")).
 		Foreground(lipgloss.Color("250"))
 
@@ -130,14 +129,21 @@ func (m Model) footerView() string {
 
 	pill := statusStyle.Render(statusText)
 
-	// Right side: Help
+	// Right side: Help hints
 	m.help.ShowAll = false
+	m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	helpView := m.help.View(keys)
 
-	// Combine
-	s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, pill, "  ", helpView))
+	// Build the ribbon
+	rightPadding := 1
+	gapWidth := m.width - lipgloss.Width(pill) - lipgloss.Width(helpView) - rightPadding
+	if gapWidth < 0 {
+		gapWidth = 0
+	}
+	gap := strings.Repeat(" ", gapWidth)
 
-	return s.String()
+	return "\n" + pill + gap + helpView + strings.Repeat(" ", rightPadding)
 }
 
 func (m Model) maxItemsVisible() int {
