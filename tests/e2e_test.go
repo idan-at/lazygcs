@@ -25,15 +25,16 @@ func TestMain(m *testing.M) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	binaryPath = filepath.Join(tmpDir, "lazygcs")
-	buildCmd := exec.Command("go", "build", "-o", binaryPath, "main.go")
-	if err := buildCmd.Run(); err != nil {
-		fmt.Printf("failed to build binary: %v\n", err)
+
+	// tests run in the 'tests' directory, so we point to the main.go in the parent dir
+	buildCmd := exec.Command("go", "build", "-o", binaryPath, "../main.go")
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		fmt.Printf("failed to build binary: %v\noutput:\n%s\n", err, output)
 		os.Exit(1)
 	}
 
 	os.Exit(m.Run())
 }
-
 func TestMain_E2E(t *testing.T) {
 	// 1. Setup a valid config file for the binary
 	tmpDir := t.TempDir()
@@ -93,7 +94,9 @@ download_dir = "/tmp"
 func TestMain_NoConfig(t *testing.T) {
 	assert.NilError(t, os.Setenv("LAZYGCS_CONFIG", "/tmp/non-existent-lazygcs-config.toml"))
 	t.Cleanup(func() { _ = os.Unsetenv("LAZYGCS_CONFIG") })
-	err := run([]string{}, nil)
+
+	cmd := exec.Command(binaryPath)
+	err := cmd.Run()
 
 	// Should fail with a config error because default config won't exist in the test environment (unless the user has one)
 	// We can't guarantee what err will be, but it should fail.
@@ -101,8 +104,8 @@ func TestMain_NoConfig(t *testing.T) {
 }
 
 func TestVersionFlag(t *testing.T) {
-	// Use a mock args array instead of actually executing the binary
-	err := run([]string{"--version"}, nil)
+	cmd := exec.Command(binaryPath, "--version")
+	err := cmd.Run()
 
 	// Should succeed
 	assert.NilError(t, err)

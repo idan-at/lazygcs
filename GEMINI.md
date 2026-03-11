@@ -26,6 +26,15 @@
     *   Follow `DESIGN.md`.
     *   Use `main.go` for the entry point, but keep logic in packages (e.g., `tui`, `gcs`, `models`).
 
+## UI Snapshot Testing
+We use `teatest` to verify the exact visual output of the TUI.
+*   **Running Snapshot Tests:** `go test -v ./tests -run TestSnapshot`
+*   **Updating Snapshots:** If you intentionally change the UI layout, colors, or components, you must update the snapshot "golden" files by running the tests with the `-update` flag:
+    ```bash
+    go test -v ./tests -run TestSnapshot -update
+    ```
+    After updating, review the changes in `tests/testdata/` to ensure the new visual output is exactly as expected.
+
 ## Pre-Commit Checklist
 Before committing any code, MUST run:
 1.  `golangci-lint run` (Linting, formatting, and static analysis)
