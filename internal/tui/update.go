@@ -125,11 +125,17 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 	if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
+		m.bgJobs--
+		if m.bgJobs < 0 {
+			m.bgJobs = 0
+		}
 		return m, nil
 	}
 	m.loading = false
 	m.bgJobs--
-	if m.bgJobs < 0 { m.bgJobs = 0 }
+	if m.bgJobs < 0 {
+		m.bgJobs = 0
+	}
 	if msg.Err != nil {
 		m.errorsList = append(m.errorsList, msg.Err)
 		return m, nil
@@ -166,6 +172,10 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
+		m.bgJobs--
+		if m.bgJobs < 0 {
+			m.bgJobs = 0
+		}
 		return m, nil
 	}
 
@@ -173,7 +183,9 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 		m.errorsList = append(m.errorsList, msg.Err)
 		m.loading = false
 		m.bgJobs--
-		if m.bgJobs < 0 { m.bgJobs = 0 }
+		if m.bgJobs < 0 {
+			m.bgJobs = 0
+		}
 		return m, nil
 	}
 
