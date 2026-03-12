@@ -401,7 +401,8 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 		m.cursor = (m.cursor + 1) % itemsCount
 		if oldCursor != m.cursor {
 			m.previewContent = "" // Reset preview on move
-			if m.state == viewObjects {
+			switch m.state {
+			case viewObjects:
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
 					if !m.prefixes[origIdx].Fetched {
@@ -414,7 +415,7 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 					m.previewContent = "Loading..."
 					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
 				}
-			} else if m.state == viewBuckets {
+			case viewBuckets:
 				filtered := m.filteredBuckets()
 				if m.cursor < len(filtered) {
 					item := filtered[m.cursor]
@@ -451,7 +452,8 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 		m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
 		if oldCursor != m.cursor {
 			m.previewContent = "" // Reset preview on move
-			if m.state == viewObjects {
+			switch m.state {
+			case viewObjects:
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
 					if !m.prefixes[origIdx].Fetched {
@@ -464,7 +466,7 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 					m.previewContent = "Loading..."
 					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
 				}
-			} else if m.state == viewBuckets {
+			case viewBuckets:
 				filtered := m.filteredBuckets()
 				if m.cursor < len(filtered) {
 					item := filtered[m.cursor]
