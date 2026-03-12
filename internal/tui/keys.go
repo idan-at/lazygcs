@@ -4,16 +4,18 @@ import "github.com/charmbracelet/bubbles/key"
 
 // keyMap defines a set of keybindings.
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Left     key.Binding
-	Right    key.Binding
-	Select   key.Binding
-	Download key.Binding
-	Search   key.Binding
-	Help     key.Binding
-	Errors   key.Binding
-	Quit     key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	HalfPageUp   key.Binding
+	HalfPageDown key.Binding
+	Left         key.Binding
+	Right        key.Binding
+	Select       key.Binding
+	Download     key.Binding
+	Search       key.Binding
+	Help         key.Binding
+	Errors       key.Binding
+	Quit         key.Binding
 }
 
 // ShortHelp returns keybindings to be shown in the mini help view.
@@ -24,9 +26,9 @@ func (k keyMap) ShortHelp() []key.Binding {
 // FullHelp returns keybindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right},  // Navigation
-		{k.Select, k.Download, k.Search}, // Actions
-		{k.Errors, k.Help, k.Quit},       // App
+		{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.Left, k.Right}, // Navigation
+		{k.Select, k.Download, k.Search},                              // Actions
+		{k.Errors, k.Help, k.Quit},                                    // App
 	}
 }
 
@@ -38,6 +40,14 @@ var keys = keyMap{
 	Down: key.NewBinding(
 		key.WithKeys("down", "j"),
 		key.WithHelp("↓/j", "down"),
+	),
+	HalfPageUp: key.NewBinding(
+		key.WithKeys("ctrl+u"),
+		key.WithHelp("ctrl+u", "half page up"),
+	),
+	HalfPageDown: key.NewBinding(
+		key.WithKeys("ctrl+d"),
+		key.WithHelp("ctrl+d", "half page down"),
 	),
 	Left: key.NewBinding(
 		key.WithKeys("left", "h"),

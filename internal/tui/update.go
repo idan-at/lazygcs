@@ -349,8 +349,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Down):
 		return m.handleDownKey()
 
+	case key.Matches(msg, keys.HalfPageDown):
+		return m.handleHalfPageDownKey()
+
 	case key.Matches(msg, keys.Up):
 		return m.handleUpKey()
+
+	case key.Matches(msg, keys.HalfPageUp):
+		return m.handleHalfPageUpKey()
 
 	case key.Matches(msg, keys.Right):
 		return m.handleRightKey()
@@ -531,6 +537,122 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 	if itemsCount > 0 {
 		oldCursor := m.cursor
 		m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
+		if oldCursor != m.cursor {
+			m.previewContent = "" // Reset preview on move
+			switch m.state {
+			case viewObjects:
+				if m.cursor < len(currentPrefixes) {
+					origIdx := origIndices[m.cursor]
+					if !m.prefixes[origIdx].Fetched {
+						return m.triggerDebounces(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx), m.currentBucket, currentPrefixes[m.cursor].Name)
+					}
+					return m.triggerDebounces(nil, m.currentBucket, currentPrefixes[m.cursor].Name)
+				} else if m.cursor >= len(currentPrefixes) {
+					idx := m.cursor - len(currentPrefixes)
+					obj := currentObjects[idx]
+					m.previewContent = "Loading..."
+					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+				}
+			case viewBuckets:
+				filtered := m.filteredBuckets()
+				if m.cursor < len(filtered) {
+					item := filtered[m.cursor]
+					if !item.IsProject {
+						return m.triggerDebounces(nil, item.BucketName, "")
+					}
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleHalfPageDownKey() (tea.Model, tea.Cmd) {
+	if !strings.HasPrefix(m.status, "Downloading") {
+		m.status = ""
+	}
+
+	var itemsCount int
+	var currentPrefixes []gcs.PrefixMetadata
+	var currentObjects []gcs.ObjectMetadata
+	var origIndices []int
+
+	switch m.state {
+	case viewBuckets:
+		itemsCount = len(m.filteredBuckets())
+	case viewObjects:
+		currentPrefixes, currentObjects, origIndices = m.filteredObjects()
+		itemsCount = len(currentObjects) + len(currentPrefixes)
+	}
+
+	if itemsCount > 0 {
+		offset := m.maxItemsVisible() / 2
+		if offset < 1 {
+			offset = 1
+		}
+		oldCursor := m.cursor
+		m.cursor += offset
+		if m.cursor >= itemsCount {
+			m.cursor = itemsCount - 1
+		}
+		if oldCursor != m.cursor {
+			m.previewContent = "" // Reset preview on move
+			switch m.state {
+			case viewObjects:
+				if m.cursor < len(currentPrefixes) {
+					origIdx := origIndices[m.cursor]
+					if !m.prefixes[origIdx].Fetched {
+						return m.triggerDebounces(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx), m.currentBucket, currentPrefixes[m.cursor].Name)
+					}
+					return m.triggerDebounces(nil, m.currentBucket, currentPrefixes[m.cursor].Name)
+				} else if m.cursor >= len(currentPrefixes) {
+					idx := m.cursor - len(currentPrefixes)
+					obj := currentObjects[idx]
+					m.previewContent = "Loading..."
+					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+				}
+			case viewBuckets:
+				filtered := m.filteredBuckets()
+				if m.cursor < len(filtered) {
+					item := filtered[m.cursor]
+					if !item.IsProject {
+						return m.triggerDebounces(nil, item.BucketName, "")
+					}
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleHalfPageUpKey() (tea.Model, tea.Cmd) {
+	if !strings.HasPrefix(m.status, "Downloading") {
+		m.status = ""
+	}
+
+	var itemsCount int
+	var currentPrefixes []gcs.PrefixMetadata
+	var currentObjects []gcs.ObjectMetadata
+	var origIndices []int
+
+	switch m.state {
+	case viewBuckets:
+		itemsCount = len(m.filteredBuckets())
+	case viewObjects:
+		currentPrefixes, currentObjects, origIndices = m.filteredObjects()
+		itemsCount = len(currentObjects) + len(currentPrefixes)
+	}
+
+	if itemsCount > 0 {
+		offset := m.maxItemsVisible() / 2
+		if offset < 1 {
+			offset = 1
+		}
+		oldCursor := m.cursor
+		m.cursor -= offset
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
 		if oldCursor != m.cursor {
 			m.previewContent = "" // Reset preview on move
 			switch m.state {

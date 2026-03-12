@@ -450,6 +450,39 @@ func TestModel_Update_CursorNavigation(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
 }
 
+func TestModel_Update_HalfPageNavigation(t *testing.T) {
+	var buckets []string
+	for i := 0; i < 50; i++ {
+		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
+	}
+	client := mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 30})
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: buckets})
+
+	// Initial view should show bucket-00
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "bucket-00"))
+	assert.Assert(t, !strings.Contains(view, "bucket-20")) // Verify it's not showing everything
+
+	// Press Ctrl+D twice to move down significantly
+	m, _ = pressKeyType(m, tea.KeyCtrlD)
+	m, _ = pressKeyType(m, tea.KeyCtrlD)
+	
+	viewDown := m.View()
+	assert.Assert(t, !strings.Contains(viewDown, "bucket-00"))
+	// We expect the view to have scrolled down
+	
+	// Press Ctrl+U twice to move back up
+	m, _ = pressKeyType(m, tea.KeyCtrlU)
+	m, _ = pressKeyType(m, tea.KeyCtrlU)
+	
+	viewUp := m.View()
+	assert.Assert(t, strings.Contains(viewUp, "bucket-00"))
+}
+
 func TestModel_Update_CursorCycle(t *testing.T) {
 	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
