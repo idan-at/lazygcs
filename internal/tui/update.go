@@ -31,6 +31,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, msg.FetchCmd
 		}
 		return m, nil
+	case HoverPrefetchTickMsg:
+		if msg.CursorVersion == m.cursorVersion {
+			if msg.FetchCmd != nil {
+				return m, msg.FetchCmd
+			}
+		}
+		return m, nil
+	case HoverPrefetchMsg:
+		if msg.Err == nil && msg.List != nil {
+			cacheKey := msg.Bucket + "::" + msg.Prefix
+			m.listCache[cacheKey] = listCacheEntry{List: msg.List, ExpiresAt: time.Now().Add(5 * time.Minute)}
+		}
+		return m, nil
 	case ClearStatusMsg:
 		if !strings.HasPrefix(m.status, "Downloading") {
 			m.status = ""
@@ -92,10 +105,10 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if len(m.prefixes) > 0 {
 		// Fetch metadata for the current cursor (either 0 or restored)
-		m, cmd = m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor))
+		m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 	} else if len(m.objects) > 0 {
 		m.previewContent = "Loading..."
-		m, cmd = m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, m.objects[0].Name))
+		m, cmd = m.triggerDebounces(m.fetchContent(m.currentBucket, m.objects[0].Name), "", "")
 	}
 	return m, cmd
 }
@@ -236,14 +249,15 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(currentPrefixes) {
 			origIdx := origIndices[m.cursor]
 			if !m.prefixes[origIdx].Fetched {
-				return m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx))
+				return m.triggerDebounces(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx), m.currentBucket, currentPrefixes[m.cursor].Name)
 			}
+			return m.triggerDebounces(nil, m.currentBucket, currentPrefixes[m.cursor].Name)
 		} else if m.cursor >= len(currentPrefixes) {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
 				m.previewContent = "Loading..."
-				return m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, obj.Name))
+				return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
 			}
 		}
 	}
@@ -328,13 +342,22 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
 					if !m.prefixes[origIdx].Fetched {
-						return m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx))
+						return m.triggerDebounces(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx), m.currentBucket, currentPrefixes[m.cursor].Name)
 					}
+					return m.triggerDebounces(nil, m.currentBucket, currentPrefixes[m.cursor].Name)
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, obj.Name))
+					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+				}
+			} else if m.state == viewBuckets {
+				filtered := m.filteredBuckets()
+				if m.cursor < len(filtered) {
+					item := filtered[m.cursor]
+					if !item.IsProject {
+						return m.triggerDebounces(nil, item.BucketName, "")
+					}
 				}
 			}
 		}
@@ -369,13 +392,22 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
 					if !m.prefixes[origIdx].Fetched {
-						return m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx))
+						return m.triggerDebounces(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx), m.currentBucket, currentPrefixes[m.cursor].Name)
 					}
+					return m.triggerDebounces(nil, m.currentBucket, currentPrefixes[m.cursor].Name)
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, obj.Name))
+					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+				}
+			} else if m.state == viewBuckets {
+				filtered := m.filteredBuckets()
+				if m.cursor < len(filtered) {
+					item := filtered[m.cursor]
+					if !item.IsProject {
+						return m.triggerDebounces(nil, item.BucketName, "")
+					}
 				}
 			}
 		}

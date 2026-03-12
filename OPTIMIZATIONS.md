@@ -20,7 +20,7 @@ Enable zero-latency navigation for previously visited folders/buckets.
 *   Cache entries use a 5-minute TTL to ensure data stays relatively fresh without requiring manual invalidation.
 *   **Benefit:** Instant rendering when navigating back (`h`) and forward (`l`) to known paths.
 
-## 4. Predictive Prefetching (Status: Pending)
+## 4. Predictive Prefetching (Status: Completed)
 Anticipate user actions to hide latency.
 *   When hovering on a directory/bucket for a set time, kick off a background `ListObjects` fetch.
 *   Store the result silently in the cache.

@@ -112,13 +112,32 @@ func clearStatusCmd() tea.Cmd {
 	})
 }
 
-func (m Model) triggerPreviewDebounce(fetchCmd tea.Cmd) (Model, tea.Cmd) {
+func (m Model) triggerDebounces(previewCmd tea.Cmd, hoverBucket, hoverPrefix string) (Model, tea.Cmd) {
 	m.cursorVersion++
 	cv := m.cursorVersion
-	return m, tea.Tick(150*time.Millisecond, func(_ time.Time) tea.Msg {
-		return DebouncePreviewMsg{
-			CursorVersion: cv,
-			FetchCmd:      fetchCmd,
+
+	var cmds []tea.Cmd
+
+	if previewCmd != nil {
+		cmds = append(cmds, tea.Tick(150*time.Millisecond, func(_ time.Time) tea.Msg {
+			return DebouncePreviewMsg{CursorVersion: cv, FetchCmd: previewCmd}
+		}))
+	}
+
+	if hoverBucket != "" {
+		hoverCmd := func() tea.Msg {
+			cacheKey := hoverBucket + "::" + hoverPrefix
+			if cached, ok := m.listCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
+				return nil
+			}
+			list, err := m.client.ListObjects(context.Background(), hoverBucket, hoverPrefix)
+			return HoverPrefetchMsg{Bucket: hoverBucket, Prefix: hoverPrefix, List: list, Err: err}
 		}
-	})
+
+		cmds = append(cmds, tea.Tick(300*time.Millisecond, func(_ time.Time) tea.Msg {
+			return HoverPrefetchTickMsg{CursorVersion: cv, FetchCmd: hoverCmd}
+		}))
+	}
+
+	return m, tea.Batch(cmds...)
 }

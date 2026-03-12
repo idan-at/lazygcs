@@ -120,9 +120,32 @@ func resolveFetchCmd(cmd tea.Cmd) tea.Msg {
 		return nil
 	}
 	msg := cmd()
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		// Just take the first valid DebouncePreviewMsg or HoverPrefetchTickMsg
+		for _, c := range batchMsg {
+			if c != nil {
+				subMsg := c()
+				if dMsg, ok := subMsg.(tui.DebouncePreviewMsg); ok {
+					if dMsg.FetchCmd != nil {
+						return dMsg.FetchCmd()
+					}
+				}
+				if hMsg, ok := subMsg.(tui.HoverPrefetchTickMsg); ok {
+					if hMsg.FetchCmd != nil {
+						return hMsg.FetchCmd()
+					}
+				}
+			}
+		}
+	}
 	if dMsg, ok := msg.(tui.DebouncePreviewMsg); ok {
 		if dMsg.FetchCmd != nil {
 			return dMsg.FetchCmd()
+		}
+	}
+	if hMsg, ok := msg.(tui.HoverPrefetchTickMsg); ok {
+		if hMsg.FetchCmd != nil {
+			return hMsg.FetchCmd()
 		}
 	}
 	return msg

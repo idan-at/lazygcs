@@ -68,3 +68,17 @@ type DebouncePreviewMsg struct {
 	CursorVersion int
 	FetchCmd      tea.Cmd
 }
+
+// HoverPrefetchTickMsg is sent after a delay to trigger a background prefetch.
+type HoverPrefetchTickMsg struct {
+	CursorVersion int
+	FetchCmd      tea.Cmd
+}
+
+// HoverPrefetchMsg is sent when a background prefetch completes.
+type HoverPrefetchMsg struct {
+	Bucket string
+	Prefix string
+	List   *gcs.ObjectList
+	Err    error
+}
