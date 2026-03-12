@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"lazygcs/internal/gcs"
 )
 
@@ -61,3 +62,9 @@ type DownloadMsg struct {
 
 // ClearStatusMsg is sent to clear the status bar.
 type ClearStatusMsg struct{}
+
+// DebouncePreviewMsg is sent after a delay to trigger a preview fetch.
+type DebouncePreviewMsg struct {
+	CursorVersion int
+	FetchCmd      tea.Cmd
+}

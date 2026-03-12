@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -189,22 +190,33 @@ type ProjectBuckets struct {
 //   - []ProjectBuckets: A list of projects and their corresponding buckets.
 //   - error: If any underlying API call fails.
 func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]ProjectBuckets, error) {
-	allProjects := make([]ProjectBuckets, 0, len(projectIDs))
-	for _, pID := range projectIDs {
-		it := c.storageClient.Buckets(ctx, pID)
-		var buckets []string
-		for {
-			bucketAttrs, err := it.Next()
-			if err == iterator.Done {
-				break
+	allProjects := make([]ProjectBuckets, len(projectIDs))
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i, pID := range projectIDs {
+		i, pID := i, pID // capture loop variables
+		g.Go(func() error {
+			it := c.storageClient.Buckets(ctx, pID)
+			var buckets []string
+			for {
+				bucketAttrs, err := it.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					return fmt.Errorf("failed to list buckets for project %q: %w", pID, err)
+				}
+				buckets = append(buckets, bucketAttrs.Name)
 			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to list buckets for project %q: %w", pID, err)
-			}
-			buckets = append(buckets, bucketAttrs.Name)
-		}
-		allProjects = append(allProjects, ProjectBuckets{ProjectID: pID, Buckets: buckets})
+			allProjects[i] = ProjectBuckets{ProjectID: pID, Buckets: buckets}
+			return nil
+		})
 	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
 	return allProjects, nil
 }
 

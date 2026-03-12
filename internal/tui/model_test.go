@@ -115,6 +115,19 @@ func pressKeyType(m tui.Model, keyType tea.KeyType) (tui.Model, tea.Cmd) {
 	return updateModel(m, tea.KeyMsg{Type: keyType})
 }
 
+func resolveFetchCmd(cmd tea.Cmd) tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if dMsg, ok := msg.(tui.DebouncePreviewMsg); ok {
+		if dMsg.FetchCmd != nil {
+			return dMsg.FetchCmd()
+		}
+	}
+	return msg
+}
+
 func TestModel_ObjectPreview(t *testing.T) {
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1"}, []string{"folder1/"})
@@ -132,8 +145,9 @@ func TestModel_ObjectPreview(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Loading"))
 
 	// Simulate receiving the content
-	msg := cmd()
-	m, _ = updateModel(m, msg)
+	msg2 := resolveFetchCmd(cmd)
+	fmt.Printf("Initial Preview Msg type: %T\n", msg2)
+	m, _ = updateModel(m, msg2)
 
 	// Verify view shows the content
 	view := m.View()
@@ -236,7 +250,7 @@ func TestModel_InitialObjectPreview(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Loading"))
 
 	// Simulate receiving the content
-	contentMsg := cmd()
+	contentMsg := resolveFetchCmd(cmd)
 	m, _ = updateModel(m, contentMsg)
 
 	// Verify view shows the content
@@ -254,7 +268,7 @@ func TestModel_CursorNoop_PreviewNotReloaded(t *testing.T) {
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Process initial fetchContent
-	m, _ = updateModel(m, cmd())
+	m, _ = updateModel(m, resolveFetchCmd(cmd))
 
 	assert.Assert(t, strings.Contains(m.View(), "content of obj1"))
 
@@ -284,7 +298,7 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Simulate receiving the error message
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	m, _ = updateModel(m, msg)
 
 	// Verify view shows the error
@@ -311,7 +325,7 @@ func TestModel_PrefixMetadata_VirtualDirectory(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Loading metadata..."))
 
 	// Simulate receiving the error message (virtual directory)
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	metaMsg := msg.(tui.MetadataMsg)
 	metaMsg.Err = fmt.Errorf("object doesn't exist")
 	m, _ = updateModel(m, metaMsg)
@@ -357,7 +371,7 @@ func TestModel_AsyncLoading(t *testing.T) {
 	cmd := m.Init()
 	assert.Assert(t, cmd != nil)
 
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	if batchMsg, ok := msg.(tea.BatchMsg); ok {
 		for _, c := range batchMsg {
 			if c != nil {
@@ -569,7 +583,7 @@ func TestModel_SelectPrefix(t *testing.T) {
 
 	// Initial fetch for first item (prefix)
 	assert.Assert(t, cmd != nil)
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	metaMsg := msg.(tui.MetadataMsg)
 
 	// Simulate metadata arrival
@@ -753,7 +767,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "Downloading 1/2"), "View should show batch downloading progress")
 
 	// With the queue system, the first command is a single download fetch
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	dl1, ok := msg.(tui.DownloadMsg)
 	assert.Assert(t, ok, "Expected a tui.DownloadMsg for the first item")
 
@@ -830,7 +844,7 @@ func TestModel_PreviewBinaryContent(t *testing.T) {
 
 	// Simulate receiving binary content
 	binaryContent := "ELF\x01\x02\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00"
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	contentMsg := msg.(tui.ContentMsg)
 	contentMsg.Content = binaryContent
 	m, _ = updateModel(m, contentMsg)
@@ -863,7 +877,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 	m, cmd := updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
 	// Simulate receiving the content but with 100 lines
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	contentMsg := msg.(tui.ContentMsg)
 	contentMsg.Content = longContent.String()
 	m, _ = updateModel(m, contentMsg)
@@ -937,7 +951,7 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	assert.Assert(t, cmd != nil, "Cmd should be returned for overwrite")
 	assert.Assert(t, strings.Contains(m.View(), "Downloading (overwriting)..."), "View should show overwriting status")
 
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	downloadMsg, ok := msg.(tui.DownloadMsg)
 	assert.Assert(t, ok, "Expected DownloadMsg")
 	assert.Equal(t, downloadMsg.Path, existingFile)
@@ -967,7 +981,7 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 
 	assert.Assert(t, cmd != nil, "Cmd should be returned for rename")
 
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	downloadMsg, ok := msg.(tui.DownloadMsg)
 	assert.Assert(t, ok, "Expected DownloadMsg")
 	expectedNewPath := filepath.Join(downloadDir, "obj1_1")
@@ -1199,7 +1213,7 @@ func TestModel_SearchFetchesMetadata(t *testing.T) {
 	assert.Assert(t, cmd != nil, "A command should be returned to fetch metadata for the newly focused item")
 	
 	// Let's actually execute the command to see if it yields a MetadataMsg
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	_, ok := msg.(tui.MetadataMsg)
 	assert.Assert(t, ok, "Expected a MetadataMsg to be returned")
 }
@@ -1289,7 +1303,7 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	assert.Assert(t, cmd != nil, "Expected a command to clear the status")
 	
 	// Execute the command (simulate timer firing)
-	msg := cmd()
+	msg := resolveFetchCmd(cmd)
 	m, _ = updateModel(m, msg)
 
 	// Status should be CLEARED

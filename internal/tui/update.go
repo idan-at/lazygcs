@@ -25,6 +25,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleContentMsg(msg)
 	case DownloadMsg:
 		return m.handleDownloadMsg(msg)
+	case DebouncePreviewMsg:
+		if msg.CursorVersion == m.cursorVersion {
+			return m, msg.FetchCmd
+		}
+		return m, nil
 	case ClearStatusMsg:
 		if !strings.HasPrefix(m.status, "Downloading") {
 			m.status = ""
@@ -82,10 +87,10 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if len(m.prefixes) > 0 {
 		// Fetch metadata for the current cursor (either 0 or restored)
-		cmd = m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor)
+		m, cmd = m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor))
 	} else if len(m.objects) > 0 {
-		cmd = m.fetchContent(m.currentBucket, m.objects[0].Name)
 		m.previewContent = "Loading..."
+		m, cmd = m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, m.objects[0].Name))
 	}
 	return m, cmd
 }
@@ -221,14 +226,14 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(currentPrefixes) {
 			origIdx := origIndices[m.cursor]
 			if !m.prefixes[origIdx].Fetched {
-				return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
+				return m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx))
 			}
 		} else if m.cursor >= len(currentPrefixes) {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
 				m.previewContent = "Loading..."
-				return m, m.fetchContent(m.currentBucket, obj.Name)
+				return m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, obj.Name))
 			}
 		}
 	}
@@ -313,13 +318,13 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
 					if !m.prefixes[origIdx].Fetched {
-						return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
+						return m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx))
 					}
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m, m.fetchContent(m.currentBucket, obj.Name)
+					return m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, obj.Name))
 				}
 			}
 		}
@@ -354,13 +359,13 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 				if m.cursor < len(currentPrefixes) {
 					origIdx := origIndices[m.cursor]
 					if !m.prefixes[origIdx].Fetched {
-						return m, m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx)
+						return m.triggerPreviewDebounce(m.fetchPrefixMetadataByName(currentPrefixes[m.cursor].Name, origIdx))
 					}
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m, m.fetchContent(m.currentBucket, obj.Name)
+					return m.triggerPreviewDebounce(m.fetchContent(m.currentBucket, obj.Name))
 				}
 			}
 		}

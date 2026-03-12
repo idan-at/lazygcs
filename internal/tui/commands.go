@@ -88,3 +88,14 @@ func clearStatusCmd() tea.Cmd {
 		return ClearStatusMsg{}
 	})
 }
+
+func (m Model) triggerPreviewDebounce(fetchCmd tea.Cmd) (Model, tea.Cmd) {
+	m.cursorVersion++
+	cv := m.cursorVersion
+	return m, tea.Tick(150*time.Millisecond, func(_ time.Time) tea.Msg {
+		return DebouncePreviewMsg{
+			CursorVersion: cv,
+			FetchCmd:      fetchCmd,
+		}
+	})
+}
