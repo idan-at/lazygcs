@@ -12,6 +12,7 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 *   **Lightning Fast:** Keyboard-centric workflow means your hands never have to leave the home row.
 *   **File Previews:** Peek at file contents and metadata (size, type, created/updated dates) without downloading them. Safely ignores binary files to prevent terminal corruption!
 *   **Inline Search:** Instantly filter your buckets or objects. Supports exact matching or configurable **fuzzy search**.
+*   **Error History Overlay:** Quickly diagnose permission or network issues with a dedicated error history view (`Ctrl+e`).
 *   **Multi-Select & Batch Downloads:** Select multiple files or entire directories and download them all concurrently. Directories are automatically packaged into `.zip` archives!
 *   **Vim-like Keybindings:** `j`/`k` for vertical movement, `h`/`l` for entering and exiting directories.
 
@@ -83,6 +84,7 @@ gcloud auth application-default login
 ### Actions
 *   `space`: Toggle selection of the highlighted item (Multi-select)
 *   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.
+*   `Ctrl+e`: Toggle the Error History modal (visible when errors occur)
 *   `/`: Start searching/filtering the current column
 *   `?`: Toggle the Help Menu overlay
 *   `esc` or `Enter`: Exit search mode
