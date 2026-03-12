@@ -145,8 +145,8 @@ func (m Model) footerView() string {
 		statusText = fmt.Sprintf(" %s ", m.status)
 		statusStyle = statusStyle.Background(lipgloss.Color("130")).Foreground(lipgloss.Color("15"))
 	} else if m.bgJobs > 0 {
-		statusText = fmt.Sprintf(" %s LOADING ", m.spinner.View())
-		statusStyle = statusStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
+		statusText = m.spinner.View()
+		statusStyle = lipgloss.NewStyle().Padding(0, 1)
 	}
 
 	pill := statusStyle.Render(statusText)
