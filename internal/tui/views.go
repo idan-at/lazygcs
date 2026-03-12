@@ -151,6 +151,16 @@ func (m Model) footerView() string {
 
 	pill := statusStyle.Render(statusText)
 
+	var errorsPill string
+	if len(m.errorsList) > 0 {
+		errorsPill = " " + lipgloss.NewStyle().
+			Bold(true).
+			Padding(0, 1).
+			Background(lipgloss.Color("196")). // Red background
+			Foreground(lipgloss.Color("15")).
+			Render(fmt.Sprintf("%d ERRORS", len(m.errorsList)))
+	}
+
 	// Right side: Help hints
 	m.help.ShowAll = false
 	m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
@@ -159,13 +169,13 @@ func (m Model) footerView() string {
 
 	// Build the ribbon
 	rightPadding := 1
-	gapWidth := m.width - lipgloss.Width(pill) - lipgloss.Width(helpView) - rightPadding
+	gapWidth := m.width - lipgloss.Width(pill) - lipgloss.Width(errorsPill) - lipgloss.Width(helpView) - rightPadding
 	if gapWidth < 0 {
 		gapWidth = 0
 	}
 	gap := strings.Repeat(" ", gapWidth)
 
-	return "\n" + pill + gap + helpView + strings.Repeat(" ", rightPadding)
+	return "\n" + pill + errorsPill + gap + helpView + strings.Repeat(" ", rightPadding)
 }
 
 func (m Model) maxItemsVisible() int {
@@ -392,6 +402,19 @@ func (m Model) View() string {
 		view += m.footerView()
 	}
 
+	if m.showErrors {
+		// Use lipgloss.Place to center the errors modal.
+		return lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			m.errorsView(),
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("236")),
+		)
+	}
+
 	return view
 }
 
@@ -412,4 +435,50 @@ func (m Model) helpView() string {
 
 	content := lipgloss.JoinVertical(lipgloss.Left, titleStyle, helpText)
 	return helpStyle.Render(content)
+}
+
+func (m Model) errorsView() string {
+	var s strings.Builder
+
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("204")).
+		Render(fmt.Sprintf("ERRORS (%d)", len(m.errorsList)))
+	
+	s.WriteString(title + "\n\n")
+
+	// Limit to last 10 errors to avoid huge modals
+	start := 0
+	if len(m.errorsList) > 10 {
+		start = len(m.errorsList) - 10
+	}
+
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	for i := start; i < len(m.errorsList); i++ {
+		s.WriteString("• " + errStyle.Render(m.errorsList[i].Error()) + "\n")
+	}
+
+	footer := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		MarginTop(1).
+		Render("Press esc or q to close")
+	
+	s.WriteString(footer)
+
+	boxWidth := m.width / 2
+	if boxWidth < 50 {
+		boxWidth = 50
+	}
+	if boxWidth > m.width-4 {
+		boxWidth = m.width - 4
+	}
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("204")).
+		Padding(1, 2).
+		Width(boxWidth).
+		Render(s.String())
+
+	return box
 }

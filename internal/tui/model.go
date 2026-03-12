@@ -43,6 +43,7 @@ type Model struct {
 	state          viewState
 	previewContent string
 	showHelp       bool
+	showErrors     bool
 
 	// Search State
 	searchMode  bool
@@ -80,6 +81,7 @@ type Model struct {
 	bgJobs  int
 	status  string
 	err     error
+	errorsList []error
 	help    help.Model
 	spinner spinner.Model
 

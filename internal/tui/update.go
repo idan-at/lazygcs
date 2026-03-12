@@ -68,7 +68,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		m.err = msg.Err
+		m.errorsList = append(m.errorsList, msg.Err)
 		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 { m.bgJobs = 0 }
@@ -131,7 +131,7 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 	m.bgJobs--
 	if m.bgJobs < 0 { m.bgJobs = 0 }
 	if msg.Err != nil {
-		m.err = msg.Err
+		m.errorsList = append(m.errorsList, msg.Err)
 		return m, nil
 	}
 
@@ -170,7 +170,7 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.Err != nil {
-		m.err = msg.Err
+		m.errorsList = append(m.errorsList, msg.Err)
 		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 { m.bgJobs = 0 }
@@ -296,6 +296,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.showErrors {
+		switch {
+		case key.Matches(msg, keys.Errors), key.Matches(msg, keys.Quit), msg.String() == "esc":
+			m.showErrors = false
+		}
+		return m, nil
+	}
+
 	if m.searchMode {
 		return m.handleSearchKey(msg)
 	}
@@ -307,6 +315,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Help):
 		m.showHelp = true
+		return m, nil
+
+	case key.Matches(msg, keys.Errors):
+		if len(m.errorsList) > 0 {
+			m.showErrors = true
+		}
 		return m, nil
 
 	case key.Matches(msg, keys.Search):
