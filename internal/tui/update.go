@@ -311,8 +311,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Search):
 		m.searchMode = true
-		m.searchQuery = ""
-		m.cursor = 0
+		if m.searchQuery != "" {
+			m.searchQuery = ""
+			m.cursor = 0
+		}
 		return m, nil
 
 	case key.Matches(msg, keys.Select):
