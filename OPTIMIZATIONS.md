@@ -13,11 +13,11 @@ Prevent API spam when scrolling rapidly through the list.
 *   Cancel previous fetches if the cursor moves again within the window.
 *   **Benefit:** Reduces unnecessary API calls and CPU overhead, preventing UI lag.
 
-## 3. In-Memory Caching (Status: Pending)
+## 3. In-Memory Caching (Status: Completed)
 Enable zero-latency navigation for previously visited folders/buckets.
 *   Implement a cache for `ListObjects` results (keyed by bucket + prefix).
 *   Cache `GetObjectContent` and `GetObjectMetadata` results.
-*   Add a manual "Refresh" keybind to force-fetch fresh data.
+*   Cache entries use a 5-minute TTL to ensure data stays relatively fresh without requiring manual invalidation.
 *   **Benefit:** Instant rendering when navigating back (`h`) and forward (`l`) to known paths.
 
 ## 4. Predictive Prefetching (Status: Pending)

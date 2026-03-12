@@ -22,6 +22,14 @@ func (m Model) Init() tea.Cmd {
 func (m Model) fetchObjects() tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
+	
+	cacheKey := bucket + "::" + prefix
+	if cached, ok := m.listCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
+		return func() tea.Msg {
+			return ObjectsMsg{Bucket: bucket, Prefix: prefix, List: cached.List, Err: nil}
+		}
+	}
+
 	return func() tea.Msg {
 		list, err := m.client.ListObjects(context.Background(), bucket, prefix)
 		return ObjectsMsg{Bucket: bucket, Prefix: prefix, List: list, Err: err}
@@ -29,6 +37,13 @@ func (m Model) fetchObjects() tea.Cmd {
 }
 
 func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
+	cacheKey := bucketName + "::" + objectName
+	if cached, ok := m.contentCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
+		return func() tea.Msg {
+			return ContentMsg{ObjectName: objectName, Content: cached.Content, Err: nil}
+		}
+	}
+
 	return func() tea.Msg {
 		content, err := m.client.GetObjectContent(context.Background(), bucketName, objectName)
 		return ContentMsg{ObjectName: objectName, Content: content, Err: err}
@@ -38,6 +53,14 @@ func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
 func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
+	
+	cacheKey := bucket + "::" + name
+	if cached, ok := m.metadataCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
+		return func() tea.Msg {
+			return MetadataMsg{Bucket: bucket, Prefix: prefix, PrefixIndex: originalIdx, Metadata: cached.Metadata, Err: nil}
+		}
+	}
+
 	return func() tea.Msg {
 		meta, err := m.client.GetObjectMetadata(context.Background(), bucket, name)
 		return MetadataMsg{Bucket: bucket, Prefix: prefix, PrefixIndex: originalIdx, Metadata: meta, Err: err}

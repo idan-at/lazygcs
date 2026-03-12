@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -80,6 +81,26 @@ type Model struct {
 	err     error
 	help    help.Model
 	spinner spinner.Model
+
+	// Caches
+	listCache     map[string]listCacheEntry
+	contentCache  map[string]contentCacheEntry
+	metadataCache map[string]metadataCacheEntry
+}
+
+type listCacheEntry struct {
+	List      *gcs.ObjectList
+	ExpiresAt time.Time
+}
+
+type contentCacheEntry struct {
+	Content   string
+	ExpiresAt time.Time
+}
+
+type metadataCacheEntry struct {
+	Metadata  *gcs.ObjectMetadata
+	ExpiresAt time.Time
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
@@ -102,6 +123,9 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		collapsedProjects: make(map[string]struct{}),
 		help:              help.New(),
 		spinner:           s,
+		listCache:         make(map[string]listCacheEntry),
+		contentCache:      make(map[string]contentCacheEntry),
+		metadataCache:     make(map[string]metadataCacheEntry),
 	}
 }
 

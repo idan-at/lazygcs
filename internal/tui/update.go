@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -69,6 +70,10 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		return m, nil
 	}
+
+	cacheKey := msg.Bucket + "::" + msg.Prefix
+	m.listCache[cacheKey] = listCacheEntry{List: msg.List, ExpiresAt: time.Now().Add(5 * time.Minute)}
+
 	m.objects = msg.List.Objects
 	m.prefixes = msg.List.Prefixes
 	m.cursor = 0
@@ -106,6 +111,9 @@ func (m Model) handleMetadataMsg(msg MetadataMsg) (tea.Model, tea.Cmd) {
 			m.prefixes[msg.PrefixIndex].Created = msg.Metadata.Created
 			m.prefixes[msg.PrefixIndex].Updated = msg.Metadata.Updated
 			m.prefixes[msg.PrefixIndex].Owner = msg.Metadata.Owner
+
+			cacheKey := msg.Bucket + "::" + msg.Metadata.Name
+			m.metadataCache[cacheKey] = metadataCacheEntry{Metadata: msg.Metadata, ExpiresAt: time.Now().Add(5 * time.Minute)}
 		}
 	}
 	return m, nil
@@ -122,6 +130,8 @@ func (m Model) handleContentMsg(msg ContentMsg) (tea.Model, tea.Cmd) {
 					m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
 				} else {
 					m.previewContent = msg.Content
+					cacheKey := m.currentBucket + "::" + msg.ObjectName
+					m.contentCache[cacheKey] = contentCacheEntry{Content: msg.Content, ExpiresAt: time.Now().Add(5 * time.Minute)}
 				}
 			}
 		}
