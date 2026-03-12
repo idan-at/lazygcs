@@ -68,17 +68,18 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 	}
 }
 
-func TestClient_ListBuckets(t *testing.T) {
+func TestClient_ListBucketsPage(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "o1"}},
 	}
 	_, client := setupTestServer(t, objects)
 
-	projects, err := client.ListBuckets(context.Background(), []string{"test-project"})
+	buckets, nextToken, err := client.ListBucketsPage(context.Background(), "test-project", "", 500)
 	assert.NilError(t, err)
-	assert.Equal(t, len(projects), 1)
+	assert.Equal(t, len(buckets), 1)
 
-	assert.Assert(t, slices.Contains(projects[0].Buckets, "b1"), "b1 not found in buckets")
+	assert.Assert(t, buckets[0] == "b1", "b1 not found in buckets")
+	assert.Equal(t, nextToken, "")
 }
 
 func TestClient_ListObjects(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 // GCSClient defines the contract for interacting with Google Cloud Storage.
 // This interface allows for easy mocking in TUI unit tests.
 type GCSClient interface {
-	// ListBuckets returns names of buckets grouped by project.
-	ListBuckets(ctx context.Context, projectIDs []string) ([]gcs.ProjectBuckets, error)
+	// ListBucketsPage retrieves a specific page of buckets for a given project.
+	ListBucketsPage(ctx context.Context, projectID, pageToken string, pageSize int) ([]string, string, error)
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
 	// ListObjectsPage retrieves a specific page of object names and common prefixes (folders).
@@ -26,10 +26,12 @@ type GCSClient interface {
 	DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error
 }
 
-// BucketsMsg is sent when bucket listing completes.
-type BucketsMsg struct {
-	Projects []gcs.ProjectBuckets
-	Err      error
+// BucketsPageMsg is sent for progressive loading of project buckets.
+type BucketsPageMsg struct {
+	ProjectID string
+	Buckets   []string
+	NextToken string
+	Err       error
 }
 
 // ObjectsMsg is sent when object listing completes.

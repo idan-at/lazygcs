@@ -77,6 +77,7 @@ type Model struct {
 	selected           map[string]struct{}
 
 	loading bool
+	bgJobs  int
 	status  string
 	err     error
 	help    help.Model
@@ -119,6 +120,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		height:            40,
 		state:             viewBuckets,
 		loading:           true,
+		bgJobs:            len(projectIDs),
 		selected:          make(map[string]struct{}),
 		collapsedProjects: make(map[string]struct{}),
 		help:              help.New(),
@@ -139,6 +141,7 @@ func (m Model) resetObjectsState() Model {
 	m.prefixes = nil
 	m.cursor = 0
 	m.loading = true
+	m.bgJobs++
 	if !strings.HasPrefix(m.status, "Downloading") {
 		m.status = ""
 	}

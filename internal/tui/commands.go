@@ -12,11 +12,19 @@ import (
 
 // Init initializes the application by triggering the first bucket fetch and the spinner.
 func (m Model) Init() tea.Cmd {
-	fetchCmd := func() tea.Msg {
-		projects, err := m.client.ListBuckets(context.Background(), m.projectIDs)
-		return BucketsMsg{Projects: projects, Err: err}
+	var cmds []tea.Cmd
+	cmds = append(cmds, m.spinner.Tick)
+	for _, pID := range m.projectIDs {
+		cmds = append(cmds, m.fetchBucketsPage(pID, ""))
 	}
-	return tea.Batch(fetchCmd, m.spinner.Tick)
+	return tea.Batch(cmds...)
+}
+
+func (m Model) fetchBucketsPage(projectID string, pageToken string) tea.Cmd {
+	return func() tea.Msg {
+		buckets, nextToken, err := m.client.ListBucketsPage(context.Background(), projectID, pageToken, 500)
+		return BucketsPageMsg{ProjectID: projectID, Buckets: buckets, NextToken: nextToken, Err: err}
+	}
 }
 
 func (m Model) fetchObjects() tea.Cmd {

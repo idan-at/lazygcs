@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -180,44 +179,32 @@ type ProjectBuckets struct {
 	Buckets   []string
 }
 
-// ListBuckets retrieves the names of all buckets accessible within the given projects.
+// ListBucketsPage retrieves a specific page of buckets for a specific project.
 //
 // Arguments:
-//   - ctx: The context for the API calls.
-//   - projectIDs: A list of Google Cloud Project IDs to scan for buckets.
+//   - ctx: The context for the API call.
+//   - projectID: The Google Cloud Project ID to scan for buckets.
+//   - pageToken: Token for pagination.
+//   - pageSize: Maximum number of buckets to return.
 //
 // Returns:
-//   - []ProjectBuckets: A list of projects and their corresponding buckets.
-//   - error: If any underlying API call fails.
-func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]ProjectBuckets, error) {
-	allProjects := make([]ProjectBuckets, len(projectIDs))
-	g, ctx := errgroup.WithContext(ctx)
-
-	for i, pID := range projectIDs {
-		i, pID := i, pID // capture loop variables
-		g.Go(func() error {
-			it := c.storageClient.Buckets(ctx, pID)
-			var buckets []string
-			for {
-				bucketAttrs, err := it.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					return fmt.Errorf("failed to list buckets for project %q: %w", pID, err)
-				}
-				buckets = append(buckets, bucketAttrs.Name)
-			}
-			allProjects[i] = ProjectBuckets{ProjectID: pID, Buckets: buckets}
-			return nil
-		})
+//   - []string: A list of bucket names.
+//   - string: The next page token.
+//   - error: If the underlying API call fails.
+func (c *Client) ListBucketsPage(ctx context.Context, projectID string, pageToken string, pageSize int) ([]string, string, error) {
+	it := c.storageClient.Buckets(ctx, projectID)
+	pager := iterator.NewPager(it, pageSize, pageToken)
+	var attrs []*storage.BucketAttrs
+	nextToken, err := pager.NextPage(&attrs)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch buckets page for project %q: %w", projectID, err)
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
+	var buckets []string
+	for _, attr := range attrs {
+		buckets = append(buckets, attr.Name)
 	}
-
-	return allProjects, nil
+	return buckets, nextToken, nil
 }
 
 // ListObjectsPage retrieves a specific page of object names and common prefixes (folders).

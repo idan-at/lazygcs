@@ -10,7 +10,6 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/exp/teatest v0.0.0-20260302105528-e9b285c73169
 	github.com/fsouza/fake-gcs-server v1.54.0
-	golang.org/x/sync v0.19.0
 	google.golang.org/api v0.266.0
 	gotest.tools/v3 v3.5.2
 )
@@ -79,6 +78,7 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect

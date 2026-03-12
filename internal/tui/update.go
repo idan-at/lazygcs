@@ -16,8 +16,8 @@ import (
 // Update processes terminal messages (key presses, window resizes) and async responses.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case BucketsMsg:
-		return m.handleBucketsMsg(msg)
+	case BucketsPageMsg:
+		return m.handleBucketsPageMsg(msg)
 	case ObjectsMsg:
 		return m.handleObjectsMsg(msg)
 	case ObjectsPageMsg:
@@ -66,14 +66,61 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleBucketsMsg(msg BucketsMsg) (tea.Model, tea.Cmd) {
-	m.loading = false
+func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
 		m.err = msg.Err
+		m.loading = false
+		m.bgJobs--
+		if m.bgJobs < 0 { m.bgJobs = 0 }
 		return m, nil
 	}
-	m.projects = msg.Projects
-	return m, nil
+	
+	// Find if project already exists in m.projects
+	found := false
+	for i, p := range m.projects {
+		if p.ProjectID == msg.ProjectID {
+			m.projects[i].Buckets = append(m.projects[i].Buckets, msg.Buckets...)
+			found = true
+			break
+		}
+	}
+	
+	if !found {
+		// Maintain order from m.projectIDs if possible, or just append
+		m.projects = append(m.projects, gcs.ProjectBuckets{
+			ProjectID: msg.ProjectID,
+			Buckets:   msg.Buckets,
+		})
+		// Reorder m.projects to match m.projectIDs
+		var ordered []gcs.ProjectBuckets
+		for _, id := range m.projectIDs {
+			for _, p := range m.projects {
+				if p.ProjectID == id {
+					ordered = append(ordered, p)
+					break
+				}
+			}
+		}
+		m.projects = ordered
+	}
+
+	var cmd tea.Cmd
+	if msg.NextToken != "" {
+		cmd = m.fetchBucketsPage(msg.ProjectID, msg.NextToken)
+	} else {
+		// Only stop loading if all projects are fully loaded?
+		// For a lazy UI, we can turn off loading immediately, 
+		// or maintain a map of loading projects.
+		// For simplicity, let's turn it off when we get any page 
+		// so the UI feels fast, or wait until all are done.
+		// Let's just turn it off immediately so buckets appear ASAP.
+		m.loading = false
+		m.bgJobs--
+		if m.bgJobs < 0 { m.bgJobs = 0 }
+	}
+	// On first successful page, ensure loading screen hides
+	m.loading = false
+	return m, cmd
 }
 
 func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
@@ -81,6 +128,8 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = false
+	m.bgJobs--
+	if m.bgJobs < 0 { m.bgJobs = 0 }
 	if msg.Err != nil {
 		m.err = msg.Err
 		return m, nil
@@ -123,6 +172,8 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
 		m.err = msg.Err
 		m.loading = false
+		m.bgJobs--
+		if m.bgJobs < 0 { m.bgJobs = 0 }
 		return m, nil
 	}
 
@@ -166,6 +217,8 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 
 	// Loading complete
 	m.loading = false
+	m.bgJobs--
+	if m.bgJobs < 0 { m.bgJobs = 0 }
 	cacheKey := msg.Bucket + "::" + msg.Prefix
 	fullList := &gcs.ObjectList{
 		Objects:  m.objects,
