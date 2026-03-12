@@ -29,6 +29,10 @@ func (f mockGCSClient) ListObjects(ctx context.Context, bucketName, prefix strin
 	return f.objects, nil
 }
 
+func (f mockGCSClient) ListObjectsPage(ctx context.Context, bucketName, prefix, pageToken string, pageSize int) (*gcs.ObjectList, string, error) {
+	return f.objects, "", nil
+}
+
 func (f mockGCSClient) GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error) {
 	// Simple mock: find in prefixes or objects
 	if f.objects != nil {

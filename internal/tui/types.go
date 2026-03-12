@@ -14,6 +14,8 @@ type GCSClient interface {
 	ListBuckets(ctx context.Context, projectIDs []string) ([]gcs.ProjectBuckets, error)
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
+	// ListObjectsPage retrieves a specific page of object names and common prefixes (folders).
+	ListObjectsPage(ctx context.Context, bucketName, prefix, pageToken string, pageSize int) (*gcs.ObjectList, string, error)
 	// GetObjectMetadata returns full metadata for a specific object or directory stub.
 	GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error)
 	// GetObjectContent returns the first 1KB of content for a specific object.
@@ -36,6 +38,15 @@ type ObjectsMsg struct {
 	Prefix string
 	List   *gcs.ObjectList
 	Err    error
+}
+
+// ObjectsPageMsg is sent for progressive loading of large buckets.
+type ObjectsPageMsg struct {
+	Bucket    string
+	Prefix    string
+	List      *gcs.ObjectList
+	NextToken string
+	Err       error
 }
 
 // MetadataMsg is sent when on-demand metadata fetching completes.

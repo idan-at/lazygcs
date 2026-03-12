@@ -26,8 +26,8 @@ Anticipate user actions to hide latency.
 *   Store the result silently in the cache.
 *   **Benefit:** Near-instant rendering when the user finally enters the directory.
 
-## 5. Progressive Loading for Large Buckets (Status: Pending)
+## 5. Progressive Loading for Large Buckets (Status: Completed)
 Prevent the TUI from blocking when entering a folder with 10,000+ objects.
-*   Modify `fetchObjects` to yield messages in chunks (e.g., `PartialObjectsMsg`).
+*   Modify `fetchObjects` to yield messages in chunks (e.g., `ObjectsPageMsg`).
 *   Render the first page immediately while background fetches continue appending to the list.
 *   **Benefit:** Immediate feedback even for massive directories.

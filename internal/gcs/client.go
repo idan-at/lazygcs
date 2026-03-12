@@ -220,6 +220,40 @@ func (c *Client) ListBuckets(ctx context.Context, projectIDs []string) ([]Projec
 	return allProjects, nil
 }
 
+// ListObjectsPage retrieves a specific page of object names and common prefixes (folders).
+func (c *Client) ListObjectsPage(ctx context.Context, bucketName, prefix, pageToken string, pageSize int) (*ObjectList, string, error) {
+	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
+		Prefix:    prefix,
+		Delimiter: "/",
+	})
+
+	pager := iterator.NewPager(it, pageSize, pageToken)
+	var attrs []*storage.ObjectAttrs
+	nextToken, err := pager.NextPage(&attrs)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch page for bucket %q: %w", bucketName, err)
+	}
+
+	list := &ObjectList{}
+	for _, attr := range attrs {
+		if attr.Prefix != "" {
+			list.Prefixes = append(list.Prefixes, PrefixMetadata{Name: attr.Prefix})
+		} else {
+			if attr.Name != prefix {
+				list.Objects = append(list.Objects, ObjectMetadata{
+					Name:        attr.Name,
+					Size:        attr.Size,
+					ContentType: attr.ContentType,
+					Updated:     attr.Updated,
+					Created:     attr.Created,
+					Owner:       attr.Owner,
+				})
+			}
+		}
+	}
+
+	return list, nextToken, nil
+}
 // ListObjects retrieves object names and common prefixes (folders) for a specific bucket and prefix.
 // It uses "/" as a delimiter to enable hierarchical navigation.
 //

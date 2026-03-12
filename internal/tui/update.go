@@ -20,6 +20,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleBucketsMsg(msg)
 	case ObjectsMsg:
 		return m.handleObjectsMsg(msg)
+	case ObjectsPageMsg:
+		return m.handleObjectsPageMsg(msg)
 	case MetadataMsg:
 		return m.handleMetadataMsg(msg)
 	case ContentMsg:
@@ -110,6 +112,67 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		m.previewContent = "Loading..."
 		m, cmd = m.triggerDebounces(m.fetchContent(m.currentBucket, m.objects[0].Name), "", "")
 	}
+	return m, cmd
+}
+
+func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
+	if m.state != viewObjects || msg.Bucket != m.currentBucket || msg.Prefix != m.currentPrefix {
+		return m, nil
+	}
+
+	if msg.Err != nil {
+		m.err = msg.Err
+		m.loading = false
+		return m, nil
+	}
+
+	isFirstPage := len(m.objects) == 0 && len(m.prefixes) == 0
+
+	m.objects = append(m.objects, msg.List.Objects...)
+	m.prefixes = append(m.prefixes, msg.List.Prefixes...)
+
+	var cmd tea.Cmd
+	if isFirstPage {
+		m.cursor = 0
+		// Restore cursor if we just navigated back from a prefix
+		if m.targetPrefixCursor != "" {
+			for i, p := range m.prefixes {
+				if p.Name == m.targetPrefixCursor {
+					m.cursor = i
+					break
+				}
+			}
+			m.targetPrefixCursor = "" // Clear it after use
+		}
+
+		if len(m.prefixes) > 0 {
+			// Fetch metadata for the current cursor (either 0 or restored)
+			m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
+		} else if len(m.objects) > 0 {
+			m.previewContent = "Loading..."
+			m, cmd = m.triggerDebounces(m.fetchContent(m.currentBucket, m.objects[0].Name), "", "")
+		}
+	}
+
+	if msg.NextToken != "" {
+		// Still loading more
+		var batch []tea.Cmd
+		if cmd != nil {
+			batch = append(batch, cmd)
+		}
+		batch = append(batch, m.fetchObjectsPage(msg.Bucket, msg.Prefix, msg.NextToken))
+		return m, tea.Batch(batch...)
+	}
+
+	// Loading complete
+	m.loading = false
+	cacheKey := msg.Bucket + "::" + msg.Prefix
+	fullList := &gcs.ObjectList{
+		Objects:  m.objects,
+		Prefixes: m.prefixes,
+	}
+	m.listCache[cacheKey] = listCacheEntry{List: fullList, ExpiresAt: time.Now().Add(5 * time.Minute)}
+
 	return m, cmd
 }
 

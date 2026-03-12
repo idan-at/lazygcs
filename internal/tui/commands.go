@@ -30,9 +30,13 @@ func (m Model) fetchObjects() tea.Cmd {
 		}
 	}
 
+	return m.fetchObjectsPage(bucket, prefix, "")
+}
+
+func (m Model) fetchObjectsPage(bucket, prefix, pageToken string) tea.Cmd {
 	return func() tea.Msg {
-		list, err := m.client.ListObjects(context.Background(), bucket, prefix)
-		return ObjectsMsg{Bucket: bucket, Prefix: prefix, List: list, Err: err}
+		list, nextToken, err := m.client.ListObjectsPage(context.Background(), bucket, prefix, pageToken, 500)
+		return ObjectsPageMsg{Bucket: bucket, Prefix: prefix, List: list, NextToken: nextToken, Err: err}
 	}
 }
 
