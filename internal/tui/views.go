@@ -194,13 +194,22 @@ func (m Model) objectsView(width int) string {
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
 		title := fmt.Sprintf("Objects in %s", m.currentBucket)
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(title, width)) + "\n\n")
-		if m.loading {
+
+		currentPrefixes, currentObjects, _ := m.filteredObjects()
+		totalItems := len(currentPrefixes) + len(currentObjects)
+
+		if m.loading && totalItems == 0 {
 			fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 		} else {
-			currentPrefixes, currentObjects, _ := m.filteredObjects()
-			totalItems := len(currentPrefixes) + len(currentObjects)
+			maxVisible := m.maxItemsVisible()
+			if m.loading {
+				maxVisible--
+				if maxVisible < 1 {
+					maxVisible = 1
+				}
+			}
 
-			start, end := visibleRange(m.cursor, totalItems, m.maxItemsVisible())
+			start, end := visibleRange(m.cursor, totalItems, maxVisible)
 
 			for i := start; i < end; i++ {
 				var originalName string
@@ -257,6 +266,8 @@ func (m Model) objectsView(width int) string {
 			}
 			if totalItems == 0 {
 				s.WriteString("(empty)")
+			} else if m.loading {
+				fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 			}
 		}
 	}
