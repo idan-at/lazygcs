@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
-	"lazygcs/internal/gcs"
-	"lazygcs/internal/preview"
+	"github.com/idan-at/lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/preview"
 )
 
 type viewState int

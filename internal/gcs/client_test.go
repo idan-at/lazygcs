@@ -14,7 +14,7 @@ import (
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"google.golang.org/api/iterator"
 	"gotest.tools/v3/assert"
-	"lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
 func setupTestServer(t *testing.T, objects []fakestorage.Object) (*fakestorage.Server, *gcs.Client) {

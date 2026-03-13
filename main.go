@@ -8,9 +8,9 @@ import (
 
 	"cloud.google.com/go/storage"
 	tea "github.com/charmbracelet/bubbletea"
-	"lazygcs/internal/config"
-	"lazygcs/internal/gcs"
-	"lazygcs/internal/tui"
+	"github.com/idan-at/lazygcs/internal/config"
+	"github.com/idan-at/lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/tui"
 )
 
 var version = "dev"

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"lazygcs/internal/preview"
+	"github.com/idan-at/lazygcs/internal/preview"
 )
 
 type failingPreviewer struct{}

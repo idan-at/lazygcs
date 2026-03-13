@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"lazygcs/internal/config"
+	"github.com/idan-at/lazygcs/internal/config"
 )
 
 func createConfigFile(t *testing.T, content string) string {

@@ -1,4 +1,4 @@
-module lazygcs
+module github.com/idan-at/lazygcs
 
 go 1.25.0
 

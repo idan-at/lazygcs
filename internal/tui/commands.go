@@ -8,8 +8,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"lazygcs/internal/gcs"
-	"lazygcs/internal/preview"
+	"github.com/idan-at/lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/preview"
 )
 
 // Init initializes the application by triggering the first bucket fetch and the spinner.

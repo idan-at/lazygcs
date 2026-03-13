@@ -12,8 +12,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"gotest.tools/v3/assert"
-	"lazygcs/internal/gcs"
-	"lazygcs/internal/tui"
+	"github.com/idan-at/lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/tui"
 )
 
 type mockGCSClient struct {

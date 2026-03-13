@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
 // Update processes terminal messages (key presses, window resizes) and async responses.

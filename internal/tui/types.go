@@ -5,7 +5,7 @@ import (
 	"io"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
 // GCSClient defines the contract for interacting with Google Cloud Storage.

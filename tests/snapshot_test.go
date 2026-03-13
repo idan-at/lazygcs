@@ -10,7 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
-	"lazygcs/internal/tui"
+	"github.com/idan-at/lazygcs/internal/tui"
 )
 
 func TestSnapshot_InitialBucketsView(t *testing.T) {

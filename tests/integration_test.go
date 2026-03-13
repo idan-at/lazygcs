@@ -15,9 +15,9 @@ import (
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"gotest.tools/v3/assert"
 
-	"lazygcs/internal/config"
-	"lazygcs/internal/gcs"
-	"lazygcs/internal/tui"
+	"github.com/idan-at/lazygcs/internal/config"
+	"github.com/idan-at/lazygcs/internal/gcs"
+	"github.com/idan-at/lazygcs/internal/tui"
 
 	"github.com/hamba/avro/v2"
 	"github.com/hamba/avro/v2/ocf"

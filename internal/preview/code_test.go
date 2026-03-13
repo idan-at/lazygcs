@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"lazygcs/internal/preview"
+	"github.com/idan-at/lazygcs/internal/preview"
 )
 
 func TestHighlight_Go(t *testing.T) {
