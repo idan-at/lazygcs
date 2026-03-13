@@ -652,6 +652,46 @@ func TestRichPreview_PDF(t *testing.T) {
 	}, teatest.WithDuration(3*time.Second))
 }
 
+func TestRichPreview_Conf(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "server.conf"},
+			Content:     []byte("listen = 80\nserver_name = localhost"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8107, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "server.conf") && strings.Contains(s, "listen") && strings.Contains(s, "80")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_Properties(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "app.properties"},
+			Content:     []byte("app.version=1.2.3\napp.env=prod"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8108, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "app.properties") && strings.Contains(s, "version") && strings.Contains(s, "1.2.3")
+	}, teatest.WithDuration(3*time.Second))
+}
+
 func TestNavigationCycle(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},

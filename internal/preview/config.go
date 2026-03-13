@@ -18,6 +18,7 @@ func (p *ConfigPreviewer) Priority() int { return 30 }
 func (p *ConfigPreviewer) CanPreview(obj Object) bool {
 	ext := strings.ToLower(filepath.Ext(obj.Name))
 	return ext == ".json" || ext == ".yaml" || ext == ".yml" || ext == ".toml" ||
+		ext == ".conf" || ext == ".properties" ||
 		obj.ContentType == "application/json" || obj.ContentType == "application/x-yaml"
 }
 
