@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"gotest.tools/v3/assert"
 	"github.com/idan-at/lazygcs/internal/gcs"
 	"github.com/idan-at/lazygcs/internal/tui"
@@ -1448,7 +1449,52 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "obj1"), "Objects should be visible even after scrolling deep in buckets list. View:\n%s", view)
 	}
 
-	func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
+	func TestModel_LayoutIntegrity(t *testing.T) {
+	// 1. Setup model with fixed dimensions and a very wide/long preview content
+	wideContent := strings.Repeat("THIS LINE IS VERY VERY WIDE AND SHOULD BE TRUNCATED BY THE UI TO PREVENT COLUMN EXPANSION ", 10)
+	longContent := ""
+	for i := 0; i < 100; i++ {
+		longContent += fmt.Sprintf("Line %d\n", i)
+	}
+
+	client := mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	width := 100
+	height := 20
+	// Correctly update and assign
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: width, Height: height})
+
+	// Enter bucket to show preview
+	m = enterBucket(m, client.projects, "b1", nil)
+	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
+
+	// Inject the oversized content
+	m, _ = updateModel(m, tui.ContentMsg{ObjectName: "obj1", Content: wideContent + "\n" + longContent})
+
+	view := m.View()
+	lines := strings.Split(view, "\n")
+
+	if len(lines) > height {
+		for i, l := range lines {
+			t.Logf("%2d: |%s| (width: %d)", i, l, lipgloss.Width(l))
+		}
+	}
+
+	// 2. Assert Height: The total view height should not exceed the requested height.
+	// We allow for the header (2 lines) + content + footer (1 line).
+	assert.Assert(t, len(lines) <= height, "View height (%d) exceeds requested height (%d)", len(lines), height)
+
+	// 3. Assert Width: Each line of the content should not exceed the terminal width.
+	for i, line := range lines {
+		w := lipgloss.Width(line)
+		assert.Assert(t, w <= width, "Line %d width (%d) exceeds requested width (%d): %q", i, w, width, line)
+	}
+}
+
+func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
 	// This test specifically checks if the rendered columns have the expected height.
 	// If wrapping occurs, the number of lines will exceed columnHeight.
 	m := tui.NewModel([]string{"p1"}, nil, "/tmp", false, false)

@@ -28,7 +28,7 @@ func (m Model) previewView(width int) string {
 			// Selected item is a prefix (folder)
 			prefix := currentPrefixes[m.cursor]
 
-			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-6)))
+			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-10)))
 			if !prefix.Fetched {
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
 				fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.spinner.View())
@@ -46,10 +46,10 @@ func (m Model) previewView(width int) string {
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(prefix.Updated.Format("2006-01-02 15:04:05")))
 				}
 				if prefix.Owner != "" {
-					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(prefix.Owner))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(prefix.Owner, width-10)))
 				}
 				if prefix.Err != nil && !strings.Contains(prefix.Err.Error(), "object doesn't exist") && !strings.Contains(prefix.Err.Error(), "not found") {
-					fmt.Fprintf(&s, "\n%s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(fmt.Sprintf("Metadata Error: %v", prefix.Err)))
+					fmt.Fprintf(&s, "\n%s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(truncate(fmt.Sprintf("Metadata Error: %v", prefix.Err), width-2)))
 				}
 			}
 		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
@@ -57,14 +57,14 @@ func (m Model) previewView(width int) string {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-6)))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-10)))
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
 
 				contentType := obj.ContentType
 				if contentType == "" {
 					contentType = "unknown"
 				}
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(contentType))
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(truncate(contentType, width-10)))
 
 				if !obj.Created.IsZero() {
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05")))
@@ -72,7 +72,7 @@ func (m Model) previewView(width int) string {
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05")))
 
 				if obj.Owner != "" {
-					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(obj.Owner))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(obj.Owner, width-10)))
 				}
 
 				if m.previewContent != "" {
@@ -91,24 +91,27 @@ func (m Model) previewView(width int) string {
 					} else if isBinary(m.previewContent) {
 						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
 					} else {
-						// Leave room for the metadata lines
-						maxContentLines := m.maxItemsVisible() - 14
-						if maxContentLines < 1 {
-							maxContentLines = 1
+						// Calculate how many lines we can actually show
+						// We want the ENTIRE previewView content to fit in m.maxItemsVisible() + 2
+						// Preview Title (2) + Metadata (~6) + Separator (2) = ~10 lines
+						maxLines := m.maxItemsVisible() - 8
+						if maxLines < 1 { maxLines = 1 }
+
+						allLines := strings.Split(m.previewContent, "\n")
+						displayLines := allLines
+						if len(displayLines) > maxLines {
+							displayLines = displayLines[:maxLines]
 						}
 
-						lines := strings.Split(m.previewContent, "\n")
-						var previewStr string
-						if len(lines) > maxContentLines {
-							previewStr = strings.Join(lines[:maxContentLines], "\n") + "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("...")
-						} else {
-							previewStr = m.previewContent
+						for i, line := range displayLines {
+							s.WriteString(truncate(line, width-2))
+							if i < len(displayLines)-1 {
+								s.WriteString("\n")
+							}
 						}
 
-						if strings.HasPrefix(previewStr, "Error:") {
-							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(previewStr))
-						} else {
-							s.WriteString(previewStr)
+						if len(allLines) > maxLines {
+							s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("..."))
 						}
 					}
 				}
@@ -370,7 +373,7 @@ func (m Model) View() string {
 	}
 
 	// Styles
-	columnHeight := m.maxItemsVisible() + 2 // Title + blank line + list items
+	columnHeight := m.maxItemsVisible() + 4 // Title + blank line + list items + borders
 
 	activeStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
@@ -397,16 +400,17 @@ func (m Model) View() string {
 	if m.state == viewBuckets {
 		leftStyle = activeStyle
 	}
-	leftCol := leftStyle.Width(leftWidth).Render(m.bucketsView(leftWidth - 4))
+	// Subtract 2 from width to account for borders
+	leftCol := leftStyle.Width(leftWidth - 2).Render(m.bucketsView(leftWidth - 4))
 
 	midStyle := inactiveStyle
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
 		midStyle = activeStyle
 	}
-	midCol := midStyle.Width(midWidth).Render(m.objectsView(midWidth - 4))
+	midCol := midStyle.Width(midWidth - 2).Render(m.objectsView(midWidth - 4))
 
 	// Preview column is always "inactive" in terms of focus
-	rightCol := inactiveStyle.Width(rightWidth).Render(m.previewView(rightWidth - 4))
+	rightCol := inactiveStyle.Width(rightWidth - 2).Render(m.previewView(rightWidth - 4))
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 

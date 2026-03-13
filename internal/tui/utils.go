@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	reflowTruncate "github.com/muesli/reflow/truncate"
 )
 
 func parentPrefix(p string) string {
@@ -85,14 +87,7 @@ func truncate(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return ""
 	}
-	r := []rune(s)
-	if len(r) > maxLen {
-		if maxLen > 3 {
-			return string(r[:maxLen-3]) + "..."
-		}
-		return string(r[:maxLen])
-	}
-	return s
+	return reflowTruncate.StringWithTail(s, uint(maxLen), "...")
 }
 
 func humanizeSize(bytes int64) string {
