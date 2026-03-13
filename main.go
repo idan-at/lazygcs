@@ -22,7 +22,7 @@ func main() {
 	}
 }
 
-// run executes the main application logic. 
+// run executes the main application logic.
 // client is an optional dependency injection for testing. If nil, it initializes the real GCS client.
 func run(args []string, client tui.GCSClient) error {
 	fs := flag.NewFlagSet("lazygcs", flag.ContinueOnError)

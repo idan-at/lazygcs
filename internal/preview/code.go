@@ -30,16 +30,12 @@ func (p *CodePreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 	}
 	defer func() { _ = rc.Close() }()
 
-	limit := int64(10 * 1024)
-	if obj.Size < limit {
-		limit = obj.Size
-	}
-	buf := make([]byte, limit)
-	n, err := io.ReadFull(rc, buf)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	lr := io.LimitReader(rc, 10*1024)
+	buf, err := io.ReadAll(lr)
+	if err != nil && err != io.EOF {
 		return "", err
 	}
-	content := string(buf[:n])
+	content := string(buf)
 
 	if IsBinary(content) {
 		return "(binary content)", nil

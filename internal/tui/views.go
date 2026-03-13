@@ -257,10 +257,8 @@ func (m Model) objectsView(width int) string {
 				}
 
 				// Truncate to fit column (account for selection indicator, optional icon, and padding)
-				truncateLen := width - 3
-				if m.showIcons {
-					truncateLen -= 2 // Icon + space
-				}
+				// Offset: 1 (indicator) + 1 (space) + 3 (icon) = 5
+				truncateLen := width - 5
 				truncatedItem := truncate(displayItem, truncateLen)
 				
 				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, icon, truncatedItem)
@@ -331,7 +329,7 @@ func (m Model) bucketsView(width int) string {
 				projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
 			}
 
-			truncateLen := width - 3
+			truncateLen := width - 2 // ▼ + space = 2
 			if m.loadingProjects[item.ProjectID] {
 				truncateLen -= 2 // space + spinner
 			}
@@ -351,13 +349,11 @@ func (m Model) bucketsView(width int) string {
 			}
 
 			// Truncate to fit column, account for indentation
+			// Offset: 1 (indicator) + 1 (space) + 3 (icon) = 5
 			truncateLen := width - 5
-			if m.showIcons {
-				truncateLen -= 2
-			}
 			truncatedBucket := truncate(item.BucketName, truncateLen)
 			
-			itemContent := fmt.Sprintf("%s  %s%s", indicator, icon, truncatedBucket)
+			itemContent := fmt.Sprintf("%s %s%s", indicator, icon, truncatedBucket)
 			content := textStyle.Width(width).Render(itemContent)
 			s.WriteString(content + "\n")
 		}

@@ -105,43 +105,43 @@ func humanizeSize(bytes int64) string {
 
 func getIcon(name string, isFolder bool, isBucket bool) string {
 	if isBucket {
-		return "🪣 " // Bucket icon
+		return "📦 " // Bucket icon (Package emoji has stable width)
 	}
 	if isFolder {
-		return " " // Folder icon
+		return "📁 " // Folder icon
 	}
 
 	ext := strings.ToLower(filepath.Ext(name))
 	switch ext {
 	case ".go":
-		return "󰟓 "
+		return "🐹 "
 	case ".md":
-		return " "
+		return "📝 "
 	case ".json":
-		return " "
+		return "⚙️ "
 	case ".txt":
-		return " "
+		return "📄 "
 	case ".csv":
-		return "󰈙 "
+		return "📊 "
 	case ".yaml", ".yml", ".toml":
-		return " "
+		return "🛠️ "
 	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
-		return " "
+		return "🖼️ "
 	case ".pdf":
-		return " "
+		return "📕 "
 	case ".zip", ".tar", ".gz", ".tgz":
-		return " "
+		return "📦 "
 	case ".sh", ".bash", ".zsh":
-		return " "
+		return "💻 "
 	case ".py":
-		return " "
+		return "🐍 "
 	case ".js", ".ts", ".jsx", ".tsx":
-		return " "
+		return "📜 "
 	case ".html", ".htm":
-		return " "
+		return "🌐 "
 	case ".css":
-		return " "
+		return "🎨 "
 	default:
-		return " " // Default file icon
+		return "📄 " // Default file icon
 	}
 }
