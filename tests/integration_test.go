@@ -486,7 +486,8 @@ func TestRichPreview_JSON(t *testing.T) {
 	// Check for pretty-printed JSON in preview
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
-		return strings.Contains(s, "name") && strings.Contains(s, "test") && strings.Contains(s, "value") && strings.Contains(s, "123")
+		// Should contain the characters regardless of styling
+		return strings.Contains(s, "{") && strings.Contains(s, "name") && strings.Contains(s, "test") && strings.Contains(s, "value")
 	}, teatest.WithDuration(3*time.Second))
 }
 

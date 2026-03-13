@@ -84,6 +84,7 @@ func (m Model) previewView(width int) string {
 						Render("")
 
 					s.WriteString(separator)
+					s.WriteString("\n")
 
 					if m.previewContent == "Loading..." {
 						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.spinner.View())
