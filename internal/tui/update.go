@@ -271,7 +271,12 @@ func (m Model) handleContentMsg(msg ContentMsg) (tea.Model, tea.Cmd) {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) && currentObjects[idx].Name == msg.ObjectName {
 				if msg.Err != nil {
-					m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
+					if msg.Content == "" {
+						m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
+					} else {
+						m.previewContent = msg.Content // Show whatever content we got (fallback)
+					}
+					m.errorsList = append(m.errorsList, msg.Err)
 				} else {
 					m.previewContent = msg.Content
 					cacheKey := m.currentBucket + "::" + msg.ObjectName

@@ -55,10 +55,19 @@ func (r *Registry) SetWidth(width int) {
 }
 
 func (r *Registry) GetPreview(ctx context.Context, client GCSClient, obj Object) (string, error) {
+	var lastErr error
 	for _, p := range r.previewers {
 		if p.CanPreview(obj) {
-			return p.Preview(ctx, client, obj)
+			content, err := p.Preview(ctx, client, obj)
+			if err == nil {
+				return content, lastErr
+			}
+			lastErr = err // Record error and try next previewer
 		}
+	}
+
+	if lastErr != nil {
+		return "", lastErr
 	}
 	return "(no preview available)", nil
 }
