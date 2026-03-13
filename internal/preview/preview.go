@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sort"
+	"strings"
 )
 
 // GCSClient defines the methods required from the GCS client for previewing.
@@ -14,7 +15,6 @@ type GCSClient interface {
 }
 
 // Object is a subset of gcs.ObjectMetadata needed for previewing.
-// This decouples the preview package from the full gcs package.
 type Object struct {
 	Bucket      string
 	Name        string
@@ -61,4 +61,8 @@ func (r *Registry) GetPreview(ctx context.Context, client GCSClient, obj Object)
 		}
 	}
 	return "(no preview available)", nil
+}
+
+func IsBinary(s string) bool {
+	return strings.ContainsRune(s, '\x00')
 }

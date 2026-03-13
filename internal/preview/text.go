@@ -2,8 +2,6 @@ package preview
 
 import (
 	"context"
-	"strings"
-
 )
 
 type TextPreviewer struct{}
@@ -20,7 +18,7 @@ func (p *TextPreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 		return "", err
 	}
 
-	if isBinary(content) {
+	if IsBinary(content) {
 		return "(binary content)", nil
 	}
 
@@ -28,7 +26,3 @@ func (p *TextPreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 }
 
 func (p *TextPreviewer) SetWidth(width int) {}
-
-func isBinary(s string) bool {
-	return strings.ContainsRune(s, '\x00')
-}

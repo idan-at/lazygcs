@@ -18,6 +18,10 @@ import (
 	"lazygcs/internal/config"
 	"lazygcs/internal/gcs"
 	"lazygcs/internal/tui"
+
+	"github.com/hamba/avro/v2"
+	"github.com/hamba/avro/v2/ocf"
+	"github.com/parquet-go/parquet-go"
 )
 
 func createConfigFile(t *testing.T, projects []string, downloadDir string) string {
@@ -462,6 +466,189 @@ func TestRichPreview_Zip(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
 		return strings.Contains(s, "test.zip") && strings.Contains(s, "file_in_zip.txt")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_JSON(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "data.json", ContentType: "application/json"},
+			Content:     []byte(`{"name":"test","value":123}`),
+		},
+	}
+	tm := setupTestApp(t, objects, 8099, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Check for pretty-printed JSON in preview
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "name") && strings.Contains(s, "test") && strings.Contains(s, "value") && strings.Contains(s, "123")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_CSV(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "data.csv"},
+			Content:     []byte("id,name,city\n1,Alice,London\n2,Bob,Paris"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8100, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Check for table rendering. We look for the values and typical table borders/alignment.
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "id") && strings.Contains(s, "Alice") && strings.Contains(s, "Paris")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_Parquet(t *testing.T) {
+	type Row struct {
+		ID   int    `parquet:"id"`
+		Name string `parquet:"name"`
+	}
+
+	buf := new(bytes.Buffer)
+	writer := parquet.NewGenericWriter[Row](buf)
+	_, _ = writer.Write([]Row{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}})
+	_ = writer.Close()
+
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "data.parquet"},
+			Content:     buf.Bytes(),
+		},
+	}
+	tm := setupTestApp(t, objects, 8101, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Check for parquet schema or rows in preview
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "data.parquet") && strings.Contains(s, "Alice") && strings.Contains(s, "id")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_YAML(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "config.yaml"},
+			Content:     []byte("app:\n  name: lazygcs\n  enabled: true"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8102, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "config.yaml") && strings.Contains(s, "lazygcs") && strings.Contains(s, "enabled")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_TOML(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "settings.toml"},
+			Content:     []byte("[server]\nport = 8080\nhost = \"localhost\""),
+		},
+	}
+	tm := setupTestApp(t, objects, 8103, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "settings.toml") && strings.Contains(s, "8080") && strings.Contains(s, "localhost")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_Avro(t *testing.T) {
+	schema, _ := avro.Parse(`{"type":"record","name":"test","fields":[{"name":"id","type":"int"},{"name":"name","type":"string"}]}`)
+	buf := new(bytes.Buffer)
+	enc, _ := ocf.NewEncoder(schema.String(), buf)
+	_ = enc.Encode(map[string]any{"id": 1, "name": "Alice"})
+	_ = enc.Close()
+
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "data.avro"},
+			Content:     buf.Bytes(),
+		},
+	}
+	tm := setupTestApp(t, objects, 8104, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "data.avro") && strings.Contains(s, "Alice") && strings.Contains(s, "Avro Schema")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_Logs(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "app.log"},
+			Content:     []byte("INFO: starting up\nERROR: failed to connect\nWARN: retrying"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8105, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// We check for the content. Log colorization is hard to check via string matching, 
+		// but checking for the strings is a good start.
+		return strings.Contains(s, "app.log") && strings.Contains(s, "ERROR") && strings.Contains(s, "failed to connect")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_PDF(t *testing.T) {
+	// A minimal PDF that might be enough to trigger metadata extraction or at least not crash
+	minimalPDF := []byte("%PDF-1.4\n1 0 obj\n<< /Title (Test PDF) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "test.pdf"},
+			Content:     minimalPDF,
+		},
+	}
+	tm := setupTestApp(t, objects, 8106, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "test.pdf") && (strings.Contains(s, "Title") || strings.Contains(s, "PDF"))
 	}, teatest.WithDuration(3*time.Second))
 }
 

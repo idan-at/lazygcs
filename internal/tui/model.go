@@ -121,10 +121,15 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	}
 
 	reg := preview.NewRegistry()
-	reg.Register(&preview.TextPreviewer{})
-	reg.Register(preview.NewMarkdownPreviewer(50)) // Default width, will be updated on resize
+	reg.Register(&preview.DataPreviewer{})
+	reg.Register(&preview.ConfigPreviewer{})
+	reg.Register(&preview.PDFPreviewer{})
+	reg.Register(&preview.LogPreviewer{})
 	reg.Register(&preview.ZipPreviewer{})
 	reg.Register(&preview.TarPreviewer{})
+	reg.Register(preview.NewMarkdownPreviewer(50))
+	reg.Register(&preview.CodePreviewer{})
+	reg.Register(&preview.TextPreviewer{}) // Fallback last
 
 	return Model{
 		projectIDs:        projectIDs,
