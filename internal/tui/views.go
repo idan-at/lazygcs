@@ -144,7 +144,7 @@ func (m Model) footerView() string {
 	} else if m.status != "" {
 		statusText = fmt.Sprintf(" %s ", m.status)
 		statusStyle = statusStyle.Background(lipgloss.Color("130")).Foreground(lipgloss.Color("15"))
-	} else if m.bgJobs > 0 {
+	} else if m.bgJobs > len(m.loadingProjects) {
 		statusText = m.spinner.View()
 		statusStyle = lipgloss.NewStyle().Padding(0, 1)
 	}
@@ -277,84 +277,88 @@ func (m Model) objectsView(width int) string {
 func (m Model) bucketsView(width int) string {
 	var s strings.Builder
 	s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width)) + "\n\n")
-	if m.state == viewBuckets && m.loading {
-		fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
-	} else {
-		filtered := m.filteredBuckets()
+	
+	filtered := m.filteredBuckets()
 
-		// Determine the active index for the buckets list
-		activeIdx := m.cursor
-		if m.state != viewBuckets {
-			// Find the index of the current bucket to keep it in view
-			activeIdx = 0
-			for i, item := range filtered {
-				if !item.IsProject && item.BucketName == m.currentBucket {
-					activeIdx = i
-					break
-				}
-			}
-		}
-
-		start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
-		for i := start; i < end; i++ {
-			item := filtered[i]
-
-			indicator := " "
-			if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
-				indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Render("●")
-			}
-
-			textStyle := lipgloss.NewStyle()
-			isFocused := m.state == viewBuckets && m.cursor == i
-			isActiveBucket := m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket
-
-			if isFocused {
-				textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
-			} else if isActiveBucket {
-				textStyle = textStyle.Foreground(lipgloss.Color("69"))
-			} else {
-				textStyle = textStyle.Foreground(lipgloss.Color("250"))
-			}
-
-			if item.IsProject {
-				// Project Header
-				icon := "▼ "
-				if _, collapsed := m.collapsedProjects[item.ProjectID]; collapsed {
-					icon = "▶ "
-				}
-
-				// Make project titles bold and a different color
-				projectStyle := textStyle
-				if !isFocused {
-					projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
-				}
-
-				truncateLen := width - 3
-				truncatedProject := truncate(item.ProjectID, truncateLen)
-				
-				itemContent := fmt.Sprintf("%s%s", icon, truncatedProject)
-				content := projectStyle.Width(width).Render(itemContent)
-				s.WriteString(content + "\n")
-			} else {
-				// Bucket Item
-				icon := ""
-				if m.showIcons {
-					icon = getIcon(item.BucketName, false, true)
-				}
-
-				// Truncate to fit column, account for indentation
-				truncateLen := width - 5
-				if m.showIcons {
-					truncateLen -= 2
-				}
-				truncatedBucket := truncate(item.BucketName, truncateLen)
-				
-				itemContent := fmt.Sprintf("%s  %s%s", indicator, icon, truncatedBucket)
-				content := textStyle.Width(width).Render(itemContent)
-				s.WriteString(content + "\n")
+	// Determine the active index for the buckets list
+	activeIdx := m.cursor
+	if m.state != viewBuckets {
+		// Find the index of the current bucket to keep it in view
+		activeIdx = 0
+		for i, item := range filtered {
+			if !item.IsProject && item.BucketName == m.currentBucket {
+				activeIdx = i
+				break
 			}
 		}
 	}
+
+	start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
+	for i := start; i < end; i++ {
+		item := filtered[i]
+
+		indicator := " "
+		if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
+			indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Render("●")
+		}
+
+		textStyle := lipgloss.NewStyle()
+		isFocused := m.state == viewBuckets && m.cursor == i
+		isActiveBucket := m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket
+
+		if isFocused {
+			textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
+		} else if isActiveBucket {
+			textStyle = textStyle.Foreground(lipgloss.Color("69"))
+		} else {
+			textStyle = textStyle.Foreground(lipgloss.Color("250"))
+		}
+
+		if item.IsProject {
+			// Project Header
+			icon := "▼ "
+			if _, collapsed := m.collapsedProjects[item.ProjectID]; collapsed {
+				icon = "▶ "
+			}
+
+			// Make project titles bold and a different color
+			projectStyle := textStyle
+			if !isFocused {
+				projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
+			}
+
+			truncateLen := width - 3
+			if m.loadingProjects[item.ProjectID] {
+				truncateLen -= 2 // space + spinner
+			}
+			truncatedProject := truncate(item.ProjectID, truncateLen)
+			
+			itemContent := fmt.Sprintf("%s%s", icon, truncatedProject)
+			if m.loadingProjects[item.ProjectID] {
+				itemContent += " " + m.spinner.View()
+			}
+			content := projectStyle.Width(width).Render(itemContent)
+			s.WriteString(content + "\n")
+		} else {
+			// Bucket Item
+			icon := ""
+			if m.showIcons {
+				icon = getIcon(item.BucketName, false, true)
+			}
+
+			// Truncate to fit column, account for indentation
+			truncateLen := width - 5
+			if m.showIcons {
+				truncateLen -= 2
+			}
+			truncatedBucket := truncate(item.BucketName, truncateLen)
+			
+			itemContent := fmt.Sprintf("%s  %s%s", indicator, icon, truncatedBucket)
+			content := textStyle.Width(width).Render(itemContent)
+			s.WriteString(content + "\n")
+		}
+	}
+
 	return s.String()
 }
 

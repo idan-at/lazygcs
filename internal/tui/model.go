@@ -78,6 +78,7 @@ type Model struct {
 	selected           map[string]struct{}
 
 	loading bool
+	loadingProjects map[string]bool
 	bgJobs  int
 	status  string
 	err     error
@@ -112,6 +113,11 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
 
+	loadingProjects := make(map[string]bool)
+	for _, id := range projectIDs {
+		loadingProjects[id] = true
+	}
+
 	return Model{
 		projectIDs:        projectIDs,
 		client:            client,
@@ -122,6 +128,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		height:            40,
 		state:             viewBuckets,
 		loading:           true,
+		loadingProjects:   loadingProjects,
 		bgJobs:            len(projectIDs),
 		selected:          make(map[string]struct{}),
 		collapsedProjects: make(map[string]struct{}),
@@ -157,9 +164,18 @@ func (m Model) filteredBuckets() []BucketListItem {
 	lowerQuery := strings.ToLower(m.searchQuery)
 	isSearchActive := m.searchQuery != "" && m.state == viewBuckets
 
-	for _, p := range m.projects {
+	for _, projectID := range m.projectIDs {
+		// Find project data if it exists
+		var p *gcs.ProjectBuckets
+		for i := range m.projects {
+			if m.projects[i].ProjectID == projectID {
+				p = &m.projects[i]
+				break
+			}
+		}
+
 		// Determine if the project should be expanded.
-		_, isCollapsed := m.collapsedProjects[p.ProjectID]
+		_, isCollapsed := m.collapsedProjects[projectID]
 		isExpanded := !isCollapsed
 		if isSearchActive {
 			isExpanded = true // Always expand during search to show matches
@@ -167,22 +183,24 @@ func (m Model) filteredBuckets() []BucketListItem {
 
 		// Filter buckets within the project
 		var matchingBuckets []string
-		for _, b := range p.Buckets {
-			if !isSearchActive {
-				matchingBuckets = append(matchingBuckets, b)
-				continue
-			}
+		if p != nil {
+			for _, b := range p.Buckets {
+				if !isSearchActive {
+					matchingBuckets = append(matchingBuckets, b)
+					continue
+				}
 
-			bMatch := false
-			if m.fuzzySearch {
-				bMatch = fuzzyMatch(lowerQuery, b)
-			} else {
-				bMatch = strings.Contains(strings.ToLower(b), lowerQuery)
-			}
+				bMatch := false
+				if m.fuzzySearch {
+					bMatch = fuzzyMatch(lowerQuery, b)
+				} else {
+					bMatch = strings.Contains(strings.ToLower(b), lowerQuery)
+				}
 
-			// Only match against bucket name
-			if bMatch {
-				matchingBuckets = append(matchingBuckets, b)
+				// Only match against bucket name
+				if bMatch {
+					matchingBuckets = append(matchingBuckets, b)
+				}
 			}
 		}
 
@@ -190,14 +208,14 @@ func (m Model) filteredBuckets() []BucketListItem {
 		if !isSearchActive || len(matchingBuckets) > 0 {
 			items = append(items, BucketListItem{
 				IsProject: true,
-				ProjectID: p.ProjectID,
+				ProjectID: projectID,
 			})
 
 			if isExpanded {
 				for _, b := range matchingBuckets {
 					items = append(items, BucketListItem{
 						IsProject:  false,
-						ProjectID:  p.ProjectID,
+						ProjectID:  projectID,
 						BucketName: b,
 					})
 				}

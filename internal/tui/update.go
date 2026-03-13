@@ -72,6 +72,7 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 { m.bgJobs = 0 }
+		delete(m.loadingProjects, msg.ProjectID)
 		return m, nil
 	}
 	
@@ -117,6 +118,7 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 { m.bgJobs = 0 }
+		delete(m.loadingProjects, msg.ProjectID)
 	}
 	// On first successful page, ensure loading screen hides
 	m.loading = false
