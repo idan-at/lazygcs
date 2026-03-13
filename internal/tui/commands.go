@@ -8,6 +8,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"lazygcs/internal/gcs"
+	"lazygcs/internal/preview"
 )
 
 // Init initializes the application by triggering the first bucket fetch and the spinner.
@@ -48,7 +50,9 @@ func (m Model) fetchObjectsPage(bucket, prefix, pageToken string) tea.Cmd {
 	}
 }
 
-func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
+func (m Model) fetchContent(obj gcs.ObjectMetadata) tea.Cmd {
+	bucketName := m.currentBucket
+	objectName := obj.Name
 	cacheKey := bucketName + "::" + objectName
 	if cached, ok := m.contentCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
 		return func() tea.Msg {
@@ -57,7 +61,13 @@ func (m Model) fetchContent(bucketName, objectName string) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		content, err := m.client.GetObjectContent(context.Background(), bucketName, objectName)
+		pObj := preview.Object{
+			Bucket:      bucketName,
+			Name:        objectName,
+			Size:        obj.Size,
+			ContentType: obj.ContentType,
+		}
+		content, err := m.previewRegistry.GetPreview(context.Background(), m.client, pObj)
 		return ContentMsg{ObjectName: objectName, Content: content, Err: err}
 	}
 }

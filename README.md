@@ -10,7 +10,7 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 
 *   **Miller Column Navigation:** Instantly see your buckets (grouped by project), the current directory's contents, and a preview of the selected file all at once.
 *   **Lightning Fast:** Keyboard-centric workflow means your hands never have to leave the home row.
-*   **File Previews:** Peek at file contents and metadata (size, type, created/updated dates) without downloading them. Safely ignores binary files to prevent terminal corruption!
+*   **Rich File Previews:** Instantly peek at file contents and metadata. Supports styled Markdown rendering and even lets you peek inside archives (ZIP, TAR, JAR) without downloading them! For ZIPs, `lazygcs` reads only the central directory, listing files instantly even for multi-GB archives.
 *   **Inline Search:** Instantly filter your buckets or objects. Supports exact matching or configurable **fuzzy search**.
 *   **Error History Overlay:** Quickly diagnose permission or network issues with a dedicated error history view (`Ctrl+e`).
 *   **Multi-Select & Batch Downloads:** Select multiple files or entire directories and download them all concurrently. Directories are automatically packaged into `.zip` archives!

@@ -183,6 +183,32 @@ func TestClient_GetObjectContent(t *testing.T) {
 	}
 }
 
+func TestClient_NewReaderAt(t *testing.T) {
+	content := []byte("0123456789abcdef")
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file.txt"}, Content: content},
+	}
+	_, client := setupTestServer(t, objects)
+
+	readerAt := client.NewReaderAt(context.Background(), "b1", "file.txt")
+
+	t.Run("Read from middle", func(t *testing.T) {
+		p := make([]byte, 4)
+		n, err := readerAt.ReadAt(p, 4)
+		assert.NilError(t, err)
+		assert.Equal(t, n, 4)
+		assert.Equal(t, string(p), "4567")
+	})
+
+	t.Run("Read till EOF", func(t *testing.T) {
+		p := make([]byte, 8)
+		n, err := readerAt.ReadAt(p, 12)
+		assert.Equal(t, err, io.EOF)
+		assert.Equal(t, n, 4)
+		assert.Equal(t, string(p[:n]), "cdef")
+	})
+}
+
 func TestFakestorage_Behavior(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/"}},

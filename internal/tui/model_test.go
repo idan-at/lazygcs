@@ -3,6 +3,7 @@ package tui_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,6 +77,14 @@ func (f mockGCSClient) DownloadObject(ctx context.Context, bucketName, objectNam
 
 func (f mockGCSClient) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error {
 	return nil
+}
+
+func (f mockGCSClient) NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader(fmt.Sprintf("content of %s", objectName))), nil
+}
+
+func (f mockGCSClient) NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt {
+	return strings.NewReader(fmt.Sprintf("content of %s", objectName))
 }
 
 // Helper to create simple object list from names

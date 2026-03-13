@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"io"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"lazygcs/internal/gcs"
@@ -24,6 +25,10 @@ type GCSClient interface {
 	DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error
 	// DownloadPrefixAsZip downloads all objects under a prefix into a local zip file.
 	DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error
+	// NewReader returns a sequential reader for an object.
+	NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error)
+	// NewReaderAt returns an io.ReaderAt for an object.
+	NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt
 }
 
 // BucketsPageMsg is sent for progressive loading of project buckets.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -403,6 +404,64 @@ func TestPreviewEdgeCases(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
 		return strings.Contains(s, "large.txt") && strings.Contains(s, "...")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_Markdown(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "README.md"},
+			Content:     []byte("# Hello\n\nThis is **markdown**"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8096, []string{"p1"}, t.TempDir())
+
+	// Wait for b1
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Check for markdown rendering. Glamour will add some styling/padding.
+	// We'll just check for the text content and some typical markdown rendering traits if possible.
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// Glamour might render "Hello" with some bold/headers styling.
+		// For now we just check if it's there.
+		return strings.Contains(s, "README.md") && strings.Contains(s, "Hello") && strings.Contains(s, "markdown")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_Zip(t *testing.T) {
+	// Create a zip in memory
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	f, _ := zw.Create("file_in_zip.txt")
+	_, _ = f.Write([]byte("inner content"))
+	_ = zw.Close()
+
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "test.zip"},
+			Content:     buf.Bytes(),
+		},
+	}
+	tm := setupTestApp(t, objects, 8097, []string{"p1"}, t.TempDir())
+
+	// Wait for b1
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Check for zip listing in preview
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "test.zip") && strings.Contains(s, "file_in_zip.txt")
 	}, teatest.WithDuration(3*time.Second))
 }
 

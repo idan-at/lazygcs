@@ -59,6 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = msg.Width
+		m.previewRegistry.SetWidth(msg.Width / 3) // Approx width of preview col
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -167,7 +168,7 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 	} else if len(m.objects) > 0 {
 		m.previewContent = "Loading..."
-		m, cmd = m.triggerDebounces(m.fetchContent(m.currentBucket, m.objects[0].Name), "", "")
+		m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
 	}
 	return m, cmd
 }
@@ -215,7 +216,7 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 			m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 		} else if len(m.objects) > 0 {
 			m.previewContent = "Loading..."
-			m, cmd = m.triggerDebounces(m.fetchContent(m.currentBucket, m.objects[0].Name), "", "")
+			m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
 		}
 	}
 
@@ -409,7 +410,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
 				m.previewContent = "Loading..."
-				return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+				return m.triggerDebounces(m.fetchContent(obj), "", "")
 			}
 		}
 	}
@@ -502,7 +503,7 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
 				filtered := m.filteredBuckets()
@@ -553,7 +554,7 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
 				filtered := m.filteredBuckets()
@@ -611,7 +612,7 @@ func (m Model) handleHalfPageDownKey() (tea.Model, tea.Cmd) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
 				filtered := m.filteredBuckets()
@@ -669,7 +670,7 @@ func (m Model) handleHalfPageUpKey() (tea.Model, tea.Cmd) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
 					m.previewContent = "Loading..."
-					return m.triggerDebounces(m.fetchContent(m.currentBucket, obj.Name), "", "")
+					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
 				filtered := m.filteredBuckets()

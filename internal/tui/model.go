@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
 	"lazygcs/internal/gcs"
+	"lazygcs/internal/preview"
 )
 
 type viewState int
@@ -85,6 +86,7 @@ type Model struct {
 	errorsList []error
 	help    help.Model
 	spinner spinner.Model
+	previewRegistry *preview.Registry
 
 	// Caches
 	listCache     map[string]listCacheEntry
@@ -118,6 +120,12 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		loadingProjects[id] = true
 	}
 
+	reg := preview.NewRegistry()
+	reg.Register(&preview.TextPreviewer{})
+	reg.Register(preview.NewMarkdownPreviewer(50)) // Default width, will be updated on resize
+	reg.Register(&preview.ZipPreviewer{})
+	reg.Register(&preview.TarPreviewer{})
+
 	return Model{
 		projectIDs:        projectIDs,
 		client:            client,
@@ -134,6 +142,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		collapsedProjects: make(map[string]struct{}),
 		help:              help.New(),
 		spinner:           s,
+		previewRegistry:   reg,
 		listCache:         make(map[string]listCacheEntry),
 		contentCache:      make(map[string]contentCacheEntry),
 		metadataCache:     make(map[string]metadataCacheEntry),

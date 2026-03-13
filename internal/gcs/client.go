@@ -6,15 +6,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 )
 
-// Client provides methods to interact with Google Cloud Storage.
-// It wraps the official storage.Client to provide a simplified API for the TUI.
 type Client struct {
 	storageClient *storage.Client
 }
@@ -29,11 +27,11 @@ type ObjectMetadata struct {
 	Owner       string
 }
 
-// PrefixMetadata holds metadata for a GCS prefix (folder).
+// PrefixMetadata holds metadata for a GCS common prefix (virtual folder).
 type PrefixMetadata struct {
 	Name    string
-	Updated time.Time
 	Created time.Time
+	Updated time.Time
 	Owner   string
 	Fetched bool // Indicates if a metadata fetch has been attempted
 	Err     error
@@ -46,90 +44,89 @@ type ObjectList struct {
 }
 
 // NewClient initializes a new GCS Client with the provided storage client.
-func NewClient(sc *storage.Client) *Client {
-	return &Client{storageClient: sc}
+func NewClient(storageClient *storage.Client) *Client {
+	return &Client{
+		storageClient: storageClient,
+	}
 }
 
-// DownloadObject downloads the content of a GCS object to a local file.
-func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error {
+// DownloadObject downloads a GCS object to the local file system.
+func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, dest string) error {
 	rc, err := c.storageClient.Bucket(bucketName).Object(objectName).NewReader(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to open reader for %q in %q: %w", objectName, bucketName, err)
+		return fmt.Errorf("failed to create reader for %q in %q: %w", objectName, bucketName, err)
 	}
 	defer func() { _ = rc.Close() }()
 
-	f, err := os.Create(destPath)
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	f, err := os.Create(dest)
 	if err != nil {
-		return fmt.Errorf("failed to create local file %q: %w", destPath, err)
+		return fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
 	if _, err := io.Copy(f, rc); err != nil {
-		return fmt.Errorf("failed to copy content to %q: %w", destPath, err)
-	}
-
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("failed to close local file %q: %w", destPath, err)
+		return fmt.Errorf("failed to copy content to destination: %w", err)
 	}
 
 	return nil
 }
 
-// DownloadPrefixAsZip downloads all objects under a prefix into a local zip file.
-func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error {
-	f, err := os.Create(destZipPath)
-	if err != nil {
-		return fmt.Errorf("failed to create zip file %q: %w", destZipPath, err)
-	}
-	defer func() { _ = f.Close() }() // Ensure file is closed on early returns
-
-	zipWriter := zip.NewWriter(f)
-
+// DownloadPrefixAsZip downloads all objects under a prefix and packages them into a ZIP file.
+func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, dest string) error {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
+
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	f, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer f.Close()
+
+	zw := zip.NewWriter(f)
+	defer zw.Close()
+
 	for {
 		attrs, err := it.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error listing objects under prefix %q: %w", prefix, err)
+			return fmt.Errorf("failed to list objects for prefix %q: %w", prefix, err)
 		}
 
-		// Skip directory markers
-		if strings.HasSuffix(attrs.Name, "/") {
+		// Skip "directory" objects (objects ending with /)
+		if attrs.Name == prefix || filepath.Base(attrs.Name) == "" {
 			continue
 		}
 
-		err = func() error {
-			rc, err := c.storageClient.Bucket(bucketName).Object(attrs.Name).NewReader(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to open reader for %q: %w", attrs.Name, err)
-			}
-			defer func() { _ = rc.Close() }()
-
-			// Keep relative path structure inside the zip
-			relPath := strings.TrimPrefix(attrs.Name, prefix)
-			if relPath == "" {
-				relPath = attrs.Name // Fallback
-			}
-
-			w, err := zipWriter.Create(relPath)
-			if err != nil {
-				return fmt.Errorf("failed to create entry %q in zip: %w", relPath, err)
-			}
-
-			if _, err := io.Copy(w, rc); err != nil {
-				return fmt.Errorf("failed to copy content for %q into zip: %w", relPath, err)
-			}
-			return nil
-		}()
-
+		rc, err := c.storageClient.Bucket(bucketName).Object(attrs.Name).NewReader(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create reader for %q: %w", attrs.Name, err)
 		}
+
+		// Create file in zip with relative path
+		relPath := attrs.Name[len(prefix):]
+		w, err := zw.Create(relPath)
+		if err != nil {
+			_ = rc.Close()
+			return fmt.Errorf("failed to create zip entry for %q: %w", attrs.Name, err)
+		}
+
+		if _, err := io.Copy(w, rc); err != nil {
+			_ = rc.Close()
+			return fmt.Errorf("failed to copy %q to zip: %w", attrs.Name, err)
+		}
+		_ = rc.Close()
 	}
 
-	if err := zipWriter.Close(); err != nil {
+	if err := zw.Close(); err != nil {
 		return fmt.Errorf("failed to finalize zip file: %w", err)
 	}
 
@@ -154,6 +151,39 @@ func (c *Client) GetObjectContent(ctx context.Context, bucketName, objectName st
 	}
 
 	return string(bytes), nil
+}
+
+type gcsReaderAt struct {
+	ctx context.Context
+	obj *storage.ObjectHandle
+}
+
+func (r *gcsReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
+	rc, err := r.obj.NewRangeReader(r.ctx, off, int64(len(p)))
+	if err != nil {
+		// handle out of range if length exceeds object size
+		return 0, err
+	}
+	defer rc.Close()
+
+	n, err = io.ReadFull(rc, p)
+	if err == io.ErrUnexpectedEOF {
+		return n, io.EOF
+	}
+	return n, err
+}
+
+// NewReaderAt returns an io.ReaderAt for a specific object, allowing random access.
+func (c *Client) NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt {
+	return &gcsReaderAt{
+		ctx: ctx,
+		obj: c.storageClient.Bucket(bucketName).Object(objectName),
+	}
+}
+
+// NewReader returns a sequential io.ReadCloser for a specific object.
+func (c *Client) NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error) {
+	return c.storageClient.Bucket(bucketName).Object(objectName).NewReader(ctx)
 }
 
 // GetObjectMetadata retrieves full metadata for a specific object or directory stub.
@@ -241,6 +271,7 @@ func (c *Client) ListObjectsPage(ctx context.Context, bucketName, prefix, pageTo
 
 	return list, nextToken, nil
 }
+
 // ListObjects retrieves object names and common prefixes (folders) for a specific bucket and prefix.
 // It uses "/" as a delimiter to enable hierarchical navigation.
 //
