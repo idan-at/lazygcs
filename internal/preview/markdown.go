@@ -31,7 +31,7 @@ func (p *MarkdownPreviewer) Preview(ctx context.Context, client GCSClient, obj O
 	if err != nil {
 		return "", err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	// Read up to 50KB
 	limit := int64(50 * 1024)

@@ -87,10 +87,10 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	zw := zip.NewWriter(f)
-	defer zw.Close()
+	defer func() { _ = zw.Close() }()
 
 	for {
 		attrs, err := it.Next()
@@ -164,7 +164,7 @@ func (r *gcsReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 		// handle out of range if length exceeds object size
 		return 0, err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	n, err = io.ReadFull(rc, p)
 	if err == io.ErrUnexpectedEOF {

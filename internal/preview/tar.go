@@ -29,7 +29,7 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	if err != nil {
 		return "", err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	var r io.Reader = rc
 	if strings.HasSuffix(obj.Name, ".tar.gz") || strings.HasSuffix(obj.Name, ".tgz") || obj.ContentType == "application/gzip" {
@@ -37,7 +37,7 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 		if err != nil {
 			return "", fmt.Errorf("failed to open gzip: %w", err)
 		}
-		defer gr.Close()
+		defer func() { _ = gr.Close() }()
 		r = gr
 	}
 
