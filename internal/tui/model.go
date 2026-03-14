@@ -122,6 +122,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	}
 
 	reg := preview.NewRegistry()
+	reg.Register(&preview.ImagePreviewer{})
 	reg.Register(&preview.DataPreviewer{})
 	reg.Register(&preview.ConfigPreviewer{})
 	reg.Register(&preview.PDFPreviewer{})

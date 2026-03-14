@@ -75,7 +75,7 @@ func (m Model) previewView(width int) string {
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(obj.Owner, width-10)))
 				}
 
-				if m.previewContent != "" {
+				if m.previewContent != "" && m.previewContent != "\x1b_Ga=d,d=A\x1b\\" {
 					separator := lipgloss.NewStyle().
 						Border(lipgloss.NormalBorder(), true, false, false, false).
 						BorderForeground(lipgloss.Color("240")).
@@ -86,7 +86,7 @@ func (m Model) previewView(width int) string {
 					s.WriteString(separator)
 					s.WriteString("\n")
 
-					if m.previewContent == "Loading..." {
+					if m.previewContent == "Loading..." || m.previewContent == "\x1b_Ga=d,d=A\x1b\\Loading..." {
 						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.spinner.View())
 					} else if isBinary(m.previewContent) {
 						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
@@ -105,8 +105,14 @@ func (m Model) previewView(width int) string {
 							displayLines = displayLines[:maxLines]
 						}
 
+						isKitty := strings.HasPrefix(m.previewContent, "\x1b_G")
+
 						for i, line := range displayLines {
-							s.WriteString(truncate(line, width-2))
+							if isKitty {
+								s.WriteString(line)
+							} else {
+								s.WriteString(truncate(line, width-2))
+							}
 							if i < len(displayLines)-1 {
 								s.WriteString("\n")
 							}
@@ -420,9 +426,10 @@ func (m Model) View() string {
 		view += m.footerView()
 	}
 
+	result := view
 	if m.showErrors {
 		// Use lipgloss.Place to center the errors modal.
-		return lipgloss.Place(
+		result = lipgloss.Place(
 			m.width,
 			m.height,
 			lipgloss.Center,
@@ -433,7 +440,10 @@ func (m Model) View() string {
 		)
 	}
 
-	return view
+	if strings.HasPrefix(m.previewContent, "\x1b_Ga=d,d=A\x1b\\") {
+		return "\x1b_Ga=d,d=A\x1b\\" + result
+	}
+	return result
 }
 
 func (m Model) helpView() string {

@@ -171,7 +171,7 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		// Fetch metadata for the current cursor (either 0 or restored)
 		m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 	} else if len(m.objects) > 0 {
-		m.previewContent = "Loading..."
+		m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 		m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
 	}
 	return m, cmd
@@ -219,7 +219,7 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 			// Fetch metadata for the current cursor (either 0 or restored)
 			m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 		} else if len(m.objects) > 0 {
-			m.previewContent = "Loading..."
+			m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 			m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
 		}
 	}
@@ -420,7 +420,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				m.previewContent = "Loading..."
+				m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 				return m.triggerDebounces(m.fetchContent(obj), "", "")
 			}
 		}
@@ -501,7 +501,7 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 		oldCursor := m.cursor
 		m.cursor = (m.cursor + 1) % itemsCount
 		if oldCursor != m.cursor {
-			m.previewContent = "" // Reset preview on move
+			m.previewContent = "\x1b_Ga=d,d=A\x1b\\" // Reset preview on move
 			switch m.state {
 			case viewObjects:
 				if m.cursor < len(currentPrefixes) {
@@ -513,7 +513,7 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
-					m.previewContent = "Loading..."
+					m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
@@ -552,7 +552,7 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 		oldCursor := m.cursor
 		m.cursor = (m.cursor - 1 + itemsCount) % itemsCount
 		if oldCursor != m.cursor {
-			m.previewContent = "" // Reset preview on move
+			m.previewContent = "\x1b_Ga=d,d=A\x1b\\" // Reset preview on move
 			switch m.state {
 			case viewObjects:
 				if m.cursor < len(currentPrefixes) {
@@ -564,7 +564,7 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
-					m.previewContent = "Loading..."
+					m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
@@ -610,7 +610,7 @@ func (m Model) handleHalfPageDownKey() (tea.Model, tea.Cmd) {
 			m.cursor = itemsCount - 1
 		}
 		if oldCursor != m.cursor {
-			m.previewContent = "" // Reset preview on move
+			m.previewContent = "\x1b_Ga=d,d=A\x1b\\" // Reset preview on move
 			switch m.state {
 			case viewObjects:
 				if m.cursor < len(currentPrefixes) {
@@ -622,7 +622,7 @@ func (m Model) handleHalfPageDownKey() (tea.Model, tea.Cmd) {
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
-					m.previewContent = "Loading..."
+					m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
@@ -668,7 +668,7 @@ func (m Model) handleHalfPageUpKey() (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		}
 		if oldCursor != m.cursor {
-			m.previewContent = "" // Reset preview on move
+			m.previewContent = "\x1b_Ga=d,d=A\x1b\\" // Reset preview on move
 			switch m.state {
 			case viewObjects:
 				if m.cursor < len(currentPrefixes) {
@@ -680,7 +680,7 @@ func (m Model) handleHalfPageUpKey() (tea.Model, tea.Cmd) {
 				} else if m.cursor >= len(currentPrefixes) {
 					idx := m.cursor - len(currentPrefixes)
 					obj := currentObjects[idx]
-					m.previewContent = "Loading..."
+					m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
 					return m.triggerDebounces(m.fetchContent(obj), "", "")
 				}
 			case viewBuckets:
@@ -731,7 +731,7 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 		currentPrefixes, _, _ := m.filteredObjects()
 		// Check if selected item is a prefix
 		if m.cursor < len(currentPrefixes) {
-			m.previewContent = ""
+			m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
 			m.currentPrefix = currentPrefixes[m.cursor].Name
 			m.searchMode = false
 			m.searchQuery = ""
@@ -762,7 +762,7 @@ func (m Model) handleLeftKey() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	} else if m.state == viewObjects {
-		m.previewContent = ""
+		m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
 		m.searchMode = false
 		m.searchQuery = ""
 		if m.currentPrefix == "" {
