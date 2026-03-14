@@ -40,3 +40,50 @@ func TestAutoRename_PermissionError(t *testing.T) {
 		t.Fatal("autoRename hit an infinite loop due to an unhandled os.Stat error")
 	}
 }
+
+func TestGetDisplayName(t *testing.T) {
+	tests := []struct {
+		name          string
+		objectName    string
+		currentPrefix string
+		want          string
+	}{
+		{
+			name:          "File in folder",
+			objectName:    "folder/subfolder/file.txt",
+			currentPrefix: "folder/subfolder/",
+			want:          "file.txt",
+		},
+		{
+			name:          "Folder in folder",
+			objectName:    "folder/subfolder/nested/",
+			currentPrefix: "folder/subfolder/",
+			want:          "nested/",
+		},
+		{
+			name:          "Root file",
+			objectName:    "file.txt",
+			currentPrefix: "",
+			want:          "file.txt",
+		},
+		{
+			name:          "Root folder",
+			objectName:    "folder/",
+			currentPrefix: "",
+			want:          "folder/",
+		},
+		{
+			name:          "No matching prefix",
+			objectName:    "other/file.txt",
+			currentPrefix: "folder/",
+			want:          "other/file.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getDisplayName(tt.objectName, tt.currentPrefix)
+			assert.Equal(t, got, tt.want)
+		})
+	}
+}

@@ -145,3 +145,7 @@ func getIcon(name string, isFolder bool, isBucket bool) string {
 		return "📄 " // Default file icon
 	}
 }
+
+func getDisplayName(name, currentPrefix string) string {
+	return strings.TrimPrefix(name, currentPrefix)
+}

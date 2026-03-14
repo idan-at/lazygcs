@@ -28,7 +28,8 @@ func (m Model) previewView(width int) string {
 			// Selected item is a prefix (folder)
 			prefix := currentPrefixes[m.cursor]
 
-			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(prefix.Name, width-10)))
+			displayName := getDisplayName(prefix.Name, m.currentPrefix)
+			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
 			if !prefix.Fetched {
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
 				fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.spinner.View())
@@ -57,7 +58,8 @@ func (m Model) previewView(width int) string {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-10)))
+				displayName := getDisplayName(obj.Name, m.currentPrefix)
+				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
 
 				contentType := obj.ContentType
@@ -245,9 +247,7 @@ func (m Model) objectsView(width int) string {
 					selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render("✓")
 				}
 
-				displayItem := originalName
-				// Display relative path
-				displayItem = strings.TrimPrefix(displayItem, m.currentPrefix)
+				displayItem := getDisplayName(originalName, m.currentPrefix)
 
 				icon := ""
 				if m.showIcons {
