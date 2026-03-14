@@ -21,6 +21,21 @@ func TestHighlight_Go(t *testing.T) {
 	assert.Assert(t, strings.Contains(out, "main"))
 }
 
+func TestHighlight_ConfAndProperties(t *testing.T) {
+	content := "foo=bar\n[sec]\nval=1"
+	outConf, err := preview.Highlight("app.conf", content)
+	assert.NilError(t, err)
+
+	outProps, err := preview.Highlight("app.properties", content)
+	assert.NilError(t, err)
+
+	// Should contain content and ANSI escape codes for formatting
+	assert.Assert(t, strings.Contains(outConf, "foo"))
+	assert.Assert(t, strings.Contains(outConf, "\x1b["))
+	assert.Assert(t, strings.Contains(outProps, "foo"))
+	assert.Assert(t, strings.Contains(outProps, "\x1b["))
+}
+
 type mockGCSClientForCode struct {
 	content []byte
 }

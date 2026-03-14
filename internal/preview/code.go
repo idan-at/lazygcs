@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
@@ -58,6 +59,11 @@ func Highlight(filename, content string) (string, error) {
 	lexer := lexers.Get(filename)
 	if lexer == nil {
 		lexer = lexers.Match(filename)
+	}
+	if lexer == nil {
+		if strings.HasSuffix(filename, ".conf") || strings.HasSuffix(filename, ".properties") {
+			lexer = lexers.Get("ini")
+		}
 	}
 	if lexer == nil {
 		lexer = lexers.Fallback
