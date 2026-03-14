@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -35,9 +36,11 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	}
 	defer func() { _ = rc.Close() }()
 
-	var r io.Reader = rc
+	// Limit to 2MB of compressed stream to prevent massive layers from hanging the UI
+	var r io.Reader
+	r = io.LimitReader(rc, 2*1024*1024)
 	if strings.HasSuffix(obj.Name, ".tar.gz") || strings.HasSuffix(obj.Name, ".tgz") || obj.ContentType == "application/gzip" {
-		gr, err := gzip.NewReader(rc)
+		gr, err := gzip.NewReader(r)
 		if err != nil {
 			return "", fmt.Errorf("failed to open gzip: %w", err)
 		}
@@ -57,10 +60,15 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	count := 0
 	for {
 		header, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
+			// A limited reader might cause unexpected EOF. Gracefully truncate.
+			if errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "unexpected EOF") {
+				fmt.Fprintf(&sb, "%s\n", headerStyle.Render("... listing truncated (archive too large)"))
+				return sb.String(), nil
+			}
 			return sb.String(), fmt.Errorf("error reading tar: %w", err)
 		}
 

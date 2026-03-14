@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -146,6 +147,11 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 func (c *Client) GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error) {
 	rc, err := c.storageClient.Bucket(bucketName).Object(objectName).NewRangeReader(ctx, 0, 1024)
 	if err != nil {
+		// A 416 (InvalidRange) error typically means the object is 0 bytes.
+		// Return empty content instead of failing.
+		if strings.Contains(err.Error(), "416") || strings.Contains(err.Error(), "InvalidRange") || strings.Contains(err.Error(), "Requested range not satisfiable") {
+			return "", nil
+		}
 		return "", fmt.Errorf("failed to create reader for %q in %q: %w", objectName, bucketName, err)
 	}
 	defer func() { _ = rc.Close() }()

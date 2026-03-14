@@ -66,7 +66,7 @@ func (r *Registry) GetPreview(ctx context.Context, client GCSClient, obj Object)
 		if p.CanPreview(obj) {
 			content, err := p.Preview(ctx, client, obj)
 			if err == nil {
-				return content, lastErr
+				return content, nil
 			}
 			lastErr = err // Record error and try next previewer
 		}

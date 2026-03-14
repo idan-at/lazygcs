@@ -36,7 +36,6 @@ func TestRegistry_Fallback(t *testing.T) {
 
 	content, err := reg.GetPreview(context.Background(), nil, preview.Object{})
 
-	// Should return the fallback content AND the error from the failed previewer
 	assert.Equal(t, content, "fallback success")
-	assert.Error(t, err, "boom")
+	assert.NilError(t, err)
 }

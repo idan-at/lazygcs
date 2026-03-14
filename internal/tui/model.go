@@ -127,8 +127,10 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	reg.Register(&preview.ConfigPreviewer{})
 	reg.Register(&preview.PDFPreviewer{})
 	reg.Register(&preview.LogPreviewer{})
+	reg.Register(&preview.DockerArchivePreviewer{})
 	reg.Register(&preview.ZipPreviewer{})
 	reg.Register(&preview.TarPreviewer{})
+	reg.Register(&preview.DockerManifestPreviewer{})
 	reg.Register(preview.NewMarkdownPreviewer(50))
 	reg.Register(&preview.CodePreviewer{})
 	reg.Register(&preview.TextPreviewer{}) // Fallback last

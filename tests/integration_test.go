@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
 	"fmt"
@@ -743,5 +744,161 @@ func TestNavigationCycle(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
 		return strings.Contains(s, "b1") && strings.Contains(s, "b2")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func createMockTar(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	buf := new(bytes.Buffer)
+	tw := tar.NewWriter(buf)
+	for name, content := range files {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0600,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestDockerPreview_TarDocker(t *testing.T) {
+	content := createMockTar(t, map[string]string{
+		"manifest.json": `[{"Config":"config.json","RepoTags":["test:latest"],"Layers":["layer.tar"]}]`,
+		"config.json":   `{"architecture":"amd64","os":"linux"}`,
+	})
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "image.tar"},
+			Content:     content,
+		},
+	}
+	tm := setupTestApp(t, objects, 8200, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "image.tar") && strings.Contains(s, "Docker Image") && strings.Contains(s, "linux/amd64")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestDockerPreview_TarOCI(t *testing.T) {
+	content := createMockTar(t, map[string]string{
+		"oci-layout": `{"imageLayoutVersion": "1.0.0"}`,
+		"index.json": `{"manifests": [{"mediaType": "application/vnd.oci.image.manifest.v1+json"}]}`,
+	})
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "oci.tar"},
+			Content:     content,
+		},
+	}
+	tm := setupTestApp(t, objects, 8201, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "oci.tar") && strings.Contains(s, "OCI Image")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestDockerPreview_TarFallback(t *testing.T) {
+	content := createMockTar(t, map[string]string{
+		"random.txt": "hello world",
+	})
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "random.tar"},
+			Content:     content,
+		},
+	}
+	tm := setupTestApp(t, objects, 8202, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// It should fall back to the generic TarPreviewer which outputs "Archive contents"
+		return strings.Contains(s, "random.tar") && strings.Contains(s, "Archive contents") && strings.Contains(s, "random.txt")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestDockerPreview_JSONDocker(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "manifest.json"},
+			Content:     []byte(`{"mediaType": "application/vnd.docker.distribution.manifest.v2+json", "config": {"digest": "sha256:12345"}}`),
+		},
+	}
+	tm := setupTestApp(t, objects, 8203, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "manifest.json") && strings.Contains(s, "Docker Manifest")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestDockerPreview_JSONOCI(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "index.json"},
+			Content:     []byte(`{"mediaType": "application/vnd.oci.image.manifest.v1+json", "config": {"digest": "sha256:67890"}}`),
+		},
+	}
+	tm := setupTestApp(t, objects, 8204, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "index.json") && strings.Contains(s, "OCI Manifest")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestDockerPreview_JSONFallback(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "generic.json"},
+			Content:     []byte(`{"foo": "bar"}`),
+		},
+	}
+	tm := setupTestApp(t, objects, 8205, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// It should render generic JSON syntax highlighting
+		return strings.Contains(s, "generic.json") && strings.Contains(s, "foo") && strings.Contains(s, "bar") && !strings.Contains(s, "Docker") && !strings.Contains(s, "OCI")
 	}, teatest.WithDuration(3*time.Second))
 }
