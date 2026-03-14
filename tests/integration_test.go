@@ -377,6 +377,45 @@ func TestHelpMenu(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return !strings.Contains(string(bts), "HELP") }, teatest.WithDuration(3*time.Second))
 }
 
+func TestHeaderPathUpdates(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("hi")},
+	}
+	tm := setupTestApp(t, objects, 8099, []string{"p1"}, t.TempDir())
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return s != "" && s != "Loading..."
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Move into buckets list (focus)
+	tm.Type("j")
+
+	// Verify header shows the selected bucket
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "gs://b1/")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket 'b1'
+	tm.Type("l")
+
+	// Wait for objects view and verify header shows the selected prefix (folder1/)
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "gs://b1/folder1/")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Enter prefix 'folder1/'
+	tm.Type("l")
+
+	// Wait for inside folder view and verify header shows the selected file
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "gs://b1/folder1/file1.txt")
+	}, teatest.WithDuration(3*time.Second))
+}
+
 func TestPreviewEdgeCases(t *testing.T) {
 	largeContent := strings.Repeat("line\n", 100)
 	binaryContent := []byte{0x00, 0x01, 0x02}

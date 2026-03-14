@@ -789,8 +789,8 @@ func TestModel_HeaderClearedOnBack(t *testing.T) {
 	// Go back to bucket list
 	m, _ = pressKey(m, 'h')
 
-	// Header should be cleared back to gs://
-	assert.Assert(t, strings.Contains(m.View(), "gs:// "))
+	// Header should update to reflect the currently focused bucket
+	assert.Assert(t, strings.Contains(m.View(), "gs://b1/"))
 }
 
 func TestModel_StaleObjectsMsg(t *testing.T) {

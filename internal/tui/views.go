@@ -8,10 +8,33 @@ import (
 )
 
 func (m Model) fullPath() string {
+	if m.state == viewBuckets {
+		filtered := m.filteredBuckets()
+		if m.cursor < len(filtered) && !filtered[m.cursor].IsProject {
+			return "gs://" + filtered[m.cursor].BucketName + "/"
+		}
+		return "gs://"
+	}
+
 	if m.currentBucket == "" {
 		return "gs://"
 	}
-	return fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
+
+	path := fmt.Sprintf("gs://%s/%s", m.currentBucket, m.currentPrefix)
+
+	if m.state == viewObjects || m.state == viewDownloadConfirm {
+		currentPrefixes, currentObjects, _ := m.filteredObjects()
+		if m.cursor < len(currentPrefixes) {
+			path = "gs://" + m.currentBucket + "/" + currentPrefixes[m.cursor].Name
+		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
+			idx := m.cursor - len(currentPrefixes)
+			if idx < len(currentObjects) {
+				path = "gs://" + m.currentBucket + "/" + currentObjects[idx].Name
+			}
+		}
+	}
+
+	return path
 }
 
 func (m Model) previewView(width int) string {
