@@ -20,11 +20,12 @@ This directory contains the scripts and assets needed to generate the `demo.gif`
 ### What happens under the hood?
 
 When you run the script, it does the following:
-1.  **Builds** the `lazygcs` binary and outputs it to `demo/lazygcs`.
-2.  **Starts** an in-memory mock GCS server (using `fsouza/fake-gcs-server`) pre-populated with some fake buckets and files.
-3.  **Generates** a temporary `config.toml` inside `demo/`.
-4.  **Runs** `vhs demo/demo.tape` with the `LAZYGCS_CONFIG` and `STORAGE_EMULATOR_HOST` environment variables set so that the tool uses the local mock data instead of real Google Cloud data.
-5.  **Saves** the resulting recording to `demo/demo.gif`.
+1.  **Creates** a temporary directory for all build artifacts and session data.
+2.  **Builds** the `lazygcs` binary with optimization flags inside that temporary directory.
+3.  **Starts** an in-memory mock GCS server (using `fsouza/fake-gcs-server`) pre-populated with realistic mock data (JSON, CSS, JARs, and SQL dumps).
+4.  **Generates** a temporary `config.toml` and download directory inside the temporary directory.
+5.  **Runs** `vhs demo/demo.tape` with the `LAZYGCS_CONFIG` and `STORAGE_EMULATOR_HOST` environment variables set so that the tool uses the isolated mock environment.
+6.  **Saves** the resulting recording to `demo/demo.gif`.
 
 ## Customizing the recording
 
