@@ -38,6 +38,8 @@ func TestImagePreviewer_CanPreview(t *testing.T) {
 		{"o.jpg", "image/jpeg", true},
 		{"o.gif", "application/octet-stream", true}, // Extension based
 		{"o.webp", "", true},                        // Extension based
+		{"o.svg", "image/svg+xml", true},            // SVG
+		{"o.svg", "", true},                         // SVG extension based
 		{"o.txt", "text/plain", false},
 		{"o.pdf", "application/pdf", false},
 	}
@@ -71,6 +73,28 @@ func TestImagePreviewer_Preview(t *testing.T) {
 	p.SetWidth(80)
 
 	obj := Object{Bucket: "b", Name: "o.png", ContentType: "image/png"}
+	res, err := p.Preview(context.Background(), client, obj)
+	if err != nil {
+		t.Fatalf("Preview failed: %v", err)
+	}
+
+	if res == "" {
+		t.Error("Preview returned empty string")
+	}
+
+	// Verify it contains either ANSI color codes or Kitty sequence
+	if !strings.Contains(res, "\x1b") {
+		t.Error("Preview does not contain escape sequences")
+	}
+}
+
+func TestImagePreviewer_Preview_SVG(t *testing.T) {
+	svgContent := `<svg width="100" height="100"><rect width="100" height="100" style="fill:rgb(0,0,255);" /></svg>`
+	client := &mockGCSClientForImage{content: []byte(svgContent)}
+	p := &ImagePreviewer{}
+	p.SetWidth(80)
+
+	obj := Object{Bucket: "b", Name: "o.svg", ContentType: "image/svg+xml"}
 	res, err := p.Preview(context.Background(), client, obj)
 	if err != nil {
 		t.Fatalf("Preview failed: %v", err)

@@ -20,6 +20,8 @@ require (
 	github.com/parquet-go/parquet-go v0.29.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/qeesung/image2ascii v1.0.1
+	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c
+	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
 	golang.org/x/image v0.36.0
 	google.golang.org/api v0.266.0
 	gopkg.in/yaml.v3 v3.0.1

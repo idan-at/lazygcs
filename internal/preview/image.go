@@ -15,6 +15,8 @@ import (
 	"github.com/dolmen-go/kittyimg"
 	"github.com/nfnt/resize"
 	"github.com/qeesung/image2ascii/convert"
+	"github.com/srwiley/oksvg"
+	"github.com/srwiley/rasterx"
 	_ "golang.org/x/image/bmp"  // Register BMP decoder
 	_ "golang.org/x/image/tiff" // Register TIFF decoder
 	_ "golang.org/x/image/webp" // Register WebP decoder
@@ -39,7 +41,7 @@ func (p *ImagePreviewer) CanPreview(obj Object) bool {
 	}
 	ext := strings.ToLower(filepath.Ext(obj.Name))
 	switch ext {
-	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff":
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".svg":
 		return true
 	}
 	return false
@@ -53,9 +55,31 @@ func (p *ImagePreviewer) Preview(ctx context.Context, client GCSClient, obj Obje
 	}
 	defer func() { _ = rc.Close() }()
 
-	img, _, err := image.Decode(rc)
-	if err != nil {
-		return "", fmt.Errorf("decode image: %w", err)
+	var img image.Image
+
+	ext := strings.ToLower(filepath.Ext(obj.Name))
+	isSVG := ext == ".svg" || obj.ContentType == "image/svg+xml"
+
+	if isSVG {
+		icon, err := oksvg.ReadIconStream(rc)
+		if err != nil {
+			return "", fmt.Errorf("decode svg: %w", err)
+		}
+		w, h := int(icon.ViewBox.W), int(icon.ViewBox.H)
+		if w == 0 || h == 0 {
+			w, h = 512, 512
+		}
+		rgba := image.NewRGBA(image.Rect(0, 0, w, h))
+		scanner := rasterx.NewScannerGV(w, h, rgba, rgba.Bounds())
+		raster := rasterx.NewDasher(w, h, scanner)
+		icon.Draw(raster, 1.0)
+		img = rgba
+	} else {
+		var decodeErr error
+		img, _, decodeErr = image.Decode(rc)
+		if decodeErr != nil {
+			return "", fmt.Errorf("decode image: %w", decodeErr)
+		}
 	}
 
 	// Downscale large images to a sensible max size to prevent generating
