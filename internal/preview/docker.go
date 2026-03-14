@@ -24,7 +24,11 @@ func (p *DockerArchivePreviewer) Priority() int { return 40 } // Higher priority
 // CanPreview ...
 func (p *DockerArchivePreviewer) CanPreview(obj Object) bool {
 	ext := strings.ToLower(filepath.Ext(obj.Name))
-	return ext == ".tar" || ext == ".tar.gz" || ext == ".tgz" || obj.ContentType == "application/x-tar" || obj.ContentType == "application/gzip"
+	name := strings.ToLower(obj.Name)
+	if strings.HasSuffix(name, ".tar.gz") || strings.HasSuffix(name, ".tgz") {
+		return true
+	}
+	return ext == ".tar" || obj.ContentType == "application/x-tar" || obj.ContentType == "application/gzip"
 }
 
 // Preview ...
