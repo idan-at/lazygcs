@@ -3,8 +3,10 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
 func (m Model) fullPath() string {
@@ -228,25 +230,64 @@ func (m Model) maxItemsVisible() int {
 
 func (m Model) objectsView(width int) string {
 	var s strings.Builder
-	if m.state == viewObjects || m.state == viewDownloadConfirm {
-		title := fmt.Sprintf("Objects in %s", m.currentBucket)
+
+	var targetBucket string
+	var targetPrefix string
+	var currentPrefixes []gcs.PrefixMetadata
+	var currentObjects []gcs.ObjectMetadata
+	var showObjects bool
+	objCursor := -1
+
+	switch m.state {
+	case viewObjects, viewDownloadConfirm:
+		targetBucket = m.currentBucket
+		targetPrefix = m.currentPrefix
+		currentPrefixes, currentObjects, _ = m.filteredObjects()
+		showObjects = true
+		objCursor = m.cursor
+	case viewBuckets:
+		filtered := m.filteredBuckets()
+		if m.cursor < len(filtered) {
+			item := filtered[m.cursor]
+			if !item.IsProject {
+				targetBucket = item.BucketName
+				targetPrefix = ""
+				cacheKey := targetBucket + "::"
+				if cached, ok := m.listCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
+					currentPrefixes = cached.List.Prefixes
+					currentObjects = cached.List.Objects
+					showObjects = true
+				} else {
+					s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(fmt.Sprintf("Objects in %s", targetBucket), width)) + "\n\n")
+					fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
+					return s.String()
+				}
+			}
+		}
+	}
+
+	if showObjects {
+		title := fmt.Sprintf("Objects in %s", targetBucket)
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(title, width)) + "\n\n")
 
-		currentPrefixes, currentObjects, _ := m.filteredObjects()
 		totalItems := len(currentPrefixes) + len(currentObjects)
 
-		if m.loading && totalItems == 0 {
+		if m.loading && m.state != viewBuckets && totalItems == 0 {
 			fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 		} else {
 			maxVisible := m.maxItemsVisible()
-			if m.loading {
+			if m.loading && m.state != viewBuckets {
 				maxVisible--
 				if maxVisible < 1 {
 					maxVisible = 1
 				}
 			}
 
-			start, end := visibleRange(m.cursor, totalItems, maxVisible)
+			startIdx := objCursor
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			start, end := visibleRange(startIdx, totalItems, maxVisible)
 
 			for i := start; i < end; i++ {
 				var originalName string
@@ -270,7 +311,7 @@ func (m Model) objectsView(width int) string {
 					selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render("✓")
 				}
 
-				displayItem := getDisplayName(originalName, m.currentPrefix)
+				displayItem := getDisplayName(originalName, targetPrefix)
 
 				icon := ""
 				if m.showIcons {
@@ -278,7 +319,7 @@ func (m Model) objectsView(width int) string {
 				}
 
 				textStyle := lipgloss.NewStyle()
-				isFocused := m.cursor == i
+				isFocused := (m.state != viewBuckets) && (objCursor == i)
 				if isFocused {
 					textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
 				} else if isSelected {
@@ -299,7 +340,7 @@ func (m Model) objectsView(width int) string {
 			}
 			if totalItems == 0 {
 				s.WriteString("(empty)")
-			} else if m.loading {
+			} else if m.loading && m.state != viewBuckets {
 				fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
 			}
 		}

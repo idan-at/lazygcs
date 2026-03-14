@@ -1157,7 +1157,6 @@ func TestModel_CursorPersistsOnBack(t *testing.T) {
 	// - Cursor should still be on b2
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "Buckets"), "Should show Buckets header")
-	assert.Assert(t, !strings.Contains(view, "Objects in"), "Should NOT show Objects header")
 	assert.Assert(t, strings.Contains(view, " b2"), "Cursor should be on b2, view:\n%s", view)
 }
 
