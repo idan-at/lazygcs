@@ -3,6 +3,7 @@ package preview
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -15,16 +16,20 @@ import (
 	"github.com/parquet-go/parquet-go"
 )
 
+// DataPreviewer ...
 type DataPreviewer struct{}
 
+// Priority ...
 func (p *DataPreviewer) Priority() int { return 20 }
 
+// CanPreview ...
 func (p *DataPreviewer) CanPreview(obj Object) bool {
 	ext := strings.ToLower(filepath.Ext(obj.Name))
 	return ext == ".csv" || ext == ".tsv" || ext == ".parquet" || ext == ".avro" ||
 		obj.ContentType == "text/csv" || obj.ContentType == "application/x-parquet"
 }
 
+// Preview ...
 func (p *DataPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	ext := strings.ToLower(filepath.Ext(obj.Name))
 
@@ -51,7 +56,7 @@ func (p *DataPreviewer) previewCSV(ctx context.Context, client GCSClient, obj Ob
 	}
 
 	rows, err := reader.ReadAll()
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
 	}
 
@@ -81,7 +86,7 @@ func (p *DataPreviewer) previewParquet(ctx context.Context, client GCSClient, ob
 
 	var sb strings.Builder
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true)
-	
+
 	fmt.Fprintf(&sb, "%s\n%v\n\n", headerStyle.Render("Parquet Schema:"), file.Schema())
 	fmt.Fprintf(&sb, "%s\n", headerStyle.Render(fmt.Sprintf("Rows: %d", file.NumRows())))
 
@@ -130,7 +135,7 @@ func (p *DataPreviewer) previewAvro(ctx context.Context, client GCSClient, obj O
 
 	var sb strings.Builder
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true)
-	
+
 	fmt.Fprintf(&sb, "%s\n%s\n\n", headerStyle.Render("Avro Schema:"), dec.Schema().String())
 
 	t := table.New().
@@ -145,7 +150,7 @@ func (p *DataPreviewer) previewAvro(ctx context.Context, client GCSClient, obj O
 		if err := dec.Decode(&record); err != nil {
 			break
 		}
-		
+
 		if count == 0 {
 			for k := range record {
 				headers = append(headers, k)
@@ -166,4 +171,5 @@ func (p *DataPreviewer) previewAvro(ctx context.Context, client GCSClient, obj O
 	return sb.String(), nil
 }
 
-func (p *DataPreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *DataPreviewer) SetWidth(_ int) {}

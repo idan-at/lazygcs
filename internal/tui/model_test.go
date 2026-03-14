@@ -12,9 +12,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"gotest.tools/v3/assert"
 	"github.com/idan-at/lazygcs/internal/gcs"
 	"github.com/idan-at/lazygcs/internal/tui"
+	"gotest.tools/v3/assert"
 )
 
 type mockGCSClient struct {
@@ -23,7 +23,7 @@ type mockGCSClient struct {
 	contentError error // Used to force an error for GetObjectContent
 }
 
-func (f mockGCSClient) ListBucketsPage(ctx context.Context, projectID, pageToken string, pageSize int) ([]string, string, error) {
+func (f mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
 	for _, p := range f.projects {
 		if p.ProjectID == projectID {
 			return p.Buckets, "", nil
@@ -32,15 +32,15 @@ func (f mockGCSClient) ListBucketsPage(ctx context.Context, projectID, pageToken
 	return nil, "", nil
 }
 
-func (f mockGCSClient) ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error) {
+func (f mockGCSClient) ListObjects(_ context.Context, _, _ string) (*gcs.ObjectList, error) {
 	return f.objects, nil
 }
 
-func (f mockGCSClient) ListObjectsPage(ctx context.Context, bucketName, prefix, pageToken string, pageSize int) (*gcs.ObjectList, string, error) {
+func (f mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int) (*gcs.ObjectList, string, error) {
 	return f.objects, "", nil
 }
 
-func (f mockGCSClient) GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error) {
+func (f mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string) (*gcs.ObjectMetadata, error) {
 	// Simple mock: find in prefixes or objects
 	if f.objects != nil {
 		for _, p := range f.objects.Prefixes {
@@ -57,7 +57,7 @@ func (f mockGCSClient) GetObjectMetadata(ctx context.Context, bucketName, object
 	return nil, fmt.Errorf("not found")
 }
 
-func (f mockGCSClient) GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error) {
+func (f mockGCSClient) GetObjectContent(_ context.Context, _, objectName string) (string, error) {
 	if f.contentError != nil {
 		return "", f.contentError
 	}
@@ -72,19 +72,19 @@ func (f mockGCSClient) GetObjectContent(ctx context.Context, bucketName, objectN
 	return "", fmt.Errorf("not found")
 }
 
-func (f mockGCSClient) DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error {
+func (f mockGCSClient) DownloadObject(_ context.Context, _, _, _ string) error {
 	return nil
 }
 
-func (f mockGCSClient) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error {
+func (f mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string) error {
 	return nil
 }
 
-func (f mockGCSClient) NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error) {
+func (f mockGCSClient) NewReader(_ context.Context, _, objectName string) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader(fmt.Sprintf("content of %s", objectName))), nil
 }
 
-func (f mockGCSClient) NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt {
+func (f mockGCSClient) NewReaderAt(_ context.Context, _, objectName string) io.ReaderAt {
 	return strings.NewReader(fmt.Sprintf("content of %s", objectName))
 }
 
@@ -413,22 +413,22 @@ func TestModel_ProjectSpecificLoading(t *testing.T) {
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "p1"))
 	assert.Assert(t, strings.Contains(view, "p2"))
-	
+
 	// Footer should NOT have a spinner because bgJobs (2) == len(loadingProjects) (2)
 	// We check the pill area. The spinner is rendered as a single character.
-	// It's hard to assert "no spinner" if we don't know the character, 
+	// It's hard to assert "no spinner" if we don't know the character,
 	// but we can check that the status pill is empty or doesn't contain the spinner character if we knew it.
 	// Actually, footerView uses m.spinner.View() which is dynamic.
-	
+
 	// Let's simulate p1 finishing
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
-	
+
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "b1")) // p1 loaded
 	assert.Assert(t, strings.Contains(view, "p2")) // p2 still there
-	
+
 	// p1 should not have a spinner anymore, p2 should.
-	// Since we can't easily check for the absence of a dynamic spinner character in a string 
+	// Since we can't easily check for the absence of a dynamic spinner character in a string
 	// that might contain other things, this is a bit tricky with just strings.Contains.
 	// But we've verified the logic in the code.
 }
@@ -509,15 +509,15 @@ func TestModel_Update_HalfPageNavigation(t *testing.T) {
 	// Press Ctrl+D twice to move down significantly
 	m, _ = pressKeyType(m, tea.KeyCtrlD)
 	m, _ = pressKeyType(m, tea.KeyCtrlD)
-	
+
 	viewDown := m.View()
 	assert.Assert(t, !strings.Contains(viewDown, "bucket-00"))
 	// We expect the view to have scrolled down
-	
+
 	// Press Ctrl+U twice to move back up
 	m, _ = pressKeyType(m, tea.KeyCtrlU)
 	m, _ = pressKeyType(m, tea.KeyCtrlU)
-	
+
 	viewUp := m.View()
 	assert.Assert(t, strings.Contains(viewUp, "bucket-00"))
 }
@@ -1000,7 +1000,7 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 
 	// Create a dummy file that already exists
 	existingFile := filepath.Join(downloadDir, "obj1")
-	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
+	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
 	client := mockGCSClient{
@@ -1034,7 +1034,7 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	downloadDir := t.TempDir()
 
 	existingFile := filepath.Join(downloadDir, "obj1")
-	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
+	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
 	client := mockGCSClient{
@@ -1065,7 +1065,7 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	downloadDir := t.TempDir()
 
 	existingFile := filepath.Join(downloadDir, "obj1")
-	err := os.WriteFile(existingFile, []byte("existing content"), 0644)
+	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
 	client := mockGCSClient{
@@ -1312,10 +1312,10 @@ func TestModel_SearchFetchesMetadata(t *testing.T) {
 
 	// Type '2' to filter down to "folder2/"
 	_, cmd := pressKey(m, '2')
-	
+
 	// The cmd returned should be the fetchPrefixMetadataByName command
 	assert.Assert(t, cmd != nil, "A command should be returned to fetch metadata for the newly focused item")
-	
+
 	// Let's actually execute the command to see if it yields a MetadataMsg
 	msg := resolveFetchCmd(cmd)
 	_, ok := msg.(tui.MetadataMsg)
@@ -1402,10 +1402,10 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	// Trigger download success
 	m, cmd := updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1"})
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"))
-	
+
 	// Command to clear status should be returned
 	assert.Assert(t, cmd != nil, "Expected a command to clear the status")
-	
+
 	// Execute the command (simulate timer firing)
 	msg := resolveFetchCmd(cmd)
 	m, _ = updateModel(m, msg)
@@ -1415,7 +1415,7 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), " NORMAL "), "Status should be NORMAL again")
 }
 
-	func TestModel_LongBucketList_EnterBucket_ObjectsVisible(t *testing.T) {
+func TestModel_LongBucketList_EnterBucket_ObjectsVisible(t *testing.T) {
 	var buckets []string
 	for i := 0; i < 100; i++ {
 		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
@@ -1428,7 +1428,7 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20}) // maxVisible = 10
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: client.projects[0].ProjectID, Buckets: client.projects[0].Buckets})
 
-	// Scroll to bucket-90. 
+	// Scroll to bucket-90.
 	// The list has: [p1 (0), bucket-00 (1), ..., bucket-90 (91), ...]
 	for i := 0; i < 91; i++ {
 		m, _ = pressKeyType(m, tea.KeyDown)
@@ -1447,9 +1447,9 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	view := m.View()
 	// Check if obj1 is visible in the view
 	assert.Assert(t, strings.Contains(view, "obj1"), "Objects should be visible even after scrolling deep in buckets list. View:\n%s", view)
-	}
+}
 
-	func TestModel_LayoutIntegrity(t *testing.T) {
+func TestModel_LayoutIntegrity(t *testing.T) {
 	// 1. Setup model with fixed dimensions and a very wide/long preview content
 	wideContent := strings.Repeat("THIS LINE IS VERY VERY WIDE AND SHOULD BE TRUNCATED BY THE UI TO PREVENT COLUMN EXPANSION ", 10)
 	longContent := ""
@@ -1519,4 +1519,4 @@ func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
 
 	t.Logf("Total lines in view: %d", len(lines))
 	assert.Assert(t, len(lines) <= 20, "View height %d exceeded terminal height 20. Wrapping likely occurred!", len(lines))
-	}
+}

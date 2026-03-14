@@ -95,7 +95,9 @@ func (m Model) previewView(width int) string {
 						// We want the ENTIRE previewView content to fit in m.maxItemsVisible() + 2
 						// Preview Title (2) + Metadata (~6) + Separator (2) = ~10 lines
 						maxLines := m.maxItemsVisible() - 8
-						if maxLines < 1 { maxLines = 1 }
+						if maxLines < 1 {
+							maxLines = 1
+						}
 
 						allLines := strings.Split(m.previewContent, "\n")
 						displayLines := allLines
@@ -260,7 +262,7 @@ func (m Model) objectsView(width int) string {
 				// Offset: 1 (indicator) + 1 (space) + 3 (icon) = 5
 				truncateLen := width - 5
 				truncatedItem := truncate(displayItem, truncateLen)
-				
+
 				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, icon, truncatedItem)
 				content := textStyle.Width(width).Render(itemContent)
 
@@ -279,7 +281,7 @@ func (m Model) objectsView(width int) string {
 func (m Model) bucketsView(width int) string {
 	var s strings.Builder
 	s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width)) + "\n\n")
-	
+
 	filtered := m.filteredBuckets()
 
 	// Determine the active index for the buckets list
@@ -334,7 +336,7 @@ func (m Model) bucketsView(width int) string {
 				truncateLen -= 2 // space + spinner
 			}
 			truncatedProject := truncate(item.ProjectID, truncateLen)
-			
+
 			itemContent := fmt.Sprintf("%s%s", icon, truncatedProject)
 			if m.loadingProjects[item.ProjectID] {
 				itemContent += " " + m.spinner.View()
@@ -352,7 +354,7 @@ func (m Model) bucketsView(width int) string {
 			// Offset: 1 (indicator) + 1 (space) + 3 (icon) = 5
 			truncateLen := width - 5
 			truncatedBucket := truncate(item.BucketName, truncateLen)
-			
+
 			itemContent := fmt.Sprintf("%s %s%s", indicator, icon, truncatedBucket)
 			content := textStyle.Width(width).Render(itemContent)
 			s.WriteString(content + "\n")
@@ -460,7 +462,7 @@ func (m Model) errorsView() string {
 		Bold(true).
 		Foreground(lipgloss.Color("204")).
 		Render(fmt.Sprintf("ERRORS (%d)", len(m.errorsList)))
-	
+
 	s.WriteString(title + "\n\n")
 
 	// Limit to last 10 errors to avoid huge modals
@@ -478,7 +480,7 @@ func (m Model) errorsView() string {
 		Foreground(lipgloss.Color("241")).
 		MarginTop(1).
 		Render("Press esc or q to close")
-	
+
 	s.WriteString(footer)
 
 	boxWidth := m.width / 2

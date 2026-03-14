@@ -12,10 +12,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// TarPreviewer ...
 type TarPreviewer struct{}
 
+// Priority ...
 func (p *TarPreviewer) Priority() int { return 41 }
 
+// CanPreview ...
 func (p *TarPreviewer) CanPreview(obj Object) bool {
 	ext := strings.ToLower(filepath.Ext(obj.Name))
 	if strings.HasSuffix(obj.Name, ".tar.gz") || strings.HasSuffix(obj.Name, ".tgz") {
@@ -24,6 +27,7 @@ func (p *TarPreviewer) CanPreview(obj Object) bool {
 	return ext == ".tar" || obj.ContentType == "application/x-tar" || obj.ContentType == "application/gzip"
 }
 
+// Preview ...
 func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	rc, err := client.NewReader(ctx, obj.Bucket, obj.Name)
 	if err != nil {
@@ -67,9 +71,9 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 
 		name := header.Name
 		if header.Typeflag == tar.TypeDir {
-			sb.WriteString(dirStyle.Render("  " + name) + "\n")
+			sb.WriteString(dirStyle.Render("  "+name) + "\n")
 		} else {
-			sb.WriteString(fileStyle.Render("  " + name) + "\n")
+			sb.WriteString(fileStyle.Render("  "+name) + "\n")
 		}
 		count++
 	}
@@ -77,4 +81,5 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	return sb.String(), nil
 }
 
-func (p *TarPreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *TarPreviewer) SetWidth(_ int) {}

@@ -1,3 +1,4 @@
+// Package tui provides functionality for tui.
 package tui
 
 import (
@@ -32,7 +33,7 @@ func (m Model) fetchBucketsPage(projectID string, pageToken string) tea.Cmd {
 func (m Model) fetchObjects() tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
-	
+
 	cacheKey := bucket + "::" + prefix
 	if cached, ok := m.listCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
 		return func() tea.Msg {
@@ -75,7 +76,7 @@ func (m Model) fetchContent(obj gcs.ObjectMetadata) tea.Cmd {
 func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
-	
+
 	cacheKey := bucket + "::" + name
 	if cached, ok := m.metadataCache[cacheKey]; ok && time.Now().Before(cached.ExpiresAt) {
 		return func() tea.Msg {

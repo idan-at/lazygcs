@@ -1,3 +1,4 @@
+// Package main provides functionality for main.
 package main
 
 import (
@@ -60,6 +61,7 @@ func main() {
 	// 1. Build lazygcs
 	fmt.Println("Building lazygcs...")
 	lazygcsPath := filepath.Join(tmpDir, "lazygcs")
+	// #nosec G204
 	buildCmd := exec.Command("go", "build", "-ldflags", "-s -w", "-o", lazygcsPath, ".")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
@@ -100,7 +102,7 @@ func main() {
 
 	// 3. Create a mock config.toml and downloads dir
 	downloadDir := filepath.Join(tmpDir, "downloads")
-	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+	if err := os.MkdirAll(downloadDir, 0750); err != nil {
 		log.Fatalf("Failed to create downloads dir: %v", err)
 	}
 
@@ -111,25 +113,26 @@ fuzzy_search = true
 icons = true
 `
 	configFile := filepath.Join(tmpDir, "config.toml")
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
 		log.Fatalf("Failed to write config: %v", err)
 	}
 
 	// 4. Run vhs with environment variables set
 	fmt.Println("Running vhs demo.tape...")
+	// #nosec G204
 	vhsCmd := exec.Command("vhs", filepath.Join("demo", "demo.tape"))
-	
+
 	// Ensure vhs uses our local lazygcs binary and our config
 	env := os.Environ()
 	// Add our tmp directory to PATH so vhs finds our local "lazygcs" binary
 	env = append(env, "PATH="+tmpDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	env = append(env, "LAZYGCS_CONFIG="+configFile)
-	
+
 	// Set the emulator host, omitting the "http://" prefix
 	hostURL := server.URL()
 	hostURL = strings.TrimPrefix(hostURL, "http://")
 	env = append(env, "STORAGE_EMULATOR_HOST="+hostURL)
-	
+
 	vhsCmd.Env = env
 	vhsCmd.Stdout = os.Stdout
 	vhsCmd.Stderr = os.Stderr
@@ -137,6 +140,6 @@ icons = true
 	if err := vhsCmd.Run(); err != nil {
 		log.Fatalf("vhs failed: %v", err)
 	}
-	
+
 	fmt.Println("Demo recorded successfully to demo/demo.gif!")
 }

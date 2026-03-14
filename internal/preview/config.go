@@ -3,6 +3,7 @@ package preview
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"path/filepath"
 	"strings"
@@ -11,10 +12,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ConfigPreviewer ...
 type ConfigPreviewer struct{}
 
+// Priority ...
 func (p *ConfigPreviewer) Priority() int { return 30 }
 
+// CanPreview ...
 func (p *ConfigPreviewer) CanPreview(obj Object) bool {
 	ext := strings.ToLower(filepath.Ext(obj.Name))
 	return ext == ".json" || ext == ".yaml" || ext == ".yml" || ext == ".toml" ||
@@ -22,6 +26,7 @@ func (p *ConfigPreviewer) CanPreview(obj Object) bool {
 		obj.ContentType == "application/json" || obj.ContentType == "application/x-yaml"
 }
 
+// Preview ...
 func (p *ConfigPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	rc, err := client.NewReader(ctx, obj.Bucket, obj.Name)
 	if err != nil {
@@ -36,7 +41,7 @@ func (p *ConfigPreviewer) Preview(ctx context.Context, client GCSClient, obj Obj
 	}
 	buf := make([]byte, limit)
 	n, err := io.ReadFull(rc, buf)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return "", err
 	}
 	content := buf[:n]
@@ -75,4 +80,5 @@ func (p *ConfigPreviewer) Preview(ctx context.Context, client GCSClient, obj Obj
 	return Highlight(obj.Name, indented)
 }
 
-func (p *ConfigPreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *ConfigPreviewer) SetWidth(_ int) {}

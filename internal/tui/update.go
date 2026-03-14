@@ -72,11 +72,13 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 		m.errorsList = append(m.errorsList, msg.Err)
 		m.loading = false
 		m.bgJobs--
-		if m.bgJobs < 0 { m.bgJobs = 0 }
+		if m.bgJobs < 0 {
+			m.bgJobs = 0
+		}
 		delete(m.loadingProjects, msg.ProjectID)
 		return m, nil
 	}
-	
+
 	// Find if project already exists in m.projects
 	found := false
 	for i, p := range m.projects {
@@ -86,7 +88,7 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 	}
-	
+
 	if !found {
 		// Maintain order from m.projectIDs if possible, or just append
 		m.projects = append(m.projects, gcs.ProjectBuckets{
@@ -111,14 +113,16 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 		cmd = m.fetchBucketsPage(msg.ProjectID, msg.NextToken)
 	} else {
 		// Only stop loading if all projects are fully loaded?
-		// For a lazy UI, we can turn off loading immediately, 
+		// For a lazy UI, we can turn off loading immediately,
 		// or maintain a map of loading projects.
-		// For simplicity, let's turn it off when we get any page 
+		// For simplicity, let's turn it off when we get any page
 		// so the UI feels fast, or wait until all are done.
 		// Let's just turn it off immediately so buckets appear ASAP.
 		m.loading = false
 		m.bgJobs--
-		if m.bgJobs < 0 { m.bgJobs = 0 }
+		if m.bgJobs < 0 {
+			m.bgJobs = 0
+		}
 		delete(m.loadingProjects, msg.ProjectID)
 	}
 	// On first successful page, ensure loading screen hides
@@ -233,7 +237,9 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	// Loading complete
 	m.loading = false
 	m.bgJobs--
-	if m.bgJobs < 0 { m.bgJobs = 0 }
+	if m.bgJobs < 0 {
+		m.bgJobs = 0
+	}
 	cacheKey := msg.Bucket + "::" + msg.Prefix
 	fullList := &gcs.ObjectList{
 		Objects:  m.objects,

@@ -27,6 +27,7 @@ func TestMain(m *testing.M) {
 	binaryPath = filepath.Join(tmpDir, "lazygcs")
 
 	// tests run in the 'tests' directory, so we point to the main.go in the parent dir
+	// #nosec G204
 	buildCmd := exec.Command("go", "build", "-o", binaryPath, "../main.go")
 	if output, err := buildCmd.CombinedOutput(); err != nil {
 		fmt.Printf("failed to build binary: %v\noutput:\n%s\n", err, output)
@@ -42,7 +43,7 @@ func TestMain_E2E(t *testing.T) {
 	content := `projects = ["test-project"]
 download_dir = "/tmp"
 `
-	err := os.WriteFile(configPath, []byte(content), 0644)
+	err := os.WriteFile(configPath, []byte(content), 0600)
 	assert.NilError(t, err)
 
 	// 2. Set the config environment variable
@@ -56,7 +57,7 @@ download_dir = "/tmp"
 
 	// 3. Start the binary
 	cmd := exec.Command(binaryPath)
-	
+
 	// We capture stdout to see what it printed before we kill it or it exits.
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -82,7 +83,7 @@ download_dir = "/tmp"
 		_ = cmd.Process.Kill()
 		t.Fatal("process did not exit in time")
 	}
-	
+
 	output := stdout.String()
 	// As long as it started running BubbleTea (which clears screen etc) or failed cleanly on GCS auth, it's a pass.
 	// Since we passed /dev/null for creds, it will likely return a known error:

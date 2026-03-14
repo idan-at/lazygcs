@@ -1,7 +1,9 @@
+// Package main provides functionality for main.
 package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -29,7 +31,7 @@ func run(args []string, client tui.GCSClient) error {
 	versionFlag := fs.Bool("version", false, "Print version and exit")
 
 	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
+		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
 		return err

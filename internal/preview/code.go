@@ -1,8 +1,10 @@
+// Package preview provides functionality for preview.
 package preview
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
 	"github.com/alecthomas/chroma/v2"
@@ -11,10 +13,13 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 )
 
+// CodePreviewer ...
 type CodePreviewer struct{}
 
+// Priority ...
 func (p *CodePreviewer) Priority() int { return 90 }
 
+// CanPreview ...
 func (p *CodePreviewer) CanPreview(obj Object) bool {
 	lexer := lexers.Get(obj.Name)
 	if lexer == nil {
@@ -23,6 +28,7 @@ func (p *CodePreviewer) CanPreview(obj Object) bool {
 	return lexer != nil
 }
 
+// Preview ...
 func (p *CodePreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	rc, err := client.NewReader(ctx, obj.Bucket, obj.Name)
 	if err != nil {
@@ -32,7 +38,7 @@ func (p *CodePreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 
 	lr := io.LimitReader(rc, 10*1024)
 	buf, err := io.ReadAll(lr)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
 	}
 	content := string(buf)
@@ -44,8 +50,10 @@ func (p *CodePreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 	return Highlight(obj.Name, content)
 }
 
-func (p *CodePreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *CodePreviewer) SetWidth(_ int) {}
 
+// Highlight ...
 func Highlight(filename, content string) (string, error) {
 	lexer := lexers.Get(filename)
 	if lexer == nil {
@@ -68,13 +76,13 @@ func Highlight(filename, content string) (string, error) {
 
 	iterator, err := lexer.Tokenise(nil, content)
 	if err != nil {
-		return content, nil
+		return content, nil //nolint:nilerr
 	}
 
 	var buf bytes.Buffer
 	err = formatter.Format(&buf, style, iterator)
 	if err != nil {
-		return content, nil
+		return content, nil //nolint:nilerr
 	}
 
 	return buf.String(), nil

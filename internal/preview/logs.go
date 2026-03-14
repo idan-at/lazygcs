@@ -9,16 +9,20 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// LogPreviewer ...
 type LogPreviewer struct{}
 
+// Priority ...
 func (p *LogPreviewer) Priority() int { return 70 }
 
+// CanPreview ...
 func (p *LogPreviewer) CanPreview(obj Object) bool {
 	return strings.HasSuffix(strings.ToLower(obj.Name), ".log") ||
 		strings.Contains(strings.ToLower(obj.Name), "error") ||
 		obj.ContentType == "text/plain" // fallback handled by text previewer if not .log
 }
 
+// Preview ...
 func (p *LogPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	rc, err := client.NewReader(ctx, obj.Bucket, obj.Name)
 	if err != nil {
@@ -37,7 +41,7 @@ func (p *LogPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	for scanner.Scan() {
 		line := scanner.Text()
 		upper := strings.ToUpper(line)
-		
+
 		switch {
 		case strings.Contains(upper, "ERROR") || strings.Contains(upper, "CRITICAL") || strings.Contains(upper, "FATAL"):
 			sb.WriteString(errorStyle.Render(line))
@@ -56,4 +60,5 @@ func (p *LogPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	return sb.String(), scanner.Err()
 }
 
-func (p *LogPreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *LogPreviewer) SetWidth(_ int) {}

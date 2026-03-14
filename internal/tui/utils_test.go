@@ -13,7 +13,7 @@ func TestAutoRename_PermissionError(t *testing.T) {
 	tempDir := t.TempDir()
 	restrictedDir := filepath.Join(tempDir, "restricted")
 
-	err := os.Mkdir(restrictedDir, 0755)
+	err := os.Mkdir(restrictedDir, 0750)
 	assert.NilError(t, err)
 
 	filePath := filepath.Join(restrictedDir, "test.txt")
@@ -22,7 +22,7 @@ func TestAutoRename_PermissionError(t *testing.T) {
 	assert.NilError(t, err)
 
 	defer func() {
-		_ = os.Chmod(restrictedDir, 0755)
+		_ = os.Chmod(restrictedDir, 0600)
 	}()
 
 	done := make(chan error)

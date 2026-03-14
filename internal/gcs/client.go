@@ -1,8 +1,10 @@
+// Package gcs provides functionality for gcs.
 package gcs
 
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// Client ...
 type Client struct {
 	storageClient *storage.Client
 }
@@ -58,10 +61,11 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 	}
 	defer func() { _ = rc.Close() }()
 
-	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dest), 0750); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
+	// #nosec G304
 	f, err := os.Create(dest)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
@@ -79,10 +83,11 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, dest string) error {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
 
-	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dest), 0750); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
+	// #nosec G304
 	f, err := os.Create(dest)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
@@ -94,7 +99,7 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 
 	for {
 		attrs, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
@@ -167,7 +172,7 @@ func (r *gcsReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 	defer func() { _ = rc.Close() }()
 
 	n, err = io.ReadFull(rc, p)
-	if err == io.ErrUnexpectedEOF {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return n, io.EOF
 	}
 	return n, err
@@ -293,7 +298,7 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*O
 
 	for {
 		attrs, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {

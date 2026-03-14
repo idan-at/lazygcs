@@ -1,3 +1,4 @@
+// Package config provides functionality for config.
 package config
 
 import (
@@ -30,6 +31,7 @@ func defaultDownloadDir() string {
 	return filepath.Join(home, "Downloads")
 }
 
+// DefaultPath ...
 func DefaultPath() (string, error) {
 	configPath := os.Getenv("LAZYGCS_CONFIG")
 	if configPath != "" {

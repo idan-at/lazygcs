@@ -9,18 +9,22 @@ import (
 	"github.com/dslipak/pdf"
 )
 
+// PDFPreviewer ...
 type PDFPreviewer struct{}
 
+// Priority ...
 func (p *PDFPreviewer) Priority() int { return 60 }
 
+// CanPreview ...
 func (p *PDFPreviewer) CanPreview(obj Object) bool {
 	return strings.ToLower(obj.ContentType) == "application/pdf" ||
 		strings.HasSuffix(strings.ToLower(obj.Name), ".pdf")
 }
 
+// Preview ...
 func (p *PDFPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	ra := client.NewReaderAt(ctx, obj.Bucket, obj.Name)
-	
+
 	reader, err := pdf.NewReader(ra, obj.Size)
 	if err != nil {
 		return "", fmt.Errorf("failed to open PDF: %w", err)
@@ -49,4 +53,5 @@ func (p *PDFPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 	return sb.String(), nil
 }
 
-func (p *PDFPreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *PDFPreviewer) SetWidth(_ int) {}

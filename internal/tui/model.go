@@ -26,6 +26,7 @@ type downloadTask struct {
 	isPrefix bool
 }
 
+// BucketListItem ...
 type BucketListItem struct {
 	IsProject  bool
 	ProjectID  string
@@ -78,14 +79,14 @@ type Model struct {
 	prefixes           []gcs.PrefixMetadata
 	selected           map[string]struct{}
 
-	loading bool
+	loading         bool
 	loadingProjects map[string]bool
-	bgJobs  int
-	status  string
-	err     error
-	errorsList []error
-	help    help.Model
-	spinner spinner.Model
+	bgJobs          int
+	status          string
+	err             error
+	errorsList      []error
+	help            help.Model
+	spinner         spinner.Model
 	previewRegistry *preview.Registry
 
 	// Caches

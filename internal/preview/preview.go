@@ -22,6 +22,7 @@ type Object struct {
 	ContentType string
 }
 
+// Previewer ...
 type Previewer interface {
 	// Priority defines the order of evaluation (lower is higher priority).
 	Priority() int
@@ -33,14 +34,17 @@ type Previewer interface {
 	SetWidth(width int)
 }
 
+// Registry ...
 type Registry struct {
 	previewers []Previewer
 }
 
+// NewRegistry ...
 func NewRegistry() *Registry {
 	return &Registry{}
 }
 
+// Register ...
 func (r *Registry) Register(p Previewer) {
 	r.previewers = append(r.previewers, p)
 	sort.Slice(r.previewers, func(i, j int) bool {
@@ -48,12 +52,14 @@ func (r *Registry) Register(p Previewer) {
 	})
 }
 
+// SetWidth ...
 func (r *Registry) SetWidth(width int) {
 	for _, p := range r.previewers {
 		p.SetWidth(width)
 	}
 }
 
+// GetPreview ...
 func (r *Registry) GetPreview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	var lastErr error
 	for _, p := range r.previewers {
@@ -72,6 +78,7 @@ func (r *Registry) GetPreview(ctx context.Context, client GCSClient, obj Object)
 	return "(no preview available)", nil
 }
 
+// IsBinary ...
 func IsBinary(s string) bool {
 	return strings.ContainsRune(s, '\x00')
 }

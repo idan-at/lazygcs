@@ -185,4 +185,3 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 	}
 	teatest.RequireEqualOutput(t, out)
 }
-

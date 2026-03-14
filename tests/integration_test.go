@@ -33,7 +33,7 @@ func createConfigFile(t *testing.T, projects []string, downloadDir string) strin
 	content := fmt.Sprintf("projects = [%s]\ndownload_dir = %q\n", strings.Join(quoted, ", "), downloadDir)
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	err := os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0600)
 	assert.NilError(t, err)
 	return path
 }
@@ -156,6 +156,7 @@ func TestDownloadObject(t *testing.T) {
 	expectedPath := filepath.Join(downloadDir, "file_to_dl.txt")
 	assert.NilError(t, waitForFile(expectedPath, 3*time.Second))
 
+	// #nosec G304
 	b, err := os.ReadFile(expectedPath)
 	assert.NilError(t, err)
 	assert.Equal(t, string(b), string(content))
@@ -233,6 +234,7 @@ func TestDownloadObject_MultiSelect(t *testing.T) {
 	assert.NilError(t, waitForFile(expectedPath1, 3*time.Second))
 	assert.NilError(t, waitForFile(expectedPathZip, 3*time.Second))
 
+	// #nosec G304
 	b1, err := os.ReadFile(expectedPath1)
 	assert.NilError(t, err)
 	assert.Equal(t, string(b1), "content1")
@@ -319,7 +321,7 @@ func TestDownloadOverwrite(t *testing.T) {
 	}
 	downloadDir := t.TempDir()
 	filePath := filepath.Join(downloadDir, "file1.txt")
-	err := os.WriteFile(filePath, []byte("old content"), 0644)
+	err := os.WriteFile(filePath, []byte("old content"), 0600)
 	assert.NilError(t, err)
 
 	tm := setupTestApp(t, objects, 8093, []string{"p1"}, downloadDir)
@@ -349,6 +351,7 @@ func TestDownloadOverwrite(t *testing.T) {
 	// Verify content
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
+		// #nosec G304
 		b, _ := os.ReadFile(filePath)
 		if string(b) == "new content" {
 			return
@@ -625,7 +628,7 @@ func TestRichPreview_Logs(t *testing.T) {
 
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
-		// We check for the content. Log colorization is hard to check via string matching, 
+		// We check for the content. Log colorization is hard to check via string matching,
 		// but checking for the strings is a good start.
 		return strings.Contains(s, "app.log") && strings.Contains(s, "ERROR") && strings.Contains(s, "failed to connect")
 	}, teatest.WithDuration(3*time.Second))

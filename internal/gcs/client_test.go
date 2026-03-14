@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,9 +13,9 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
+	"github.com/idan-at/lazygcs/internal/gcs"
 	"google.golang.org/api/iterator"
 	"gotest.tools/v3/assert"
-	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
 func setupTestServer(t *testing.T, objects []fakestorage.Object) (*fakestorage.Server, *gcs.Client) {
@@ -136,6 +137,7 @@ func TestClient_DownloadObject(t *testing.T) {
 	err := client.DownloadObject(context.Background(), "b1", "file1.txt", dest)
 	assert.NilError(t, err)
 
+	// #nosec G304
 	got, err := os.ReadFile(dest)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, got, content)
@@ -225,7 +227,7 @@ func TestFakestorage_Behavior(t *testing.T) {
 		foundPrefix := false
 		for {
 			attrs, err := it.Next()
-			if err == iterator.Done {
+			if errors.Is(err, iterator.Done) {
 				break
 			}
 			assert.NilError(t, err)
@@ -242,7 +244,7 @@ func TestFakestorage_Behavior(t *testing.T) {
 		foundObject := false
 		for {
 			attrs, err := it.Next()
-			if err == iterator.Done {
+			if errors.Is(err, iterator.Done) {
 				break
 			}
 			assert.NilError(t, err)

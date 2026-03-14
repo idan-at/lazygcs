@@ -4,14 +4,18 @@ import (
 	"context"
 )
 
+// TextPreviewer ...
 type TextPreviewer struct{}
 
+// Priority ...
 func (p *TextPreviewer) Priority() int { return 100 } // Low priority fallback
 
-func (p *TextPreviewer) CanPreview(obj Object) bool {
+// CanPreview ...
+func (p *TextPreviewer) CanPreview(_ Object) bool {
 	return true // Fallback for everything
 }
 
+// Preview ...
 func (p *TextPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
 	content, err := client.GetObjectContent(ctx, obj.Bucket, obj.Name)
 	if err != nil {
@@ -25,4 +29,5 @@ func (p *TextPreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 	return content, nil
 }
 
-func (p *TextPreviewer) SetWidth(width int) {}
+// SetWidth ...
+func (p *TextPreviewer) SetWidth(_ int) {}

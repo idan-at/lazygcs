@@ -5,14 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gotest.tools/v3/assert"
 	"github.com/idan-at/lazygcs/internal/config"
+	"gotest.tools/v3/assert"
 )
 
 func createConfigFile(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.toml")
-	err := os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0600)
 	assert.NilError(t, err)
 	return path
 }
