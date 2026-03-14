@@ -35,7 +35,7 @@ func (m Model) previewView(width int) string {
 			} else {
 				folderType := "Folder"
 				if prefix.Err != nil {
-					folderType = "Virtual Directory"
+					folderType = "Folder (Virtual)"
 				}
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(folderType))
 

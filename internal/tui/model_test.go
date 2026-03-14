@@ -372,9 +372,9 @@ func TestModel_PrefixMetadata_VirtualDirectory(t *testing.T) {
 	metaMsg.Err = fmt.Errorf("object doesn't exist")
 	m, _ = updateModel(m, metaMsg)
 
-	// Verify view shows Virtual Directory and no loading indicator
+	// Verify view shows Folder (Virtual) and no loading indicator
 	view := m.View()
-	assert.Assert(t, strings.Contains(view, "Virtual Directory"))
+	assert.Assert(t, strings.Contains(view, "Folder (Virtual)"))
 	assert.Assert(t, !strings.Contains(view, "Loading metadata..."))
 }
 
