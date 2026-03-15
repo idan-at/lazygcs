@@ -20,13 +20,25 @@ type CodePreviewer struct{}
 // Priority ...
 func (p *CodePreviewer) Priority() int { return 90 }
 
+// getLexer attempts to find the appropriate chroma.Lexer for a given filename.
+func getLexer(filename string) chroma.Lexer {
+	lexer := lexers.Get(filename)
+	if lexer == nil {
+		lexer = lexers.Match(filename)
+	}
+	if lexer == nil {
+		if strings.HasSuffix(filename, ".conf") || strings.HasSuffix(filename, ".properties") {
+			lexer = lexers.Get("ini")
+		} else if strings.HasSuffix(filename, ".ddl") {
+			lexer = lexers.Match("f.sql")
+		}
+	}
+	return lexer
+}
+
 // CanPreview ...
 func (p *CodePreviewer) CanPreview(obj Object) bool {
-	lexer := lexers.Get(obj.Name)
-	if lexer == nil {
-		lexer = lexers.Match(obj.Name)
-	}
-	return lexer != nil
+	return getLexer(obj.Name) != nil
 }
 
 // Preview ...
@@ -56,15 +68,7 @@ func (p *CodePreviewer) SetWidth(_ int) {}
 
 // Highlight ...
 func Highlight(filename, content string) (string, error) {
-	lexer := lexers.Get(filename)
-	if lexer == nil {
-		lexer = lexers.Match(filename)
-	}
-	if lexer == nil {
-		if strings.HasSuffix(filename, ".conf") || strings.HasSuffix(filename, ".properties") {
-			lexer = lexers.Get("ini")
-		}
-	}
+	lexer := getLexer(filename)
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}

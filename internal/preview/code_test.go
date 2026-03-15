@@ -36,6 +36,27 @@ func TestHighlight_ConfAndProperties(t *testing.T) {
 	assert.Assert(t, strings.Contains(outProps, "\x1b["))
 }
 
+func TestHighlight_DDL(t *testing.T) {
+	content := "CREATE TABLE users (id INT PRIMARY KEY);"
+	out, err := preview.Highlight("schema.ddl", content)
+	assert.NilError(t, err)
+
+	// Compare with explicit .sql highlighting to ensure consistency
+	outSQL, err := preview.Highlight("schema.sql", content)
+	assert.NilError(t, err)
+
+	assert.Equal(t, out, outSQL, "DDL should be highlighted the same as SQL")
+}
+
+func TestCodePreviewer_CanPreview_DDL(t *testing.T) {
+	p := &preview.CodePreviewer{}
+	obj := preview.Object{
+		Bucket: "b1",
+		Name:   "schema.ddl",
+	}
+	assert.Assert(t, p.CanPreview(obj), "CodePreviewer should be able to preview .ddl files")
+}
+
 type mockGCSClientForCode struct {
 	content []byte
 }
