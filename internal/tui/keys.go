@@ -13,6 +13,7 @@ type keyMap struct {
 	Select       key.Binding
 	Download     key.Binding
 	Search       key.Binding
+	Esc          key.Binding
 	Help         key.Binding
 	Errors       key.Binding
 	Quit         key.Binding
@@ -20,7 +21,7 @@ type keyMap struct {
 
 // ShortHelp returns keybindings to be shown in the mini help view.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Download, k.Errors, k.Help, k.Quit}
+	return []key.Binding{k.Search, k.Esc, k.Download, k.Help, k.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view.
@@ -28,7 +29,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.Left, k.Right}, // Navigation
 		{k.Select, k.Download, k.Search},                              // Actions
-		{k.Errors, k.Help, k.Quit},                                    // App
+		{k.Esc, k.Errors, k.Help, k.Quit},                             // App
 	}
 }
 
@@ -67,7 +68,11 @@ var keys = keyMap{
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),
-		key.WithHelp("/", "search"),
+		key.WithHelp("/", "filter list"),
+	),
+	Esc: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "clear filter/close"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),

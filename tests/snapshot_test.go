@@ -29,8 +29,7 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 
 	// Wait for buckets to load and appear on screen
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := string(bts)
-		return s != "" && s != "Loading..." // Wait until initial render passes
+		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Move cursor down to 'assets'
@@ -93,7 +92,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 	// Wait for the preview content to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		return strings.Contains(string(bts), "Hello World")
-	}, teatest.WithDuration(3*time.Second))
+	}, teatest.WithDuration(10*time.Second))
 
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()

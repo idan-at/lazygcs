@@ -91,7 +91,8 @@ To use `lazygcs`, the authenticated user or service account must have at least t
 ### Actions
 *   `space`: Toggle selection of the highlighted item (Multi-select)
 *   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.
-*   `/`: Start searching/filtering the current column
+*   `/`: Start filtering the current column (buckets or objects)
+*   `Esc`: Clear the active filter, or close any open dialogs. Filters are specific to their column and persist while you navigate.
 *   `?`: Toggle the Help Menu overlay
 *   `esc` or `Enter`: Exit search mode
 *   `q` or `Ctrl+c`: Quit the application

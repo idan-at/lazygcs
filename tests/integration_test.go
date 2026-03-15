@@ -386,7 +386,7 @@ func TestHeaderPathUpdates(t *testing.T) {
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := string(bts)
-		return s != "" && s != "Loading..."
+		return strings.Contains(s, "b1")
 	}, teatest.WithDuration(3*time.Second))
 
 	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -989,5 +989,58 @@ func TestDockerPreview_JSONFallback(t *testing.T) {
 		s := string(bts)
 		// It should render generic JSON syntax highlighting
 		return strings.Contains(s, "generic.json") && strings.Contains(s, "foo") && strings.Contains(s, "bar") && !strings.Contains(s, "Docker") && !strings.Contains(s, "OCI")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestSearchFilterPersistence(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "folder1/file1.txt"}, Content: []byte("hi")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "folder1/file2.txt"}, Content: []byte("hi")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
+	}
+	tm := setupTestApp(t, objects, 8094, []string{"test-project-1"}, t.TempDir())
+
+	// Wait for buckets
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "test-bucket-1") && strings.Contains(s, "test-bucket-2")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Move to test-bucket-1
+	tm.Type("/")
+	time.Sleep(100 * time.Millisecond)
+	tm.Type("bucket-1")
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Move cursor down to the bucket (since index 0 is the project header)
+	tm.Type("j")
+
+	// Enter bucket test-bucket-1
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Wait for folder1 to load (we are now in viewObjects)
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "folder1/")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Go back to viewBuckets
+	tm.Type("h")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Wait for buckets to load, but the filter "bucket-1" should still be active on the bucket list
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "FILTER: bucket-1") && strings.Contains(s, "test-bucket-1") && !strings.Contains(s, "test-bucket-2")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Press Esc to clear the filter
+	tm.Send(tea.KeyMsg{Type: tea.KeyEsc, Alt: false})
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Wait for filter to be cleared
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return !strings.Contains(s, "FILTER: bucket-1") && strings.Contains(s, "test-bucket-2")
 	}, teatest.WithDuration(3*time.Second))
 }

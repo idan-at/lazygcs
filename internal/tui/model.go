@@ -48,9 +48,10 @@ type Model struct {
 	showErrors     bool
 
 	// Search State
-	searchMode  bool
-	searchQuery string
-	fuzzySearch bool
+	searchMode        bool
+	bucketSearchQuery string
+	objectSearchQuery string
+	fuzzySearch       bool
 
 	// Settings
 	showIcons bool
@@ -179,8 +180,8 @@ func (m Model) resetObjectsState() Model {
 func (m Model) filteredBuckets() []BucketListItem {
 	var items []BucketListItem
 
-	lowerQuery := strings.ToLower(m.searchQuery)
-	isSearchActive := m.searchQuery != "" && m.state == viewBuckets
+	lowerQuery := strings.ToLower(m.bucketSearchQuery)
+	isSearchActive := m.bucketSearchQuery != ""
 
 	for _, projectID := range m.projectIDs {
 		// Find project data if it exists
@@ -245,7 +246,7 @@ func (m Model) filteredBuckets() []BucketListItem {
 }
 
 func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []int) {
-	if m.searchQuery == "" || m.state != viewObjects {
+	if m.objectSearchQuery == "" || m.state != viewObjects {
 		// When no search query or not in objects view, original indices are a straight mapping
 		indices := make([]int, len(m.prefixes))
 		for i := range m.prefixes {
@@ -258,7 +259,7 @@ func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []
 	var filteredObjects []gcs.ObjectMetadata
 	var originalPrefixIndices []int
 
-	lowerQuery := strings.ToLower(m.searchQuery)
+	lowerQuery := strings.ToLower(m.objectSearchQuery)
 
 	for i, p := range m.prefixes {
 		match := false

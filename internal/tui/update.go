@@ -14,6 +14,23 @@ import (
 )
 
 // Update processes terminal messages (key presses, window resizes) and async responses.
+func (m Model) currentSearchQuery() string {
+	if m.state == viewBuckets {
+		return m.bucketSearchQuery
+	}
+	return m.objectSearchQuery
+}
+
+func (m Model) withCurrentSearchQuery(query string) Model {
+	if m.state == viewBuckets {
+		m.bucketSearchQuery = query
+	} else {
+		m.objectSearchQuery = query
+	}
+	return m
+}
+
+// Update processes terminal messages (key presses, window resizes) and async responses.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case BucketsPageMsg:
@@ -316,7 +333,7 @@ func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showHelp {
 		switch {
-		case key.Matches(msg, keys.Help), key.Matches(msg, keys.Quit), msg.String() == "esc":
+		case key.Matches(msg, keys.Help), key.Matches(msg, keys.Quit), key.Matches(msg, keys.Esc):
 			m.showHelp = false
 		}
 		return m, nil
@@ -324,10 +341,25 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if m.showErrors {
 		switch {
-		case key.Matches(msg, keys.Errors), key.Matches(msg, keys.Quit), msg.String() == "esc":
+		case key.Matches(msg, keys.Errors), key.Matches(msg, keys.Quit), key.Matches(msg, keys.Esc):
 			m.showErrors = false
 		}
 		return m, nil
+	}
+
+	if key.Matches(msg, keys.Esc) && !m.searchMode {
+		if m.state == viewObjects && m.objectSearchQuery != "" {
+			m.objectSearchQuery = ""
+			m.cursor = 0
+			return m, nil
+		} else if m.state == viewObjects && m.bucketSearchQuery != "" {
+			m.bucketSearchQuery = ""
+			return m, nil
+		} else if m.state == viewBuckets && m.bucketSearchQuery != "" {
+			m.bucketSearchQuery = ""
+			m.cursor = 0
+			return m, nil
+		}
 	}
 
 	if m.searchMode {
@@ -351,8 +383,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Search):
 		m.searchMode = true
-		if m.searchQuery != "" {
-			m.searchQuery = ""
+		if m.currentSearchQuery() != "" {
+			m = m.withCurrentSearchQuery("")
 			m.cursor = 0
 		}
 		return m, nil
@@ -388,27 +420,28 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	oldQuery := m.searchQuery
+	oldQuery := m.currentSearchQuery()
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.searchMode = false
-		m.searchQuery = ""
+		m = m.withCurrentSearchQuery("")
 		m.cursor = 0
 	case tea.KeyEnter:
 		m.searchMode = false
 		return m, nil
 	case tea.KeyBackspace, tea.KeyDelete:
-		if len(m.searchQuery) > 0 {
-			runes := []rune(m.searchQuery)
-			m.searchQuery = string(runes[:len(runes)-1])
+		q := m.currentSearchQuery()
+		if len(q) > 0 {
+			runes := []rune(q)
+			m = m.withCurrentSearchQuery(string(runes[:len(runes)-1]))
 			m.cursor = 0
 		}
 	case tea.KeyRunes, tea.KeySpace:
-		m.searchQuery += msg.String()
+		m = m.withCurrentSearchQuery(m.currentSearchQuery() + msg.String())
 		m.cursor = 0
 	}
 
-	if oldQuery != m.searchQuery && m.state == viewObjects {
+	if oldQuery != m.currentSearchQuery() && m.state == viewObjects {
 		currentPrefixes, currentObjects, origIndices := m.filteredObjects()
 		if m.cursor < len(currentPrefixes) {
 			origIdx := origIndices[m.cursor]
@@ -723,7 +756,7 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 			m.currentPrefix = "" // Reset prefix when entering bucket
 			m.state = viewObjects
 			m.searchMode = false
-			m.searchQuery = ""
+			m.objectSearchQuery = ""
 			m = m.resetObjectsState()
 			return m, m.fetchObjects()
 		}
@@ -734,7 +767,7 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 			m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
 			m.currentPrefix = currentPrefixes[m.cursor].Name
 			m.searchMode = false
-			m.searchQuery = ""
+			m.objectSearchQuery = ""
 			m = m.resetObjectsState()
 			return m, m.fetchObjects()
 		}
@@ -764,7 +797,7 @@ func (m Model) handleLeftKey() (tea.Model, tea.Cmd) {
 	} else if m.state == viewObjects {
 		m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
 		m.searchMode = false
-		m.searchQuery = ""
+		m.objectSearchQuery = ""
 		if m.currentPrefix == "" {
 			m.state = viewBuckets
 

@@ -1189,12 +1189,14 @@ func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
 	m, _ = pressKey(m, 'h')
 
 	// Assertions:
-	// - Filter should be cleared
-	// - Cursor should be on blueberry
+	// - Filter should STILL be active
+	// - Cursor should be on blueberry in the filtered list
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "blueberry"), "Should contain blueberry")
-	// Index 3 in full list: p1, apple, banana, apricot, blueberry -> [0, 1, 2, 3, 4]
-	assert.Equal(t, m.Cursor(), 4, "Cursor should be on blueberry (index 4)")
+
+	// Since filter 'b' is active, the list is: [p1, banana, blueberry]
+	// blueberry is at index 2
+	assert.Equal(t, m.Cursor(), 2, "Cursor should be on blueberry (index 2 in filtered list)")
 }
 
 func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {

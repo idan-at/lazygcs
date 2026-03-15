@@ -174,11 +174,16 @@ func (m Model) footerView() string {
 		Background(lipgloss.Color("240")).
 		Foreground(lipgloss.Color("250"))
 
+	q := m.bucketSearchQuery
+	if m.state == viewObjects || m.state == viewDownloadConfirm {
+		q = m.objectSearchQuery
+	}
+
 	if m.searchMode {
-		statusText = fmt.Sprintf(" SEARCH: %s█ ", m.searchQuery)
+		statusText = fmt.Sprintf(" SEARCH: %s█ ", q)
 		statusStyle = statusStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
-	} else if m.searchQuery != "" {
-		statusText = fmt.Sprintf(" FILTER: %s ", m.searchQuery)
+	} else if q != "" {
+		statusText = fmt.Sprintf(" FILTER: %s ", q)
 		statusStyle = statusStyle.Background(lipgloss.Color("61")).Foreground(lipgloss.Color("15"))
 	} else if m.status != "" {
 		statusText = fmt.Sprintf(" %s ", m.status)
