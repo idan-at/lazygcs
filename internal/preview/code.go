@@ -27,10 +27,20 @@ func getLexer(filename string) chroma.Lexer {
 		lexer = lexers.Match(filename)
 	}
 	if lexer == nil {
-		if strings.HasSuffix(filename, ".conf") || strings.HasSuffix(filename, ".properties") {
+		lowerName := strings.ToLower(filename)
+		if strings.HasSuffix(lowerName, ".conf") || strings.HasSuffix(lowerName, ".properties") {
 			lexer = lexers.Get("ini")
-		} else if strings.HasSuffix(filename, ".ddl") {
+		} else if strings.HasSuffix(lowerName, ".ddl") {
 			lexer = lexers.Match("f.sql")
+		} else if strings.HasSuffix(lowerName, ".sh") ||
+			strings.HasSuffix(lowerName, ".zsh") ||
+			strings.HasSuffix(lowerName, ".bash") ||
+			strings.HasSuffix(lowerName, ".bashrc") ||
+			strings.HasSuffix(lowerName, ".zshrc") ||
+			strings.HasSuffix(lowerName, ".profile") ||
+			strings.HasSuffix(lowerName, "bashrc") ||
+			strings.HasSuffix(lowerName, "zshrc") {
+			lexer = lexers.Get("bash")
 		}
 	}
 	return lexer
@@ -69,6 +79,9 @@ func (p *CodePreviewer) SetWidth(_ int) {}
 // Highlight ...
 func Highlight(filename, content string) (string, error) {
 	lexer := getLexer(filename)
+	if lexer == nil {
+		lexer = lexers.Analyse(content)
+	}
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}

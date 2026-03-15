@@ -48,6 +48,55 @@ func TestHighlight_DDL(t *testing.T) {
 	assert.Equal(t, out, outSQL, "DDL should be highlighted the same as SQL")
 }
 
+func TestHighlight_Shell(t *testing.T) {
+	content := "echo 'hello world'"
+	outSH, err := preview.Highlight("script.sh", content)
+	assert.NilError(t, err)
+
+	outZSH, err := preview.Highlight("script.zsh", content)
+	assert.NilError(t, err)
+
+	outBASH, err := preview.Highlight("script.bash", content)
+	assert.NilError(t, err)
+
+	// Compare with plain text to ensure it's actually highlighted
+	outPlain, err := preview.Highlight("script.txt", content)
+	assert.NilError(t, err)
+	assert.Assert(t, outSH != outPlain, ".sh should be highlighted, not plain text")
+
+	// Verify all shell extensions yield identical highlighting
+	assert.Equal(t, outSH, outBASH, ".sh should be highlighted the same as .bash")
+	assert.Equal(t, outZSH, outBASH, ".zsh should be highlighted the same as .bash")
+}
+
+func TestHighlight_ShellAnalyse(t *testing.T) {
+	// A file with no extension but a shebang should be highlighted as shell
+	content := "#!/bin/bash\necho 'hello world'"
+	out, err := preview.Highlight("script-no-ext", content)
+	assert.NilError(t, err)
+
+	// Compare with plain text (which wouldn't have the ANSI codes for 'echo')
+	outPlain, err := preview.Highlight("script.txt", content)
+	assert.NilError(t, err)
+
+	assert.Assert(t, out != outPlain, "file with shebang should be highlighted via Analyse fallback")
+}
+
+func TestCodePreviewer_CanPreview_Shell(t *testing.T) {
+	p := &preview.CodePreviewer{}
+
+	extensions := []string{"script.sh", "script.bash", "script.zsh"}
+	for _, ext := range extensions {
+		t.Run(ext, func(t *testing.T) {
+			obj := preview.Object{
+				Bucket: "b1",
+				Name:   ext,
+			}
+			assert.Assert(t, p.CanPreview(obj), "CodePreviewer should be able to preview %s files", ext)
+		})
+	}
+}
+
 func TestCodePreviewer_CanPreview_DDL(t *testing.T) {
 	p := &preview.CodePreviewer{}
 	obj := preview.Object{

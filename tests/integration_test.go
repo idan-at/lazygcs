@@ -736,6 +736,56 @@ func TestRichPreview_Properties(t *testing.T) {
 	}, teatest.WithDuration(3*time.Second))
 }
 
+func TestRichPreview_Shell(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "script.sh"},
+			Content:     []byte("#!/bin/bash\necho 'hello world'"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8109, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// Check that filename and content are present.
+		// Since we use Monokai style, 'echo' and string literals will be colored.
+		// The ANSI escape codes (e.g., \x1b[) confirm highlighting is active.
+		return strings.Contains(s, "script.sh") &&
+			strings.Contains(s, "echo") &&
+			strings.Contains(s, "hello world") &&
+			strings.Contains(s, "\x1b[")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestRichPreview_ShellShebang(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			// No extension, but has a shebang
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "myscript"},
+			Content:     []byte("#!/bin/zsh\necho 'zsh rules'"),
+		},
+	}
+	tm := setupTestApp(t, objects, 8110, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "myscript") &&
+			strings.Contains(s, "echo") &&
+			strings.Contains(s, "zsh rules") &&
+			strings.Contains(s, "\x1b[")
+	}, teatest.WithDuration(3*time.Second))
+}
+
 func TestNavigationCycle(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
