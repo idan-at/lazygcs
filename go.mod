@@ -16,6 +16,7 @@ require (
 	github.com/fsouza/fake-gcs-server v1.54.0
 	github.com/hamba/avro/v2 v2.31.0
 	github.com/muesli/reflow v0.3.0
+	github.com/muesli/termenv v0.16.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/parquet-go/parquet-go v0.29.0
 	github.com/pelletier/go-toml/v2 v2.2.4
@@ -86,7 +87,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/parquet-go/bitpack v1.0.0 // indirect
 	github.com/parquet-go/jsonlite v1.0.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect

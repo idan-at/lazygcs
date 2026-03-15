@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -41,6 +44,10 @@ func createConfigFile(t *testing.T, projects []string, downloadDir string) strin
 
 func setupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16, projectIDs []string, downloadDir string) *teatest.TestModel {
 	t.Helper()
+
+	// Ensure tests produce deterministic colored output regardless of environment
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	lipgloss.SetHasDarkBackground(true)
 
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: initialObjects,
