@@ -80,22 +80,18 @@ To use `lazygcs`, the authenticated user or service account must have at least t
 
 ## ⌨️ Keybindings
 
-### Navigation
-*   `j` or `↓`: Move cursor down
-*   `k` or `↑`: Move cursor up
-*   `Ctrl+d`: Move cursor half-page down
-*   `Ctrl+u`: Move cursor half-page up
-*   `l` or `Enter` or `→`: Enter a bucket, directory, or expand/collapse a project header.
-*   `h` or `←`: Go back to the parent directory, bucket list, or collapse a project header.
+### Basic Navigation
+*   `j`/`k` or `↓`/`↑`: Move cursor down/up
+*   `l` or `Enter` or `→`: Enter a bucket or directory
+*   `h` or `←`: Go back to the parent directory or bucket list
 
-### Actions
+### Basic Actions
 *   `space`: Toggle selection of the highlighted item (Multi-select)
-*   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.
-*   `/`: Start filtering the current column (buckets or objects)
-*   `Esc`: Clear the active filter, or close any open dialogs. Filters are specific to their column and persist while you navigate.
-*   `?`: Toggle the Help Menu overlay
-*   `esc` or `Enter`: Exit search mode
+*   `d`: Download the currently highlighted item (or all selected items)
+*   `/`: Start filtering the current column
 *   `q` or `Ctrl+c`: Quit the application
+
+**For a complete and detailed list of all keybindings, please see [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md).**
 
 ## 🤝 Contributing
 

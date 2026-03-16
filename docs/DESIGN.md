@@ -40,34 +40,11 @@ Inspired by `ranger` and `yazi`.
 |                           |                            | - **Object Versions**     |
 
 ## 5. Key Features
-1.  **Navigation:**
-    *   `j`/`k`: Move cursor down/up.
-    *   `h`: Go to Parent Directory / Back to Bucket List.
-    *   `l`: Enter Directory / Select Bucket.
-    *   `Enter`: Same as `l`.
-2.  **Operations:**
-    *   `space`: Toggle selection for an item.
-    *   `d`: Download selected item(s).
-    *   `x`: Delete selected item(s) (with confirmation).
-    *   `v`: Toggle Object Versions view in Right Pane.
-3.  **Search:**
-    *   `/`: Filter current list.
-4.  **System:**
-    *   `?`: Toggle Help.
-    *   `q`: Quit.
 
-## 6. Configuration Strategy
-Configuration is loaded exclusively from a TOML file.
+The TUI provides comprehensive keyboard navigation and operations.
+For a full list of interactive features and their corresponding shortcuts, see [KEYBINDINGS.md](KEYBINDINGS.md).
 
-**Location:** `~/.config/lazygcs/config.toml`
-
-**Format:**
-```toml
-projects = ["project-a", "project-b"]
-download_dir = "~/Downloads"
-```
-
-## 7. Testing Strategy
+## 6. Testing Strategy
 *   **E2E Tests (`e2e_test.go`):** Verify the entire binary lifecycle.
     *   Build the binary.
     *   Run against a `fakestorage` server via env vars (`STORAGE_EMULATOR_HOST`).
@@ -80,7 +57,7 @@ download_dir = "~/Downloads"
     *   Test View rendering logic.
     *   No GCS calls involved.
 
-## 8. Development Philosophy
+## 7. Development Philosophy
 *   **TDD First:** All features must be implemented test-first.
     *   **Fail First:** Create a reproduction test case or feature test that fails *for the right reason*.
     *   **Fake it:** Use `fakestorage` to simulate GCS state (buckets, objects, versions).

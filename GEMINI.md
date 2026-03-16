@@ -23,7 +23,7 @@
         3.  Implement the feature.
         4.  Refactor.
 2.  **Architecture:**
-    *   Follow `DESIGN.md`.
+    *   Follow `docs/DESIGN.md`.
     *   Use `main.go` for the entry point, but keep logic in packages (e.g., `tui`, `gcs`, `models`).
 
 ## UI Snapshot Testing
@@ -89,5 +89,5 @@ To transition the UI from a functional text layout to a delightful, modern termi
     2.  Add Object Versions view (`v`) to inspect historical versions of a file.
 
 ## Key Files
-*   `DESIGN.md`: The architectural blueprint.
+*   `docs/DESIGN.md`: The architectural blueprint.
 *   `go.mod`: Dependencies.
