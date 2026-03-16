@@ -51,7 +51,7 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 	_ = tm.Quit()
 
 	// Read any remaining output
-	io.Copy(&buf, tm.FinalOutput(t))
+	_, _ = io.Copy(&buf, tm.FinalOutput(t))
 	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
@@ -108,7 +108,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 	_ = tm.Quit()
 
 	// Read any remaining output
-	io.Copy(&buf, tm.FinalOutput(t))
+	_, _ = io.Copy(&buf, tm.FinalOutput(t))
 	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
@@ -146,7 +146,7 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 	_ = tm.Quit()
 
 	// Read any remaining output
-	io.Copy(&buf, tm.FinalOutput(t))
+	_, _ = io.Copy(&buf, tm.FinalOutput(t))
 	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
@@ -188,6 +188,6 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 	_ = tm.Quit()
 
 	// Read any remaining output
-	io.Copy(&buf, tm.FinalOutput(t))
+	_, _ = io.Copy(&buf, tm.FinalOutput(t))
 	teatest.RequireEqualOutput(t, buf.Bytes())
 }
