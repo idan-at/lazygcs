@@ -225,7 +225,7 @@ func (m Model) footerView() string {
 func (m Model) maxItemsVisible() int {
 	v := m.height - 10
 	if m.showHelp {
-		v -= 6 // Make columns shorter when help is shown at the bottom
+		v -= 12 // Space for the shorter, wider help box
 	}
 	if v < 1 {
 		v = 1
@@ -462,7 +462,6 @@ func (m Model) View() string {
 		Height(columnHeight)
 
 	// Calculate column widths
-	// 25% | 30% | 45%
 	totalWidth := m.width
 	leftWidth := int(float64(totalWidth) * 0.25)
 	midWidth := int(float64(totalWidth) * 0.30)
@@ -487,12 +486,11 @@ func (m Model) View() string {
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
-	view := m.headerView() + "\n\n" + mainContent
-
+	var view string
 	if m.showHelp {
-		view += "\n" + m.helpView()
+		view = m.headerView() + "\n\n" + mainContent + "\n" + lipgloss.PlaceHorizontal(m.width, lipgloss.Center, m.helpView())
 	} else {
-		view += m.footerView()
+		view = m.headerView() + "\n\n" + mainContent + m.footerView()
 	}
 
 	result := view
@@ -516,22 +514,51 @@ func (m Model) View() string {
 }
 
 func (m Model) helpView() string {
-	m.help.ShowAll = true
-	helpText := m.help.View(keys)
+	bindings := keys.OrderedHelp()
+	numCols := 3
+	rows := (len(bindings) + numCols - 1) / numCols
 
-	helpStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder(), true, false, false, false).
-		BorderForeground(lipgloss.Color("69")).
-		Padding(1, 1).
-		Width(m.width)
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Width(12)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Width(20)
 
-	titleStyle := lipgloss.NewStyle().
+	cols := make([]string, numCols)
+	for i := 0; i < numCols; i++ {
+		var colBuilder strings.Builder
+		for j := 0; j < rows; j++ {
+			idx := i + j*numCols // Fill horizontally then vertically
+			if idx < len(bindings) {
+				help := bindings[idx].Help()
+				colBuilder.WriteString(keyStyle.Render(help.Key) + descStyle.Render(help.Desc) + "\n")
+			}
+		}
+		cols[i] = colBuilder.String()
+	}
+
+	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("229")).
 		Render("HELP")
 
-	content := lipgloss.JoinVertical(lipgloss.Left, titleStyle, helpText)
-	return helpStyle.Render(content)
+	helpGrid := lipgloss.JoinHorizontal(lipgloss.Top,
+		cols[0],
+		lipgloss.NewStyle().Padding(0, 2).Render(cols[1]),
+		lipgloss.NewStyle().Padding(0, 2).Render(cols[2]),
+	)
+
+	footer := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		MarginTop(1).
+		Render("Press esc or q to close")
+
+	content := lipgloss.JoinVertical(lipgloss.Left, title, "", helpGrid, footer)
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("69")).
+		Padding(1, 2).
+		Render(content)
+
+	return box
 }
 
 func (m Model) errorsView() string {

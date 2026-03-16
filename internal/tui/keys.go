@@ -21,7 +21,26 @@ type keyMap struct {
 
 // ShortHelp returns keybindings to be shown in the mini help view.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Esc, k.Download, k.Help, k.Quit}
+	return []key.Binding{k.Search, k.Select, k.Download, k.Help, k.Quit}
+}
+
+// OrderedHelp returns all keybindings ordered from most used to least used.
+func (k keyMap) OrderedHelp() []key.Binding {
+	return []key.Binding{
+		k.Up,
+		k.Down,
+		k.Left,
+		k.Right,
+		k.Select,
+		k.Download,
+		k.Search,
+		k.Esc,
+		k.HalfPageUp,
+		k.HalfPageDown,
+		k.Errors,
+		k.Help,
+		k.Quit,
+	}
 }
 
 // FullHelp returns keybindings for the expanded help view.
