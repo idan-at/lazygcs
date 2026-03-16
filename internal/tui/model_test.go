@@ -137,7 +137,6 @@ func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, down
 	return m, client
 }
 
-
 func enterBucket(m tui.Model, projects []gcs.ProjectBuckets, bucket string, objects *gcs.ObjectList) tui.Model {
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: projects[0].ProjectID, Buckets: projects[0].Buckets})
 	m, _ = pressKey(m, 'j')

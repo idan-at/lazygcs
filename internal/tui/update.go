@@ -806,7 +806,8 @@ func (m Model) handleRefreshKey() (tea.Model, tea.Cmd) {
 func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 	var uris []string
 
-	if m.state == viewBuckets {
+	switch m.state {
+	case viewBuckets:
 		filtered := m.filteredBuckets()
 		if m.cursor < len(filtered) {
 			item := filtered[m.cursor]
@@ -814,7 +815,7 @@ func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 				uris = append(uris, "gs://"+item.BucketName+"/")
 			}
 		}
-	} else if m.state == viewObjects {
+	case viewObjects:
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
 		// If there is a selection, copy all selected items

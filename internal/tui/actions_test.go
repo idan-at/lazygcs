@@ -45,16 +45,16 @@ func TestModel_Actions_CopyURI(t *testing.T) {
 	// 1. Bucket View Copy
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
 	m, _ = pressKey(m, 'j') // hover b1
-	
+
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	// We can't easily check clipboard content here without mocking, 
+	// We can't easily check clipboard content here without mocking,
 	// but we can check if the status was updated to indicate success.
 	assert.Assert(t, strings.Contains(m.View(), "Copied gs://b1/ to clipboard"))
 
 	// 2. Object View Copy
 	m = enterBucket(m, projects, "b1", objects)
 	m, _ = pressKey(m, 'j') // hover obj1
-	
+
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	assert.Assert(t, strings.Contains(m.View(), "Copied gs://b1/obj1 to clipboard"))
 
@@ -63,9 +63,9 @@ func TestModel_Actions_CopyURI(t *testing.T) {
 	// Add another object
 	objects2 := simpleObjectList([]string{"obj1", "obj2"}, nil)
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: objects2})
-	m, _ = pressKey(m, 'j') 
+	m, _ = pressKey(m, 'j')
 	m, _ = pressKey(m, ' ') // select obj2
-	
+
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	assert.Assert(t, strings.Contains(m.View(), "Copied 2 URIs to clipboard"))
 }
@@ -73,7 +73,7 @@ func TestModel_Actions_CopyURI(t *testing.T) {
 func TestModel_Actions_Open(t *testing.T) {
 	// Mock ExecCommand to avoid launching real applications
 	oldExec := tui.ExecCommand
-	tui.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
 		return exec.Command("true")
 	}
 	defer func() { tui.ExecCommand = oldExec }()
@@ -92,7 +92,7 @@ func TestModel_Actions_Open(t *testing.T) {
 	// Resolve the command (which triggers the download and exec)
 	msg := cmd()
 	// DownloadMsg is returned by openFile
-	m, _ = updateModel(m, msg)
+	_, _ = updateModel(m, msg)
 
 	// Verify mock client was called for download
 	assert.Equal(t, client.lastDownload.Bucket, "b1")
@@ -102,7 +102,7 @@ func TestModel_Actions_Open(t *testing.T) {
 func TestModel_Actions_Edit(t *testing.T) {
 	// Mock ExecCommand
 	oldExec := tui.ExecCommand
-	tui.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
 		return exec.Command("true")
 	}
 	defer func() { tui.ExecCommand = oldExec }()
@@ -122,7 +122,7 @@ func TestModel_Actions_Edit(t *testing.T) {
 	tempPath := filepath.Join(os.TempDir(), "lazygcs", "b1", "obj1")
 	// Create the file so os.Stat doesn't fail in handleEditorFinishedMsg
 	_ = os.MkdirAll(filepath.Dir(tempPath), 0750)
-	_ = os.WriteFile(tempPath, []byte("updated content"), 0644)
+	_ = os.WriteFile(tempPath, []byte("updated content"), 0600)
 
 	// Original time was likely before now
 	originalTime := time.Now().Add(-1 * time.Hour)
@@ -139,7 +139,7 @@ func TestModel_Actions_Edit(t *testing.T) {
 
 	// Resolve upload command
 	msg := cmd()
-	m, _ = updateModel(m, msg)
+	_, _ = updateModel(m, msg)
 
 	// Verify mock client was called for upload
 	assert.Equal(t, client.lastUpload.Bucket, "b1")

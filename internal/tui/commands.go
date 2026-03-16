@@ -15,6 +15,7 @@ import (
 	"github.com/idan-at/lazygcs/internal/preview"
 )
 
+// ExecCommand is a variable pointing to exec.Command, allowing for mocking in tests.
 var ExecCommand = exec.Command
 
 // Init initializes the application by triggering the first bucket fetch and the spinner.
