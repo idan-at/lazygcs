@@ -17,6 +17,8 @@ type keyMap struct {
 	Root         key.Binding
 	Select       key.Binding
 	Download     key.Binding
+	Copy         key.Binding
+	Refresh      key.Binding
 	Search       key.Binding
 	Esc          key.Binding
 	Help         key.Binding
@@ -26,7 +28,7 @@ type keyMap struct {
 
 // ShortHelp returns keybindings to be shown in the mini help view.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Select, k.Download, k.Help, k.Quit}
+	return []key.Binding{k.Search, k.Select, k.Download, k.Copy, k.Help, k.Quit}
 }
 
 // OrderedHelp returns all keybindings ordered from most used to least used.
@@ -38,7 +40,9 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.Right,
 		k.Select,
 		k.Download,
+		k.Copy,
 		k.Search,
+		k.Refresh,
 		k.Esc,
 		k.Top,
 		k.Bottom,
@@ -58,7 +62,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right, k.Root},                               // Navigation
 		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown}, // Pagination
-		{k.Select, k.Download, k.Search},                                      // Actions
+		{k.Select, k.Download, k.Copy, k.Refresh, k.Search},                   // Actions
 		{k.Esc, k.Errors, k.Help, k.Quit},                                     // App
 	}
 }
@@ -115,6 +119,14 @@ var keys = keyMap{
 	Download: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "download"),
+	),
+	Copy: key.NewBinding(
+		key.WithKeys("y"),
+		key.WithHelp("y", "copy uri"),
+	),
+	Refresh: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "refresh"),
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),

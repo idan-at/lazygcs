@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -428,6 +429,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Download):
 		return m.handleDownloadKey()
 
+	case key.Matches(msg, keys.Copy):
+		return m.handleCopyKey()
+
+	case key.Matches(msg, keys.Refresh):
+		return m.handleRefreshKey()
+
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
 	}
@@ -752,6 +759,91 @@ func (m Model) handleBottomKey() (tea.Model, tea.Cmd) {
 		return m.finalizeCursorMove(oldCursor)
 	}
 	return m, nil
+}
+
+func (m Model) handleRefreshKey() (tea.Model, tea.Cmd) {
+	if !strings.HasPrefix(m.status, "Downloading") {
+		m.status = "Refreshing..."
+	}
+
+	switch m.state {
+	case viewBuckets:
+		m.projects = nil
+		m.bgJobs = len(m.projectIDs)
+		m.loadingProjects = make(map[string]bool)
+		for _, id := range m.projectIDs {
+			m.loadingProjects[id] = true
+		}
+		var cmds []tea.Cmd
+		for _, pID := range m.projectIDs {
+			cmds = append(cmds, m.fetchBucketsPage(pID, ""))
+		}
+		return m, tea.Batch(cmds...)
+	case viewObjects:
+		m.loading = true
+		m.bgJobs++
+		m.objects = nil
+		m.prefixes = nil
+		// Invalidate cache for current prefix
+		cacheKey := m.currentBucket + "::" + m.currentPrefix
+		delete(m.listCache, cacheKey)
+		return m, m.fetchObjects()
+	}
+	return m, nil
+}
+
+func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
+	var uris []string
+
+	if m.state == viewBuckets {
+		filtered := m.filteredBuckets()
+		if m.cursor < len(filtered) {
+			item := filtered[m.cursor]
+			if !item.IsProject {
+				uris = append(uris, "gs://"+item.BucketName+"/")
+			}
+		}
+	} else if m.state == viewObjects {
+		currentPrefixes, currentObjects, _ := m.filteredObjects()
+
+		// If there is a selection, copy all selected items
+		if len(m.selected) > 0 {
+			// We need to iterate over everything to maintain order, or just collect from map.
+			// Let's collect from map for simplicity, but order might be random.
+			for name := range m.selected {
+				uris = append(uris, "gs://"+m.currentBucket+"/"+name)
+			}
+		} else {
+			// Copy the hovered item
+			if m.cursor < len(currentPrefixes) {
+				uris = append(uris, "gs://"+m.currentBucket+"/"+currentPrefixes[m.cursor].Name)
+			} else if m.cursor >= len(currentPrefixes) {
+				idx := m.cursor - len(currentPrefixes)
+				if idx < len(currentObjects) {
+					uris = append(uris, "gs://"+m.currentBucket+"/"+currentObjects[idx].Name)
+				}
+			}
+		}
+	}
+
+	if len(uris) == 0 {
+		return m, nil
+	}
+
+	content := strings.Join(uris, "\n")
+	err := clipboard.WriteAll(content)
+	if err != nil {
+		m.status = fmt.Sprintf("Clipboard error: %v", err)
+		return m, nil
+	}
+
+	if len(uris) == 1 {
+		m.status = fmt.Sprintf("Copied %s to clipboard", uris[0])
+	} else {
+		m.status = fmt.Sprintf("Copied %d URIs to clipboard", len(uris))
+	}
+
+	return m, clearStatusCmd()
 }
 
 func (m Model) handleRootKey() (tea.Model, tea.Cmd) {

@@ -26,7 +26,7 @@ Expand Vim keybindings in `lazygcs` to provide a comprehensive, keyboard-driven 
    - Write failing tests in `internal/tui/navigation_test.go`.
    - Update snapshot tests for the help menu.
 
-## Phase 2: Action Expansion (Copy URI & Refresh)
+## Phase 2: Action Expansion (Copy URI & Refresh) [DONE]
 **Objective**: Add utility actions for managing GCS items.
 
 ### New Keybindings

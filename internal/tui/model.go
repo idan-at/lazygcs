@@ -164,6 +164,16 @@ func (m Model) Cursor() int {
 	return m.cursor
 }
 
+// Objects returns the current list of objects.
+func (m Model) Objects() []gcs.ObjectMetadata {
+	return m.objects
+}
+
+// Prefixes returns the current list of prefixes.
+func (m Model) Prefixes() []gcs.PrefixMetadata {
+	return m.prefixes
+}
+
 func (m Model) resetObjectsState() Model {
 	m.objects = nil
 	m.prefixes = nil
