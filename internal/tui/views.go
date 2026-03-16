@@ -515,7 +515,7 @@ func (m Model) View() string {
 
 func (m Model) helpView() string {
 	groups := keys.FullHelp()
-	headers := []string{"Navigation", "Actions", "App"}
+	headers := []string{"Navigation", "Pagination", "Actions", "App"}
 
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Width(12)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Width(20)
@@ -541,6 +541,7 @@ func (m Model) helpView() string {
 		cols[0],
 		lipgloss.NewStyle().Padding(0, 2).Render(cols[1]),
 		lipgloss.NewStyle().Padding(0, 2).Render(cols[2]),
+		lipgloss.NewStyle().Padding(0, 2).Render(cols[3]),
 	)
 
 	footer := lipgloss.NewStyle().

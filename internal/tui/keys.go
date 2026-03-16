@@ -6,10 +6,15 @@ import "github.com/charmbracelet/bubbles/key"
 type keyMap struct {
 	Up           key.Binding
 	Down         key.Binding
+	Top          key.Binding
+	Bottom       key.Binding
+	PageUp       key.Binding
+	PageDown     key.Binding
 	HalfPageUp   key.Binding
 	HalfPageDown key.Binding
 	Left         key.Binding
 	Right        key.Binding
+	Root         key.Binding
 	Select       key.Binding
 	Download     key.Binding
 	Search       key.Binding
@@ -35,8 +40,13 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.Download,
 		k.Search,
 		k.Esc,
+		k.Top,
+		k.Bottom,
+		k.PageUp,
+		k.PageDown,
 		k.HalfPageUp,
 		k.HalfPageDown,
+		k.Root,
 		k.Errors,
 		k.Help,
 		k.Quit,
@@ -46,9 +56,10 @@ func (k keyMap) OrderedHelp() []key.Binding {
 // FullHelp returns keybindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.Left, k.Right}, // Navigation
-		{k.Select, k.Download, k.Search},                              // Actions
-		{k.Esc, k.Errors, k.Help, k.Quit},                             // App
+		{k.Up, k.Down, k.Left, k.Right, k.Root},                               // Navigation
+		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown}, // Pagination
+		{k.Select, k.Download, k.Search},                                      // Actions
+		{k.Esc, k.Errors, k.Help, k.Quit},                                     // App
 	}
 }
 
@@ -60,6 +71,22 @@ var keys = keyMap{
 	Down: key.NewBinding(
 		key.WithKeys("down", "j"),
 		key.WithHelp("↓/j", "down"),
+	),
+	Top: key.NewBinding(
+		key.WithKeys("g", "home"),
+		key.WithHelp("g/home", "top"),
+	),
+	Bottom: key.NewBinding(
+		key.WithKeys("G", "end"),
+		key.WithHelp("G/end", "bottom"),
+	),
+	PageUp: key.NewBinding(
+		key.WithKeys("ctrl+b", "pgup"),
+		key.WithHelp("ctrl+b/pgup", "page up"),
+	),
+	PageDown: key.NewBinding(
+		key.WithKeys("ctrl+f", "pgdown"),
+		key.WithHelp("ctrl+f/pgdown", "page down"),
 	),
 	HalfPageUp: key.NewBinding(
 		key.WithKeys("ctrl+u"),
@@ -76,6 +103,10 @@ var keys = keyMap{
 	Right: key.NewBinding(
 		key.WithKeys("right", "l", "enter"),
 		key.WithHelp("→/l", "enter"),
+	),
+	Root: key.NewBinding(
+		key.WithKeys("H"),
+		key.WithHelp("H", "root"),
 	),
 	Select: key.NewBinding(
 		key.WithKeys(" "),
