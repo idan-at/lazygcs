@@ -15,6 +15,8 @@ import (
 	"github.com/idan-at/lazygcs/internal/preview"
 )
 
+var ExecCommand = exec.Command
+
 // Init initializes the application by triggering the first bucket fetch and the spinner.
 func (m Model) Init() tea.Cmd {
 	var cmds []tea.Cmd
@@ -115,11 +117,11 @@ func (m Model) openFile(bucketName, objectName string) tea.Cmd {
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
 		case "darwin":
-			cmd = exec.Command("open", dest)
+			cmd = ExecCommand("open", dest)
 		case "windows":
-			cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", dest)
+			cmd = ExecCommand("rundll32", "url.dll,FileProtocolHandler", dest)
 		default: // linux, bsd, etc.
-			cmd = exec.Command("xdg-open", dest)
+			cmd = ExecCommand("xdg-open", dest)
 		}
 
 		err = cmd.Start()
@@ -148,7 +150,7 @@ func (m Model) editFile(bucketName, objectName string) tea.Cmd {
 			editor = "vim"
 		}
 
-		c := exec.Command(editor, dest)
+		c := ExecCommand(editor, dest)
 		return tea.ExecProcess(c, func(err error) tea.Msg {
 			return EditorFinishedMsg{
 				TempPath:        dest,

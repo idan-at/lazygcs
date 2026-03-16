@@ -2,6 +2,7 @@ package tui_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -70,6 +71,13 @@ func TestModel_Actions_CopyURI(t *testing.T) {
 }
 
 func TestModel_Actions_Open(t *testing.T) {
+	// Mock ExecCommand to avoid launching real applications
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1"}, nil)
 	m, client := setupTestModel(projects, objects, "/tmp")
@@ -92,6 +100,13 @@ func TestModel_Actions_Open(t *testing.T) {
 }
 
 func TestModel_Actions_Edit(t *testing.T) {
+	// Mock ExecCommand
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1"}, nil)
 	m, client := setupTestModel(projects, objects, "/tmp")
