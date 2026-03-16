@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"strings"
@@ -27,8 +28,11 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 
 	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
+	var buf bytes.Buffer
+	tee := io.TeeReader(tm.Output(), &buf)
+
 	// Wait for buckets to load and appear on screen
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
@@ -39,19 +43,16 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
 
 	// Wait for the terminal to resize and render
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(2*time.Second))
 
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
 
-	// Take snapshot
-	out, err := io.ReadAll(tm.FinalOutput(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	teatest.RequireEqualOutput(t, out)
+	// Read any remaining output
+	io.Copy(&buf, tm.FinalOutput(t))
+	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
 func TestSnapshot_ObjectsAndPreview(t *testing.T) {
@@ -61,15 +62,24 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 			Content:     []byte("fake-png-content"),
 		},
 		{
-			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "assets", Name: "README.md", ContentType: "text/markdown"},
-			Content:     []byte("# Hello World\nThis is a test file."),
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName:  "assets",
+				Name:        "README.md",
+				ContentType: "text/markdown",
+				Created:     time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+				Updated:     time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+			Content: []byte("# Hello World\nThis is a test file."),
 		},
 	}
 
 	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
+	var buf bytes.Buffer
+	tee := io.TeeReader(tm.Output(), &buf)
+
 	// Wait for buckets to load
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		s := string(bts)
 		return s != "" && s != "Loading..."
 	}, teatest.WithDuration(3*time.Second))
@@ -82,7 +92,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 	tm.Type("l")
 
 	// Wait for README.md to be visible
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		return strings.Contains(string(bts), "README.md")
 	}, teatest.WithDuration(3*time.Second))
 
@@ -90,19 +100,16 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 	tm.Type("j")
 
 	// Wait for the preview content to load
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		return strings.Contains(string(bts), "Hello World")
 	}, teatest.WithDuration(10*time.Second))
 
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
 
-	// Take snapshot
-	out, err := io.ReadAll(tm.FinalOutput(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	teatest.RequireEqualOutput(t, out)
+	// Read any remaining output
+	io.Copy(&buf, tm.FinalOutput(t))
+	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
 func TestSnapshot_HelpMenu(t *testing.T) {
@@ -115,8 +122,11 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 
 	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
+	var buf bytes.Buffer
+	tee := io.TeeReader(tm.Output(), &buf)
+
 	// Wait for buckets to load
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		s := string(bts)
 		return s != "" && s != "Loading..."
 	}, teatest.WithDuration(3*time.Second))
@@ -127,7 +137,7 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 	tm.Type("?")
 
 	// Wait for help menu to appear
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		out := string(bts)
 		return strings.Contains(out, "HELP") || strings.Contains(out, "quit")
 	}, teatest.WithDuration(2*time.Second))
@@ -135,12 +145,9 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
 
-	// Take snapshot
-	out, err := io.ReadAll(tm.FinalOutput(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	teatest.RequireEqualOutput(t, out)
+	// Read any remaining output
+	io.Copy(&buf, tm.FinalOutput(t))
+	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
 func TestSnapshot_ErrorsModal(t *testing.T) {
@@ -153,8 +160,11 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 
 	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
+	var buf bytes.Buffer
+	tee := io.TeeReader(tm.Output(), &buf)
+
 	// Wait for buckets to load
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		s := string(bts)
 		return s != "" && s != "Loading..."
 	}, teatest.WithDuration(3*time.Second))
@@ -169,7 +179,7 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlE})
 
 	// Wait for errors modal to appear
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		out := string(bts)
 		return strings.Contains(out, "ERRORS") || strings.Contains(out, "simulated permission denied")
 	}, teatest.WithDuration(2*time.Second))
@@ -177,10 +187,7 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 	// Trigger quit so FinalOutput can return
 	_ = tm.Quit()
 
-	// Take snapshot
-	out, err := io.ReadAll(tm.FinalOutput(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	teatest.RequireEqualOutput(t, out)
+	// Read any remaining output
+	io.Copy(&buf, tm.FinalOutput(t))
+	teatest.RequireEqualOutput(t, buf.Bytes())
 }

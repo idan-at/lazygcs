@@ -87,11 +87,11 @@ var keys = keyMap{
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),
-		key.WithHelp("/", "filter list"),
+		key.WithHelp("/", "filter"),
 	),
 	Esc: key.NewBinding(
 		key.WithKeys("esc"),
-		key.WithHelp("esc", "clear filter/close"),
+		key.WithHelp("esc", "clear / close"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
@@ -99,7 +99,7 @@ var keys = keyMap{
 	),
 	Errors: key.NewBinding(
 		key.WithKeys("ctrl+e"),
-		key.WithHelp("ctrl+e", "errors"),
+		key.WithHelp("ctrl+e", "toggle errors"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

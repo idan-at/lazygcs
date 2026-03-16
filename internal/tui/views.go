@@ -514,24 +514,22 @@ func (m Model) View() string {
 }
 
 func (m Model) helpView() string {
-	bindings := keys.OrderedHelp()
-	numCols := 3
-	rows := (len(bindings) + numCols - 1) / numCols
+	groups := keys.FullHelp()
+	headers := []string{"Navigation", "Actions", "App"}
 
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Width(12)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Width(20)
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Bold(true).Underline(true).MarginBottom(1)
 
-	cols := make([]string, numCols)
-	for i := 0; i < numCols; i++ {
+	cols := make([]string, len(groups))
+	for i, group := range groups {
 		var colBuilder strings.Builder
-		for j := 0; j < rows; j++ {
-			idx := i + j*numCols // Fill horizontally then vertically
-			if idx < len(bindings) {
-				help := bindings[idx].Help()
-				colBuilder.WriteString(keyStyle.Render(help.Key) + descStyle.Render(help.Desc) + "\n")
-			}
+		colBuilder.WriteString(headerStyle.Render(headers[i]) + "\n")
+		for _, b := range group {
+			help := b.Help()
+			colBuilder.WriteString(keyStyle.Render(help.Key) + descStyle.Render(help.Desc) + "\n")
 		}
-		cols[i] = colBuilder.String()
+		cols[i] = strings.TrimSpace(colBuilder.String())
 	}
 
 	title := lipgloss.NewStyle().
