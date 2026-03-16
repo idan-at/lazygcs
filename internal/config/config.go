@@ -68,6 +68,7 @@ func Load(configPath string) (*Config, error) {
 	cfg := &Config{
 		Projects:    []string{},
 		DownloadDir: defaultDownloadDir(),
+		FuzzySearch: true,
 	}
 
 	if _, err := toml.DecodeFile(configPath, cfg); err != nil {

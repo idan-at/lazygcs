@@ -40,6 +40,7 @@ func TestLoad(t *testing.T) {
 			expected: &config.Config{
 				Projects:    []string{"p1", "p2"},
 				DownloadDir: defaultDownload,
+				FuzzySearch: true,
 			},
 		},
 		{
@@ -48,6 +49,7 @@ func TestLoad(t *testing.T) {
 			expected: &config.Config{
 				Projects:    []string{"p1", "p2"},
 				DownloadDir: defaultDownload,
+				FuzzySearch: true,
 			},
 		},
 		{
@@ -56,18 +58,19 @@ func TestLoad(t *testing.T) {
 			expected: &config.Config{
 				Projects:    []string{},
 				DownloadDir: "/tmp/custom_downloads",
+				FuzzySearch: true,
 			},
 		},
 		{
-			name: "OverrideFuzzySearch",
+			name: "DisableFuzzySearch",
 			content: `
 projects = ["p1"]
-fuzzy_search = true
+fuzzy_search = false
 `,
 			expected: &config.Config{
 				Projects:    []string{"p1"},
 				DownloadDir: defaultDownload,
-				FuzzySearch: true,
+				FuzzySearch: false,
 			},
 		},
 		{
@@ -79,6 +82,7 @@ icons = true
 			expected: &config.Config{
 				Projects:    []string{"p1"},
 				DownloadDir: defaultDownload,
+				FuzzySearch: true,
 				Icons:       true,
 			},
 		},

@@ -57,8 +57,8 @@ projects = ["my-production-project", "my-staging-project"]
 download_dir = "/Users/me/Desktop/gcs_downloads"
 
 # Optional: Enable fuzzy searching when using the '/' filter.
-# Defaults to false (exact substring match).
-fuzzy_search = true
+# Defaults to true. To use exact substring matching, set this to false.
+fuzzy_search = false
 
 # Optional: Display Nerd Font icons next to buckets, folders, and files.
 # Requires a Nerd Font to be installed and active in your terminal.
