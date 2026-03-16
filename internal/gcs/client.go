@@ -80,6 +80,28 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 	return nil
 }
 
+// UploadObject uploads a local file to GCS.
+func (c *Client) UploadObject(ctx context.Context, bucketName, objectName, src string) error {
+	// #nosec G304
+	f, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	wc := c.storageClient.Bucket(bucketName).Object(objectName).NewWriter(ctx)
+	if _, err := io.Copy(wc, f); err != nil {
+		_ = wc.Close()
+		return fmt.Errorf("failed to copy content to GCS: %w", err)
+	}
+
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("failed to finalize upload to GCS: %w", err)
+	}
+
+	return nil
+}
+
 // DownloadPrefixAsZip downloads all objects under a prefix and packages them into a ZIP file.
 func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, dest string) error {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})

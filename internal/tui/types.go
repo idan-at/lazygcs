@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"io"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/idan-at/lazygcs/internal/gcs"
@@ -23,6 +24,8 @@ type GCSClient interface {
 	GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error)
 	// DownloadObject downloads the content of a GCS object to a local file.
 	DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error
+	// UploadObject uploads a local file to GCS.
+	UploadObject(ctx context.Context, bucketName, objectName, srcPath string) error
 	// DownloadPrefixAsZip downloads all objects under a prefix into a local zip file.
 	DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error
 	// NewReader returns a sequential reader for an object.
@@ -76,6 +79,19 @@ type ContentMsg struct {
 type DownloadMsg struct {
 	Path string
 	Err  error
+}
+
+// EditorFinishedMsg is sent when the external editor process exits.
+type EditorFinishedMsg struct {
+	TempPath        string
+	OriginalModTime time.Time
+	Err             error
+}
+
+// UploadMsg is sent when an upload operation completes.
+type UploadMsg struct {
+	ObjectName string
+	Err        error
 }
 
 // ClearStatusMsg is sent to clear the status bar.

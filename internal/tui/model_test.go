@@ -21,9 +21,20 @@ type mockGCSClient struct {
 	projects     []gcs.ProjectBuckets
 	objects      *gcs.ObjectList
 	contentError error // Used to force an error for GetObjectContent
+
+	lastDownload struct {
+		Bucket string
+		Object string
+		Dest   string
+	}
+	lastUpload struct {
+		Bucket string
+		Object string
+		Src    string
+	}
 }
 
-func (f mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
+func (f *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
 	for _, p := range f.projects {
 		if p.ProjectID == projectID {
 			return p.Buckets, "", nil
@@ -32,15 +43,15 @@ func (f mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _
 	return nil, "", nil
 }
 
-func (f mockGCSClient) ListObjects(_ context.Context, _, _ string) (*gcs.ObjectList, error) {
+func (f *mockGCSClient) ListObjects(_ context.Context, _, _ string) (*gcs.ObjectList, error) {
 	return f.objects, nil
 }
 
-func (f mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int) (*gcs.ObjectList, string, error) {
+func (f *mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int) (*gcs.ObjectList, string, error) {
 	return f.objects, "", nil
 }
 
-func (f mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string) (*gcs.ObjectMetadata, error) {
+func (f *mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string) (*gcs.ObjectMetadata, error) {
 	// Simple mock: find in prefixes or objects
 	if f.objects != nil {
 		for _, p := range f.objects.Prefixes {
@@ -57,7 +68,7 @@ func (f mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string
 	return nil, fmt.Errorf("not found")
 }
 
-func (f mockGCSClient) GetObjectContent(_ context.Context, _, objectName string) (string, error) {
+func (f *mockGCSClient) GetObjectContent(_ context.Context, _, objectName string) (string, error) {
 	if f.contentError != nil {
 		return "", f.contentError
 	}
@@ -72,19 +83,29 @@ func (f mockGCSClient) GetObjectContent(_ context.Context, _, objectName string)
 	return "", fmt.Errorf("not found")
 }
 
-func (f mockGCSClient) DownloadObject(_ context.Context, _, _, _ string) error {
+func (f *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest string) error {
+	f.lastDownload.Bucket = bucket
+	f.lastDownload.Object = object
+	f.lastDownload.Dest = dest
 	return nil
 }
 
-func (f mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string) error {
+func (f *mockGCSClient) UploadObject(_ context.Context, bucket, object, src string) error {
+	f.lastUpload.Bucket = bucket
+	f.lastUpload.Object = object
+	f.lastUpload.Src = src
 	return nil
 }
 
-func (f mockGCSClient) NewReader(_ context.Context, _, objectName string) (io.ReadCloser, error) {
+func (f *mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string) error {
+	return nil
+}
+
+func (f *mockGCSClient) NewReader(_ context.Context, _, objectName string) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader(fmt.Sprintf("content of %s", objectName))), nil
 }
 
-func (f mockGCSClient) NewReaderAt(_ context.Context, _, objectName string) io.ReaderAt {
+func (f *mockGCSClient) NewReaderAt(_ context.Context, _, objectName string) io.ReaderAt {
 	return strings.NewReader(fmt.Sprintf("content of %s", objectName))
 }
 
@@ -106,8 +127,8 @@ func updateModel(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
 	return updatedM.(tui.Model), cmd
 }
 
-func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, downloadDir string) (tui.Model, mockGCSClient) {
-	client := mockGCSClient{
+func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, downloadDir string) (tui.Model, *mockGCSClient) {
+	client := &mockGCSClient{
 		projects: projects,
 		objects:  objects,
 	}
@@ -115,6 +136,7 @@ func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, down
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
 	return m, client
 }
+
 
 func enterBucket(m tui.Model, projects []gcs.ProjectBuckets, bucket string, objects *gcs.ObjectList) tui.Model {
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: projects[0].ProjectID, Buckets: projects[0].Buckets})
@@ -327,7 +349,7 @@ func TestModel_CursorNoop_PreviewNotReloaded(t *testing.T) {
 }
 
 func TestModel_ObjectPreview_Error(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects:     []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:      simpleObjectList([]string{"obj1"}, nil),
 		contentError: fmt.Errorf("permission denied"),
@@ -349,7 +371,7 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 }
 
 func TestModel_PrefixMetadata_VirtualDirectory(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects: &gcs.ObjectList{
 			Prefixes: []gcs.PrefixMetadata{{Name: "folder1/"}},
@@ -405,7 +427,7 @@ func TestModel_StalePreviewContent(t *testing.T) {
 }
 
 func TestModel_ProjectSpecificLoading(t *testing.T) {
-	client := mockGCSClient{}
+	client := &mockGCSClient{}
 	// Two projects: p1 will load immediately, p2 will stay loading
 	m := tui.NewModel([]string{"p1", "p2"}, client, "/tmp", false, false)
 
@@ -434,7 +456,7 @@ func TestModel_ProjectSpecificLoading(t *testing.T) {
 }
 
 func TestModel_AsyncLoading(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"async-b1"}}}}
+	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"async-b1"}}}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 
 	assert.Assert(t, strings.Contains(m.View(), "p1"))
@@ -459,7 +481,7 @@ func TestModel_AsyncLoading(t *testing.T) {
 }
 
 func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
+	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}})
 
@@ -476,7 +498,7 @@ func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
 }
 
 func TestModel_Update_CursorNavigation(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
+	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}})
 
@@ -494,7 +516,7 @@ func TestModel_Update_HalfPageNavigation(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
 	}
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
@@ -523,7 +545,7 @@ func TestModel_Update_HalfPageNavigation(t *testing.T) {
 }
 
 func TestModel_Update_CursorCycle(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
+	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}})
 
@@ -539,7 +561,7 @@ func TestModel_Update_CursorCycle(t *testing.T) {
 }
 
 func TestModel_Update_Quit(t *testing.T) {
-	client := mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}}
+	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m.Update(tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
 
@@ -549,7 +571,7 @@ func TestModel_Update_Quit(t *testing.T) {
 }
 
 func TestModel_EnterBucket(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
@@ -572,7 +594,7 @@ func TestModel_EnterBucket(t *testing.T) {
 }
 
 func TestModel_Update_ObjectCursorCycle(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
@@ -606,7 +628,7 @@ func TestModel_Resize(t *testing.T) {
 }
 
 func TestModel_EnterPrefix(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"file1"}, []string{"folder1/"}),
 	}
@@ -644,7 +666,7 @@ func TestModel_EnterPrefix(t *testing.T) {
 }
 
 func TestModel_SelectObject(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects: &gcs.ObjectList{
 			Objects: []gcs.ObjectMetadata{{
@@ -671,7 +693,7 @@ func TestModel_SelectObject(t *testing.T) {
 }
 
 func TestModel_SelectPrefix(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b"}}},
 		objects: &gcs.ObjectList{
 			Prefixes: []gcs.PrefixMetadata{{Name: "folder1/"}},
@@ -712,7 +734,7 @@ func TestModel_Pagination_Buckets(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
 	}
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
@@ -733,7 +755,7 @@ func TestModel_Pagination_Objects(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		objects = append(objects, fmt.Sprintf("obj-%02d", i))
 	}
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList(objects, nil),
 	}
@@ -749,7 +771,7 @@ func TestModel_Pagination_Objects(t *testing.T) {
 }
 
 func TestModel_CursorBug_SingleItem(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects: &gcs.ObjectList{
 			Objects: []gcs.ObjectMetadata{{
@@ -773,7 +795,7 @@ func TestModel_CursorBug_SingleItem(t *testing.T) {
 }
 
 func TestModel_HeaderClearedOnBack(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
@@ -846,7 +868,7 @@ func TestModel_DownloadAction(t *testing.T) {
 }
 
 func TestModel_DownloadAction_MultiSelect(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1", "obj2", "obj3"}, nil),
 	}
@@ -906,7 +928,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 
 func TestModel_Truncation(t *testing.T) {
 	longName := "this_is_a_very_long_object_name_that_should_be_truncated_to_fit_in_the_column"
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{longName}}},
 		objects:  simpleObjectList([]string{longName}, nil),
 	}
@@ -935,7 +957,7 @@ func TestModel_Truncation(t *testing.T) {
 }
 
 func TestModel_PreviewBinaryContent(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"binary_obj"}, nil),
 	}
@@ -965,7 +987,7 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 		fmt.Fprintf(&longContent, "line %d\n", i)
 	}
 
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
@@ -1003,7 +1025,7 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
@@ -1037,7 +1059,7 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
@@ -1068,7 +1090,7 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
@@ -1131,7 +1153,7 @@ func TestModel_MultiSelect(t *testing.T) {
 }
 
 func TestModel_CursorPersistsOnBack(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
@@ -1161,7 +1183,7 @@ func TestModel_CursorPersistsOnBack(t *testing.T) {
 }
 
 func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot", "blueberry"}}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
@@ -1232,7 +1254,7 @@ func TestModel_CursorPersistsOnBack_Prefix(t *testing.T) {
 }
 
 func TestModel_CollapseProjectOnLeft(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
@@ -1258,7 +1280,7 @@ func TestModel_CollapseProjectOnLeft(t *testing.T) {
 }
 
 func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{
 			{ProjectID: "apple-project", Buckets: []string{"banana"}},
 		},
@@ -1324,7 +1346,7 @@ func TestModel_SearchFetchesMetadata(t *testing.T) {
 }
 
 func TestModel_SearchFilter(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
@@ -1354,7 +1376,7 @@ func TestModel_SearchFilter(t *testing.T) {
 }
 
 func TestModel_FuzzySearch(t *testing.T) {
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},
 	}
 	m := tui.NewModel([]string{"p1"}, client, "/tmp", true, false) // true enables fuzzy search
@@ -1421,7 +1443,7 @@ func TestModel_LongBucketList_EnterBucket_ObjectsVisible(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		buckets = append(buckets, fmt.Sprintf("bucket-%02d", i))
 	}
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
 		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
@@ -1458,7 +1480,7 @@ func TestModel_LayoutIntegrity(t *testing.T) {
 		longContent += fmt.Sprintf("Line %d\n", i)
 	}
 
-	client := mockGCSClient{
+	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}

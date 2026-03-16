@@ -18,6 +18,8 @@ type keyMap struct {
 	Select       key.Binding
 	Download     key.Binding
 	Copy         key.Binding
+	Open         key.Binding
+	Edit         key.Binding
 	Refresh      key.Binding
 	Search       key.Binding
 	Esc          key.Binding
@@ -41,6 +43,8 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.Select,
 		k.Download,
 		k.Copy,
+		k.Open,
+		k.Edit,
 		k.Search,
 		k.Refresh,
 		k.Esc,
@@ -62,7 +66,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right, k.Root},                               // Navigation
 		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown}, // Pagination
-		{k.Select, k.Download, k.Copy, k.Refresh, k.Search},                   // Actions
+		{k.Select, k.Download, k.Copy, k.Open, k.Edit, k.Refresh, k.Search},   // Actions
 		{k.Esc, k.Errors, k.Help, k.Quit},                                     // App
 	}
 }
@@ -123,6 +127,14 @@ var keys = keyMap{
 	Copy: key.NewBinding(
 		key.WithKeys("y"),
 		key.WithHelp("y", "copy uri"),
+	),
+	Open: key.NewBinding(
+		key.WithKeys("o"),
+		key.WithHelp("o", "open"),
+	),
+	Edit: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "edit"),
 	),
 	Refresh: key.NewBinding(
 		key.WithKeys("r"),

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -46,6 +47,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleContentMsg(msg)
 	case DownloadMsg:
 		return m.handleDownloadMsg(msg)
+	case EditorFinishedMsg:
+		return m.handleEditorFinishedMsg(msg)
+	case UploadMsg:
+		return m.handleUploadMsg(msg)
 	case DebouncePreviewMsg:
 		if msg.CursorVersion == m.cursorVersion {
 			return m, msg.FetchCmd
@@ -428,6 +433,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Download):
 		return m.handleDownloadKey()
+
+	case key.Matches(msg, keys.Open):
+		return m.handleOpenKey()
+
+	case key.Matches(msg, keys.Edit):
+		return m.handleEditKey()
 
 	case key.Matches(msg, keys.Copy):
 		return m.handleCopyKey()
@@ -1006,4 +1017,69 @@ func (m Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m Model) handleOpenKey() (tea.Model, tea.Cmd) {
+	if m.state != viewObjects {
+		return m, nil
+	}
+
+	currentPrefixes, currentObjects, _ := m.filteredObjects()
+	if m.cursor < len(currentPrefixes) || m.cursor >= len(currentPrefixes)+len(currentObjects) {
+		return m, nil
+	}
+
+	obj := currentObjects[m.cursor-len(currentPrefixes)]
+	m.status = fmt.Sprintf("Opening %s...", filepath.Base(obj.Name))
+	return m, m.openFile(m.currentBucket, obj.Name)
+}
+
+func (m Model) handleEditKey() (tea.Model, tea.Cmd) {
+	if m.state != viewObjects {
+		return m, nil
+	}
+
+	currentPrefixes, currentObjects, _ := m.filteredObjects()
+	if m.cursor < len(currentPrefixes) || m.cursor >= len(currentPrefixes)+len(currentObjects) {
+		return m, nil
+	}
+
+	obj := currentObjects[m.cursor-len(currentPrefixes)]
+	m.status = fmt.Sprintf("Editing %s...", filepath.Base(obj.Name))
+	// Save target name for re-upload
+	m.targetPrefixCursor = obj.Name
+	return m, m.editFile(m.currentBucket, obj.Name)
+}
+
+func (m Model) handleEditorFinishedMsg(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.status = fmt.Sprintf("Editor error: %v", msg.Err)
+		return m, clearStatusCmd()
+	}
+
+	info, err := os.Stat(msg.TempPath)
+	if err != nil {
+		m.status = fmt.Sprintf("Error checking file: %v", err)
+		return m, clearStatusCmd()
+	}
+
+	if info.ModTime().After(msg.OriginalModTime) {
+		m.status = fmt.Sprintf("Uploading changes to %s...", filepath.Base(msg.TempPath))
+		// m.targetPrefixCursor stores the object name from handleEditKey
+		return m, m.uploadFile(m.currentBucket, m.targetPrefixCursor, msg.TempPath)
+	}
+
+	m.status = "No changes made"
+	return m, clearStatusCmd()
+}
+
+func (m Model) handleUploadMsg(msg UploadMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.status = fmt.Sprintf("Upload failed: %v", msg.Err)
+	} else {
+		m.status = fmt.Sprintf("Uploaded %s", filepath.Base(msg.ObjectName))
+		// Refresh view to show updated metadata (size/time)
+		return m.handleRefreshKey()
+	}
+	return m, clearStatusCmd()
 }

@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -98,6 +100,69 @@ func (m Model) fetchDownload(bucketName, objectName, dest string, isPrefix bool)
 		}
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
 		return DownloadMsg{Path: dest, Err: err}
+	}
+}
+
+func (m Model) openFile(bucketName, objectName string) tea.Cmd {
+	return func() tea.Msg {
+		tmpDir := os.TempDir()
+		dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
+		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
+		if err != nil {
+			return DownloadMsg{Err: err}
+		}
+
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", dest)
+		case "windows":
+			cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", dest)
+		default: // linux, bsd, etc.
+			cmd = exec.Command("xdg-open", dest)
+		}
+
+		err = cmd.Start()
+		return DownloadMsg{Path: dest, Err: err}
+	}
+}
+
+func (m Model) editFile(bucketName, objectName string) tea.Cmd {
+	tmpDir := os.TempDir()
+	dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
+
+	return func() tea.Msg {
+		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
+		if err != nil {
+			return EditorFinishedMsg{Err: err}
+		}
+
+		info, err := os.Stat(dest)
+		if err != nil {
+			return EditorFinishedMsg{Err: err}
+		}
+		modTime := info.ModTime()
+
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+
+		c := exec.Command(editor, dest)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return EditorFinishedMsg{
+				TempPath:        dest,
+				OriginalModTime: modTime,
+				Err:             err,
+			}
+		})()
+	}
+}
+
+func (m Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.client.UploadObject(context.Background(), bucketName, objectName, srcPath)
+		return UploadMsg{ObjectName: objectName, Err: err}
 	}
 }
 
