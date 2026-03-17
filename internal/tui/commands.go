@@ -112,7 +112,7 @@ func (m Model) openFile(bucketName, objectName string) tea.Cmd {
 		dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
 		if err != nil {
-			return DownloadMsg{Err: err}
+			return FileOpenedMsg{Err: err}
 		}
 
 		var cmd *exec.Cmd
@@ -126,7 +126,7 @@ func (m Model) openFile(bucketName, objectName string) tea.Cmd {
 		}
 
 		err = cmd.Start()
-		return DownloadMsg{Path: dest, Err: err}
+		return FileOpenedMsg{Err: err}
 	}
 }
 

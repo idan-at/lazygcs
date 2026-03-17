@@ -30,6 +30,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleContentMsg(msg)
 	case DownloadMsg:
 		return m.handleDownloadMsg(msg)
+	case FileOpenedMsg:
+		if msg.Err != nil {
+			m.status = fmt.Sprintf("Error opening file: %v", msg.Err)
+			return m, clearStatusCmd()
+		}
+		// The status is already set to "Opening...", which gets cleared naturally or we can clear it.
+		return m, clearStatusCmd()
 	case EditorFinishedMsg:
 		return m.handleEditorFinishedMsg(msg)
 	case UploadMsg:
@@ -1074,7 +1081,7 @@ func (m Model) handleEditKey() (tea.Model, tea.Cmd) {
 	}
 
 	obj := currentObjects[m.cursor-len(currentPrefixes)]
-	m.status = fmt.Sprintf("Editing %s...", filepath.Base(obj.Name))
+	m.status = fmt.Sprintf("Opening %s...", filepath.Base(obj.Name))
 	// Save target name for re-upload
 	m.targetPrefixCursor = obj.Name
 	return m, m.editFile(m.currentBucket, obj.Name)

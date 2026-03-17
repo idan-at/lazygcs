@@ -107,7 +107,7 @@ func TestModel_Actions_Open(t *testing.T) {
 
 	// Resolve the command (which triggers the download and exec)
 	msg := cmd()
-	// DownloadMsg is returned by openFile
+	// FileOpenedMsg is returned by openFile
 	_, _ = updateModel(m, msg)
 
 	// Verify mock client was called for download
@@ -132,7 +132,7 @@ func TestModel_Actions_Edit(t *testing.T) {
 	// Press 'e' to edit
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	assert.Assert(t, cmd != nil)
-	assert.Assert(t, strings.Contains(m.View(), "Editing obj1..."))
+	assert.Assert(t, strings.Contains(m.View(), "Opening obj1..."))
 
 	// Simulate editor finishing with a modified file
 	tempPath := filepath.Join(os.TempDir(), "lazygcs", "b1", "obj1")

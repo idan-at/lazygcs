@@ -86,6 +86,11 @@ type DownloadMsg struct {
 	Err  error
 }
 
+// FileOpenedMsg is sent when a file opening operation completes.
+type FileOpenedMsg struct {
+	Err error
+}
+
 // EditorFinishedMsg is sent when the external editor process exits.
 type EditorFinishedMsg struct {
 	TempPath        string
