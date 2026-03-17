@@ -9,6 +9,13 @@ import (
 	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
+func (m Model) renderSpinner() string {
+	if m.deterministicSpinner {
+		return "*"
+	}
+	return m.spinner.View()
+}
+
 func (m Model) fullPath() string {
 	if m.state == viewBuckets {
 		filtered := m.filteredBuckets()
@@ -57,7 +64,7 @@ func (m Model) previewView(width int) string {
 			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
 			if !prefix.Fetched {
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
-				fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.spinner.View())
+				fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.renderSpinner())
 			} else {
 				folderType := "Folder"
 				if prefix.Err != nil {
@@ -114,7 +121,7 @@ func (m Model) previewView(width int) string {
 					s.WriteString("\n")
 
 					if m.previewContent == "Loading..." || m.previewContent == "\x1b_Ga=d,d=A\x1b\\Loading..." {
-						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.spinner.View())
+						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.renderSpinner())
 					} else if isBinary(m.previewContent) {
 						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
 					} else {
@@ -189,7 +196,7 @@ func (m Model) footerView() string {
 		statusText = fmt.Sprintf(" %s ", m.status)
 		statusStyle = statusStyle.Background(lipgloss.Color("130")).Foreground(lipgloss.Color("15"))
 	} else if m.bgJobs > len(m.loadingProjects) {
-		statusText = m.spinner.View()
+		statusText = m.renderSpinner()
 		statusStyle = lipgloss.NewStyle().Padding(0, 1)
 	}
 
@@ -264,7 +271,7 @@ func (m Model) objectsView(width int) string {
 					showObjects = true
 				} else {
 					s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(fmt.Sprintf("Objects in %s", targetBucket), width)) + "\n\n")
-					fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
+					fmt.Fprintf(&s, "%s Loading...", m.renderSpinner())
 					return s.String()
 				}
 			}
@@ -278,7 +285,7 @@ func (m Model) objectsView(width int) string {
 		totalItems := len(currentPrefixes) + len(currentObjects)
 
 		if m.loading && m.state != viewBuckets && totalItems == 0 {
-			fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
+			fmt.Fprintf(&s, "%s Loading...", m.renderSpinner())
 		} else {
 			maxVisible := m.maxItemsVisible()
 			if m.loading && m.state != viewBuckets {
@@ -346,7 +353,7 @@ func (m Model) objectsView(width int) string {
 			if totalItems == 0 {
 				s.WriteString("(empty)")
 			} else if m.loading && m.state != viewBuckets {
-				fmt.Fprintf(&s, "%s Loading...", m.spinner.View())
+				fmt.Fprintf(&s, "%s Loading...", m.renderSpinner())
 			}
 		}
 	}
@@ -414,7 +421,7 @@ func (m Model) bucketsView(width int) string {
 
 			itemContent := fmt.Sprintf("%s%s", icon, truncatedProject)
 			if m.loadingProjects[item.ProjectID] {
-				itemContent += " " + m.spinner.View()
+				itemContent += " " + m.renderSpinner()
 			}
 			content := projectStyle.Width(width).Render(itemContent)
 			s.WriteString(content + "\n")

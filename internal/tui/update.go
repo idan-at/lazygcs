@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -107,16 +108,19 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 	for i, p := range m.projects {
 		if p.ProjectID == msg.ProjectID {
 			m.projects[i].Buckets = append(m.projects[i].Buckets, msg.Buckets...)
+			sort.Strings(m.projects[i].Buckets)
 			found = true
 			break
 		}
 	}
 
 	if !found {
+		buckets := msg.Buckets
+		sort.Strings(buckets)
 		// Maintain order from m.projectIDs if possible, or just append
 		m.projects = append(m.projects, gcs.ProjectBuckets{
 			ProjectID: msg.ProjectID,
-			Buckets:   msg.Buckets,
+			Buckets:   buckets,
 		})
 		// Reorder m.projects to match m.projectIDs
 		var ordered []gcs.ProjectBuckets
@@ -175,7 +179,13 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 	m.listCache[cacheKey] = listCacheEntry{List: msg.List, ExpiresAt: time.Now().Add(5 * time.Minute)}
 
 	m.objects = msg.List.Objects
+	sort.Slice(m.objects, func(i, j int) bool {
+		return m.objects[i].Name < m.objects[j].Name
+	})
 	m.prefixes = msg.List.Prefixes
+	sort.Slice(m.prefixes, func(i, j int) bool {
+		return m.prefixes[i].Name < m.prefixes[j].Name
+	})
 	m.cursor = 0
 
 	// Restore cursor if we just navigated back from a prefix
@@ -222,7 +232,13 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	isFirstPage := len(m.objects) == 0 && len(m.prefixes) == 0
 
 	m.objects = append(m.objects, msg.List.Objects...)
+	sort.Slice(m.objects, func(i, j int) bool {
+		return m.objects[i].Name < m.objects[j].Name
+	})
 	m.prefixes = append(m.prefixes, msg.List.Prefixes...)
+	sort.Slice(m.prefixes, func(i, j int) bool {
+		return m.prefixes[i].Name < m.prefixes[j].Name
+	})
 
 	var cmd tea.Cmd
 	if isFirstPage {

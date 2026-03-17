@@ -90,6 +90,9 @@ type Model struct {
 	spinner         spinner.Model
 	previewRegistry *preview.Registry
 
+	// Test settings
+	deterministicSpinner bool
+
 	// Caches
 	listCache     map[string]listCacheEntry
 	contentCache  map[string]contentCacheEntry
@@ -137,26 +140,32 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 	reg.Register(&preview.TextPreviewer{}) // Fallback last
 
 	return Model{
-		projectIDs:        projectIDs,
-		client:            client,
-		downloadDir:       downloadDir,
-		fuzzySearch:       fuzzySearch,
-		showIcons:         showIcons,
-		width:             120,
-		height:            40,
-		state:             viewBuckets,
-		loading:           true,
-		loadingProjects:   loadingProjects,
-		bgJobs:            len(projectIDs),
-		selected:          make(map[string]struct{}),
-		collapsedProjects: make(map[string]struct{}),
-		help:              help.New(),
-		spinner:           s,
-		previewRegistry:   reg,
-		listCache:         make(map[string]listCacheEntry),
-		contentCache:      make(map[string]contentCacheEntry),
-		metadataCache:     make(map[string]metadataCacheEntry),
+		projectIDs:           projectIDs,
+		client:               client,
+		downloadDir:          downloadDir,
+		fuzzySearch:          fuzzySearch,
+		showIcons:            showIcons,
+		width:                120,
+		height:               40,
+		state:                viewBuckets,
+		loading:              true,
+		loadingProjects:      loadingProjects,
+		bgJobs:               len(projectIDs),
+		selected:             make(map[string]struct{}),
+		collapsedProjects:    make(map[string]struct{}),
+		help:                 help.New(),
+		spinner:              s,
+		previewRegistry:      reg,
+		deterministicSpinner: false,
+		listCache:            make(map[string]listCacheEntry),
+		contentCache:         make(map[string]contentCacheEntry),
+		metadataCache:        make(map[string]metadataCacheEntry),
 	}
+}
+
+// SetDeterministicSpinner sets the spinner to a fixed state for testing.
+func (m *Model) SetDeterministicSpinner(v bool) {
+	m.deterministicSpinner = v
 }
 
 // Cursor returns the current cursor position.
