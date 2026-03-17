@@ -72,8 +72,8 @@ download_dir = "/tmp"
 
 	// It should fail with GCS client error because we provided a non-existent credentials path
 	assert.Assert(t, err != nil, "should fail due to missing credentials")
-	assert.Check(t, strings.Contains(output, "failed to create GCS client") || 
-	               strings.Contains(output, "failed to load config") == false)
+	assert.Check(t, strings.Contains(output, "failed to create GCS client"))
+	assert.Check(t, !strings.Contains(output, "failed to load config"))
 }
 
 func TestMain_NoConfig(t *testing.T) {

@@ -42,7 +42,7 @@ type Model struct {
 
 	// View State
 	width          int
-	height          int
+	height         int
 	state          viewState
 	previewContent string
 	showHelp       bool
@@ -119,6 +119,7 @@ type metadataCacheEntry struct {
 // RealClipboard implements ClipboardWriter using the system clipboard.
 type RealClipboard struct{}
 
+// WriteAll writes the given text to the system clipboard.
 func (c *RealClipboard) WriteAll(text string) error {
 	return clipboard.WriteAll(text)
 }
