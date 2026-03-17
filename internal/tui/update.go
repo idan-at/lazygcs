@@ -190,24 +190,34 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 	})
 	m.cursor = 0
 
-	// Restore cursor if we just navigated back from a prefix
+	// Restore cursor if we just navigated back from a prefix or refreshed an object
 	if m.targetPrefixCursor != "" {
+		found := false
 		for i, p := range m.prefixes {
 			if p.Name == m.targetPrefixCursor {
 				m.cursor = i
+				found = true
 				break
+			}
+		}
+		if !found {
+			for i, o := range m.objects {
+				if o.Name == m.targetPrefixCursor {
+					m.cursor = len(m.prefixes) + i
+					break
+				}
 			}
 		}
 		m.targetPrefixCursor = "" // Clear it after use
 	}
 
 	var cmd tea.Cmd
-	if len(m.prefixes) > 0 {
+	if m.cursor < len(m.prefixes) {
 		// Fetch metadata for the current cursor (either 0 or restored)
 		m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
-	} else if len(m.objects) > 0 {
+	} else if m.cursor-len(m.prefixes) < len(m.objects) {
 		m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
-		m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
+		m, cmd = m.triggerDebounces(m.fetchContent(m.objects[m.cursor-len(m.prefixes)]), "", "")
 	}
 	return m, cmd
 }
@@ -1097,6 +1107,9 @@ func (m Model) handleUploadMsg(msg UploadMsg) (tea.Model, tea.Cmd) {
 		m.status = fmt.Sprintf("Upload failed: %v", msg.Err)
 	} else {
 		m.status = fmt.Sprintf("Uploaded %s", filepath.Base(msg.ObjectName))
+		cacheKey := m.currentBucket + "::" + msg.ObjectName
+		delete(m.contentCache, cacheKey)
+		delete(m.metadataCache, cacheKey)
 		// Refresh view to show updated metadata (size/time)
 		return m.handleRefreshKey()
 	}

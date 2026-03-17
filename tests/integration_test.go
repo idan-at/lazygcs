@@ -1052,3 +1052,43 @@ func TestSearchFilterPersistence(t *testing.T) {
 		return !strings.Contains(s, "FILTER: bucket-1") && strings.Contains(s, "test-bucket-2")
 	}, teatest.WithDuration(3*time.Second))
 }
+
+func TestEditUpdatesPreview(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"},
+			Content:     []byte("old content"),
+		},
+	}
+
+	// Create a script that modifies the file to simulate the editor
+	scriptPath := filepath.Join(t.TempDir(), "editor.sh")
+	// #nosec G306
+	err := os.WriteFile(scriptPath, []byte("#!/bin/sh\necho 'new content' > \"$1\"\n"), 0755)
+	assert.NilError(t, err)
+	t.Setenv("EDITOR", scriptPath)
+
+	tm := setupTestApp(t, objects, 8111, []string{"p1"}, t.TempDir())
+
+	// Wait for b1
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Wait for preview to show "old content"
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "file1.txt") && strings.Contains(string(bts), "old content")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Edit file
+	tm.Type("e")
+
+	// The editor mock script will run, modify the file, and then the app should upload and refresh.
+	// We wait for the preview to update to "new content".
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "new content")
+	}, teatest.WithDuration(5*time.Second))
+}
