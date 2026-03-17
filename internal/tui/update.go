@@ -135,6 +135,26 @@ func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 		m.projects = ordered
 	}
 
+	// Always sort projects by their appearance in m.projectIDs or alphabetically
+	// Since we already have the ordered logic above, we can just ensure m.projects
+	// stays consistent.
+	sort.Slice(m.projects, func(i, j int) bool {
+		// Try to match the order in m.projectIDs
+		iIdx, jIdx := -1, -1
+		for idx, id := range m.projectIDs {
+			if id == m.projects[i].ProjectID {
+				iIdx = idx
+			}
+			if id == m.projects[j].ProjectID {
+				jIdx = idx
+			}
+		}
+		if iIdx != -1 && jIdx != -1 {
+			return iIdx < jIdx
+		}
+		return m.projects[i].ProjectID < m.projects[j].ProjectID
+	})
+
 	var cmd tea.Cmd
 	if msg.NextToken != "" {
 		cmd = m.fetchBucketsPage(msg.ProjectID, msg.NextToken)
