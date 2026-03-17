@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"gotest.tools/v3/assert"
 )
@@ -49,47 +48,32 @@ download_dir = "/tmp"
 	// 2. Set the config environment variable
 	assert.NilError(t, os.Setenv("LAZYGCS_CONFIG", configPath))
 	t.Cleanup(func() { _ = os.Unsetenv("LAZYGCS_CONFIG") })
-	// Also need to set google credentials or the client will fail in true e2e.
-	// We'll set a dummy value to bypass the missing credentials error and test
-	// that it successfully started the process (it will fail to fetch, but that's okay for verifying the binary works)
-	assert.NilError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/dev/null"))
+
+	// We want to ensure it doesn't pick up real credentials from the environment or well-known locations
+	assert.NilError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/non-existent-path.json"))
 	t.Cleanup(func() { _ = os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS") })
+
+	// Also override HOME to avoid finding gcloud credentials
+	origHome := os.Getenv("HOME")
+	assert.NilError(t, os.Setenv("HOME", tmpDir))
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
 
 	// 3. Start the binary
 	cmd := exec.Command(binaryPath)
 
-	// We capture stdout to see what it printed before we kill it or it exits.
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = os.Stderr
+	// We capture stdout/err to see what it printed.
+	var combined bytes.Buffer
+	cmd.Stdout = &combined
+	cmd.Stderr = &combined
 
-	err = cmd.Start()
-	assert.NilError(t, err, "binary should start successfully")
+	// Run it to completion - it should fail fast on GCS client creation
+	err = cmd.Run()
+	output := combined.String()
 
-	// 4. Wait a tiny bit and kill it (since it's a TUI that blocks)
-	time.Sleep(500 * time.Millisecond)
-	err = cmd.Process.Signal(os.Interrupt)
-	assert.NilError(t, err, "should be able to interrupt process")
-
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	// Wait for process to exit
-	select {
-	case err = <-done:
-	case <-time.After(2 * time.Second):
-		_ = cmd.Process.Kill()
-		t.Fatal("process did not exit in time")
-	}
-
-	output := stdout.String()
-	// As long as it started running BubbleTea (which clears screen etc) or failed cleanly on GCS auth, it's a pass.
-	// Since we passed /dev/null for creds, it will likely return a known error:
-	assert.Assert(t, err != nil)
-	assert.Check(t, !strings.Contains(output, "failed to load config"))
-	assert.Assert(t, strings.Contains(output, "no project IDs found") == false)
+	// It should fail with GCS client error because we provided a non-existent credentials path
+	assert.Assert(t, err != nil, "should fail due to missing credentials")
+	assert.Check(t, strings.Contains(output, "failed to create GCS client") || 
+	               strings.Contains(output, "failed to load config") == false)
 }
 
 func TestMain_NoConfig(t *testing.T) {

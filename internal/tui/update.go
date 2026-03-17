@@ -8,30 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/idan-at/lazygcs/internal/gcs"
 )
-
-// Update processes terminal messages (key presses, window resizes) and async responses.
-func (m Model) currentSearchQuery() string {
-	if m.state == viewBuckets {
-		return m.bucketSearchQuery
-	}
-	return m.objectSearchQuery
-}
-
-func (m Model) withCurrentSearchQuery(query string) Model {
-	if m.state == viewBuckets {
-		m.bucketSearchQuery = query
-	} else {
-		m.objectSearchQuery = query
-	}
-	return m
-}
 
 // Update processes terminal messages (key presses, window resizes) and async responses.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -879,7 +861,7 @@ func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 	}
 
 	content := strings.Join(uris, "\n")
-	err := clipboard.WriteAll(content)
+	err := m.clipboard.WriteAll(content)
 	if err != nil {
 		m.status = fmt.Sprintf("Clipboard error: %v", err)
 		return m, nil

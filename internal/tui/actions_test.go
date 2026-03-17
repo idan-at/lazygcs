@@ -36,26 +36,39 @@ func TestModel_Actions_Refresh(t *testing.T) {
 	assert.Equal(t, len(m.Objects()), 1, "Objects should not be duplicated after refresh")
 }
 
+type mockClipboard struct {
+	content string
+}
+
+func (c *mockClipboard) WriteAll(text string) error {
+	c.content = text
+	return nil
+}
+
 func TestModel_Actions_CopyURI(t *testing.T) {
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1"}, nil)
 	m, client := setupTestModel(projects, objects, "/tmp")
 	_ = client
 
+	cb := &mockClipboard{}
+	m.SetClipboard(cb)
+
 	// 1. Bucket View Copy
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
 	m, _ = pressKey(m, 'j') // hover b1
 
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	// We can't easily check clipboard content here without mocking,
-	// but we can check if the status was updated to indicate success.
+	assert.Equal(t, cb.content, "gs://b1/")
 	assert.Assert(t, strings.Contains(m.View(), "Copied gs://b1/ to clipboard"))
 
 	// 2. Object View Copy
 	m = enterBucket(m, projects, "b1", objects)
+	m.SetClipboard(cb)
 	m, _ = pressKey(m, 'j') // hover obj1
 
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	assert.Equal(t, cb.content, "gs://b1/obj1")
 	assert.Assert(t, strings.Contains(m.View(), "Copied gs://b1/obj1 to clipboard"))
 
 	// 3. Multi-select Copy
@@ -67,6 +80,9 @@ func TestModel_Actions_CopyURI(t *testing.T) {
 	m, _ = pressKey(m, ' ') // select obj2
 
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	// Check content (order depends on map iteration, but both should be there)
+	assert.Assert(t, strings.Contains(cb.content, "gs://b1/obj1"))
+	assert.Assert(t, strings.Contains(cb.content, "gs://b1/obj2"))
 	assert.Assert(t, strings.Contains(m.View(), "Copied 2 URIs to clipboard"))
 }
 

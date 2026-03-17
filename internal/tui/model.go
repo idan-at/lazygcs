@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -41,7 +42,7 @@ type Model struct {
 
 	// View State
 	width          int
-	height         int
+	height          int
 	state          viewState
 	previewContent string
 	showHelp       bool
@@ -89,6 +90,7 @@ type Model struct {
 	help            help.Model
 	spinner         spinner.Model
 	previewRegistry *preview.Registry
+	clipboard       ClipboardWriter
 
 	// Test settings
 	deterministicSpinner bool
@@ -112,6 +114,13 @@ type contentCacheEntry struct {
 type metadataCacheEntry struct {
 	Metadata  *gcs.ObjectMetadata
 	ExpiresAt time.Time
+}
+
+// RealClipboard implements ClipboardWriter using the system clipboard.
+type RealClipboard struct{}
+
+func (c *RealClipboard) WriteAll(text string) error {
+	return clipboard.WriteAll(text)
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
@@ -156,6 +165,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		help:                 help.New(),
 		spinner:              s,
 		previewRegistry:      reg,
+		clipboard:            &RealClipboard{},
 		deterministicSpinner: false,
 		listCache:            make(map[string]listCacheEntry),
 		contentCache:         make(map[string]contentCacheEntry),
@@ -166,6 +176,11 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 // SetDeterministicSpinner sets the spinner to a fixed state for testing.
 func (m *Model) SetDeterministicSpinner(v bool) {
 	m.deterministicSpinner = v
+}
+
+// SetClipboard sets the clipboard writer for testing.
+func (m *Model) SetClipboard(c ClipboardWriter) {
+	m.clipboard = c
 }
 
 // Cursor returns the current cursor position.
@@ -194,6 +209,22 @@ func (m Model) resetObjectsState() Model {
 	}
 	m.selected = make(map[string]struct{})
 	return m
+}
+
+func (m Model) withCurrentSearchQuery(q string) Model {
+	if m.state == viewBuckets {
+		m.bucketSearchQuery = q
+	} else {
+		m.objectSearchQuery = q
+	}
+	return m
+}
+
+func (m Model) currentSearchQuery() string {
+	if m.state == viewBuckets {
+		return m.bucketSearchQuery
+	}
+	return m.objectSearchQuery
 }
 
 func (m Model) filteredBuckets() []BucketListItem {

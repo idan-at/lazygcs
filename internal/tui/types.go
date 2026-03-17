@@ -34,6 +34,11 @@ type GCSClient interface {
 	NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt
 }
 
+// ClipboardWriter defines the interface for writing to the system clipboard.
+type ClipboardWriter interface {
+	WriteAll(text string) error
+}
+
 // BucketsPageMsg is sent for progressive loading of project buckets.
 type BucketsPageMsg struct {
 	ProjectID string
