@@ -40,6 +40,7 @@ brews:
   - repository:
       owner: idan-at
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
     description: "A fast, keyboard-driven Terminal User Interface (TUI) for exploring and managing Google Cloud Storage (GCS)."
     homepage: "https://github.com/idan-at/lazygcs"
