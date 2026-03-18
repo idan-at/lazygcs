@@ -31,6 +31,39 @@ func run(args []string, client tui.GCSClient) error {
 	fs := flag.NewFlagSet("lazygcs", flag.ContinueOnError)
 	versionFlag := fs.Bool("version", false, "Print version and exit")
 
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, `lazygcs - A fast, keyboard-driven TUI for Google Cloud Storage.
+
+Usage:
+  lazygcs [flags]
+
+Flags:
+  -version    Print version and exit
+  -help       Print this help message
+
+Configuration:
+  lazygcs requires a configuration file at ~/.config/lazygcs/config.toml
+  containing your Google Cloud project IDs.
+
+  Example:
+  projects = ["my-gcp-project-1", "my-gcp-project-2"]
+  download_dir = "~/Downloads"
+  fuzzy_search = true
+  icons = true
+
+Controls:
+  Use arrow keys or h/j/k/l to navigate.
+  Enter    - Drill down into folders/objects
+  Space    - Select multiple objects
+  d        - Download selected objects
+  /        - Search current view
+  ?        - Show full help menu
+  q/Ctrl+C - Quit
+
+For more details, see the ? help menu inside the application.
+`)
+	}
+
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
