@@ -18,11 +18,22 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 
 ## 🚀 Installation
 
+### Homebrew (macOS & Linux)
+
+```bash
+brew tap idan-at/tap
+brew install lazygcs
+```
+
+### Using Go
+
 Ensure you have [Go](https://golang.org/doc/install) (v1.24+) installed, then run:
 
 ```bash
 go install github.com/idan-at/lazygcs@latest
 ```
+
+### Manual Build
 
 Alternatively, clone the repository and build it manually with optimization flags (to reduce binary size):
 

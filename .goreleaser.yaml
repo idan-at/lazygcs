@@ -35,3 +35,13 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+
+brews:
+  - repository:
+      owner: idan-at
+      name: homebrew-tap
+    directory: Formula
+    description: "A fast, keyboard-driven Terminal User Interface (TUI) for exploring and managing Google Cloud Storage (GCS)."
+    homepage: "https://github.com/idan-at/lazygcs"
+    test: |
+      system "#{bin}/lazygcs --version"
