@@ -266,7 +266,7 @@ func TestDownloadOverwrite(t *testing.T) {
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		// #nosec G304
-		b, _ := os.ReadFile(filePath)
+		b, _ := os.ReadFile(filePath) //nolint:gosec // acceptable in tests
 		if string(b) == "new content" {
 			return
 		}
@@ -384,7 +384,7 @@ func TestDownloadAbortRename(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify old content still exists
-	b, _ := os.ReadFile(filePath)
+	b, _ := os.ReadFile(filePath) //nolint:gosec // acceptable in tests
 	assert.Equal(t, string(b), "old")
 
 	// 2. Test Rename
@@ -395,7 +395,7 @@ func TestDownloadAbortRename(t *testing.T) {
 	// Verify renamed file exists
 	renamePath := filepath.Join(downloadDir, "file1_1.txt")
 	assert.NilError(t, testutil.WaitForFile(renamePath, 3*time.Second))
-	b2, _ := os.ReadFile(renamePath)
+	b2, _ := os.ReadFile(renamePath) //nolint:gosec // acceptable in tests
 	assert.Equal(t, string(b2), "content")
 }
 
@@ -461,7 +461,7 @@ func TestRefresh(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
 
 	// Add new bucket directly to server
-	server.CreateBucket("new-bucket")
+	server.CreateBucketWithOpts(fakestorage.CreateBucketOpts{Name: "new-bucket"})
 
 	// Refresh
 	tm.Type("r")
