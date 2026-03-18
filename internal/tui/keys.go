@@ -81,20 +81,20 @@ var keys = keyMap{
 		key.WithHelp("↓/j", "down"),
 	),
 	Top: key.NewBinding(
-		key.WithKeys("g", "home"),
-		key.WithHelp("g/home", "top"),
+		key.WithKeys("g"),
+		key.WithHelp("g", "top"),
 	),
 	Bottom: key.NewBinding(
-		key.WithKeys("G", "end"),
-		key.WithHelp("G/end", "bottom"),
+		key.WithKeys("G"),
+		key.WithHelp("G", "bottom"),
 	),
 	PageUp: key.NewBinding(
-		key.WithKeys("ctrl+b", "pgup"),
-		key.WithHelp("ctrl+b/pgup", "page up"),
+		key.WithKeys("ctrl+b"),
+		key.WithHelp("ctrl+b", "page up"),
 	),
 	PageDown: key.NewBinding(
-		key.WithKeys("ctrl+f", "pgdown"),
-		key.WithHelp("ctrl+f/pgdown", "page down"),
+		key.WithKeys("ctrl+f"),
+		key.WithHelp("ctrl+f", "page down"),
 	),
 	HalfPageUp: key.NewBinding(
 		key.WithKeys("ctrl+u"),

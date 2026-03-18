@@ -5,10 +5,10 @@ This document provides a comprehensive list of all keybindings available in `laz
 ## Navigation
 *   `j` or `↓`: Move cursor down
 *   `k` or `↑`: Move cursor up
-*   `g` or `Home`: Go to the top of the list
-*   `G` or `End`: Go to the bottom of the list
-*   `Ctrl+f` or `PageDown`: Move cursor one page down
-*   `Ctrl+b` or `PageUp`: Move cursor one page up
+*   `g`: Go to the top of the list
+*   `G`: Go to the bottom of the list
+*   `Ctrl+f`: Move cursor one page down
+*   `Ctrl+b`: Move cursor one page up
 *   `Ctrl+d`: Move cursor half-page down
 *   `Ctrl+u`: Move cursor half-page up
 *   `l` or `Enter` or `→`: Enter a bucket, directory, or expand/collapse a project header.
