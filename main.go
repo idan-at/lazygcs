@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"cloud.google.com/go/storage"
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,6 +39,12 @@ func run(args []string, client tui.GCSClient) error {
 	}
 
 	if *versionFlag {
+		// If version is still "dev" (e.g., when using 'go install'), try to read the module version from build info.
+		if version == "dev" {
+			if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+				version = info.Main.Version
+			}
+		}
 		fmt.Printf("lazygcs %s\n", version)
 		return nil
 	}

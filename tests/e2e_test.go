@@ -90,8 +90,12 @@ func TestMain_NoConfig(t *testing.T) {
 
 func TestVersionFlag(t *testing.T) {
 	cmd := exec.Command(binaryPath, "--version")
-	err := cmd.Run()
+	output, err := cmd.CombinedOutput()
 
 	// Should succeed
 	assert.NilError(t, err)
+
+	// Ensure the output format is correct
+	assert.Assert(t, strings.HasPrefix(string(output), "lazygcs "))
+	assert.Assert(t, strings.HasSuffix(string(output), "\n"))
 }
