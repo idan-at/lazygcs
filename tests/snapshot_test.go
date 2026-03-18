@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
+	"github.com/idan-at/lazygcs/internal/testutil"
 	"github.com/idan-at/lazygcs/internal/tui"
 )
 
@@ -26,7 +27,7 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	var buf bytes.Buffer
 	tee := io.TeeReader(tm.Output(), &buf)
@@ -73,7 +74,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	var buf bytes.Buffer
 	tee := io.TeeReader(tm.Output(), &buf)
@@ -120,7 +121,7 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	var buf bytes.Buffer
 	tee := io.TeeReader(tm.Output(), &buf)
@@ -158,7 +159,7 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 		},
 	}
 
-	tm := setupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	var buf bytes.Buffer
 	tee := io.TeeReader(tm.Output(), &buf)

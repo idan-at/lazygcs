@@ -44,6 +44,24 @@ func NewRegistry() *Registry {
 	return &Registry{}
 }
 
+// NewDefaultRegistry returns a Registry with all standard previewers registered.
+func NewDefaultRegistry() *Registry {
+	reg := NewRegistry()
+	reg.Register(&ImagePreviewer{})
+	reg.Register(&DataPreviewer{})
+	reg.Register(&ConfigPreviewer{})
+	reg.Register(&PDFPreviewer{})
+	reg.Register(&LogPreviewer{})
+	reg.Register(&DockerArchivePreviewer{})
+	reg.Register(&ZipPreviewer{})
+	reg.Register(&TarPreviewer{})
+	reg.Register(&DockerManifestPreviewer{})
+	reg.Register(NewMarkdownPreviewer(50))
+	reg.Register(&CodePreviewer{})
+	reg.Register(&TextPreviewer{}) // Fallback last
+	return reg
+}
+
 // Register ...
 func (r *Registry) Register(p Previewer) {
 	r.previewers = append(r.previewers, p)
