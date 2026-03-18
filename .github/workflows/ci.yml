@@ -37,8 +37,8 @@ jobs:
           version: latest
           args: --timeout=5m
 
-      - name: Run Tests with Race Detector
-        run: go test -v -race ./...
+      - name: Run Tests with Coverage
+        run: go test -v -race -coverpkg=./... -coverprofile=coverage.out ./...
 
       - name: Build
         run: go build -v -o lazygcs main.go

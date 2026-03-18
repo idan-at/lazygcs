@@ -151,6 +151,123 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
+func TestSnapshot_SearchView(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "assets", Name: "init"},
+			Content:     []byte("hi"),
+		},
+	}
+
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+
+	var buf bytes.Buffer
+	tee := io.TeeReader(tm.Output(), &buf)
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		s := string(bts)
+		return s != "" && s != "Loading..."
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// Open search
+	tm.Type("/")
+	// Type query
+	tm.Type("ass")
+
+	// Wait for search bar to be visible and have text
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		return strings.Contains(string(bts), "SEARCH") && strings.Contains(string(bts), "ass")
+	}, teatest.WithDuration(2*time.Second))
+
+	// Trigger quit
+	_ = tm.Quit()
+
+	_, _ = io.Copy(&buf, tm.FinalOutput(t))
+	teatest.RequireEqualOutput(t, buf.Bytes())
+}
+
+func TestSnapshot_MultiSelectionView(t *testing.T) {
+	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "assets",
+				Name:       "file1.txt",
+				Created:    fixedTime,
+				Updated:    fixedTime,
+			},
+			Content: []byte("content1"),
+		},
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "assets",
+				Name:       "file2.txt",
+				Created:    fixedTime,
+				Updated:    fixedTime,
+			},
+			Content: []byte("content2"),
+		},
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "assets",
+				Name:       "file3.txt",
+				Created:    fixedTime,
+				Updated:    fixedTime,
+			},
+			Content: []byte("content3"),
+		},
+	}
+
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+
+	var buf bytes.Buffer
+	tee := io.TeeReader(tm.Output(), &buf)
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		s := string(bts)
+		return s != "" && s != "Loading..."
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// Wait for buckets to load and appear
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		return strings.Contains(string(bts), "assets")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Move down to bucket 'assets'
+	tm.Type("j")
+	// Enter bucket
+	tm.Type("l")
+
+	// Wait for objects to load
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		return strings.Contains(string(bts), "file1.txt")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Select file1.txt
+	tm.Type(" ")
+	// Move to file2.txt
+	tm.Type("j")
+	// Select file2.txt
+	tm.Type(" ")
+
+	// Wait for selection to be visible (✓ symbol)
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		return strings.Contains(string(bts), "✓")
+	}, teatest.WithDuration(2*time.Second))
+
+	// Trigger quit
+	_ = tm.Quit()
+
+	_, _ = io.Copy(&buf, tm.FinalOutput(t))
+	teatest.RequireEqualOutput(t, buf.Bytes())
+}
+
 func TestSnapshot_ErrorsModal(t *testing.T) {
 	objects := []fakestorage.Object{
 		{

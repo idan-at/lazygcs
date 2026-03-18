@@ -35,6 +35,7 @@ func TestMain(m *testing.M) {
 
 	os.Exit(m.Run())
 }
+
 func TestMain_E2E(t *testing.T) {
 	// 1. Setup a valid config file for the binary
 	tmpDir := t.TempDir()
@@ -77,15 +78,16 @@ download_dir = "/tmp"
 }
 
 func TestMain_NoConfig(t *testing.T) {
+	// Set an invalid config path to force failure
 	assert.NilError(t, os.Setenv("LAZYGCS_CONFIG", "/tmp/non-existent-lazygcs-config.toml"))
 	t.Cleanup(func() { _ = os.Unsetenv("LAZYGCS_CONFIG") })
 
 	cmd := exec.Command(binaryPath)
-	err := cmd.Run()
+	output, err := cmd.CombinedOutput()
 
-	// Should fail with a config error because default config won't exist in the test environment (unless the user has one)
-	// We can't guarantee what err will be, but it should fail.
+	// Should fail with a config error
 	assert.Assert(t, err != nil)
+	assert.Check(t, strings.Contains(string(output), "failed to load config"))
 }
 
 func TestVersionFlag(t *testing.T) {
@@ -98,4 +100,17 @@ func TestVersionFlag(t *testing.T) {
 	// Ensure the output format is correct
 	assert.Assert(t, strings.HasPrefix(string(output), "lazygcs "))
 	assert.Assert(t, strings.HasSuffix(string(output), "\n"))
+}
+
+func TestHelpFlag(t *testing.T) {
+	cmd := exec.Command(binaryPath, "--help")
+	output, err := cmd.CombinedOutput()
+
+	// Should succeed (returns nil in run() when flag.ErrHelp)
+	assert.NilError(t, err)
+
+	// Ensure the output contains usage info
+	assert.Assert(t, strings.Contains(string(output), "Usage:"))
+	assert.Assert(t, strings.Contains(string(output), "Flags:"))
+	assert.Assert(t, strings.Contains(string(output), "Controls:"))
 }

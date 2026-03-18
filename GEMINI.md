@@ -39,7 +39,7 @@ We use `teatest` to verify the exact visual output of the TUI.
 Before committing any code, MUST run:
 1.  `golangci-lint run` (Linting, formatting, and static analysis)
 2.  `go mod tidy` (Clean dependencies)
-3.  `go test -v ./...` (Verify tests pass)
+3.  `go test -v -coverpkg=./... -coverprofile=coverage.out ./...` (Verify tests pass with coverage)
 
 ## Current Status
 *   **Phase:** Feature Implementation.
