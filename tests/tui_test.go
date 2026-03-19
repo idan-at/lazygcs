@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -412,9 +413,12 @@ func TestOpen(t *testing.T) {
 	originalExec := tui.ExecCommand
 	defer func() { tui.ExecCommand = originalExec }()
 
+	var mu sync.Mutex
 	var capturedCmd string
 	var capturedArgs []string
 	tui.ExecCommand = func(name string, arg ...string) *exec.Cmd {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedCmd = name
 		capturedArgs = arg
 		// Return a command that does nothing
@@ -432,16 +436,24 @@ func TestOpen(t *testing.T) {
 	// Wait for captured command
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if capturedCmd != "" {
+		mu.Lock()
+		cmd := capturedCmd
+		mu.Unlock()
+		if cmd != "" {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	mu.Lock()
+	finalCmd := capturedCmd
+	finalArgs := capturedArgs
+	mu.Unlock()
+
 	// Verify command was triggered
-	assert.Assert(t, capturedCmd == "open" || capturedCmd == "xdg-open" || capturedCmd == "rundll32")
-	assert.Assert(t, len(capturedArgs) > 0)
-	assert.Assert(t, strings.Contains(capturedArgs[len(capturedArgs)-1], "file1.txt"))
+	assert.Assert(t, finalCmd == "open" || finalCmd == "xdg-open" || finalCmd == "rundll32")
+	assert.Assert(t, len(finalArgs) > 0)
+	assert.Assert(t, strings.Contains(finalArgs[len(finalArgs)-1], "file1.txt"))
 }
 
 func TestRefresh(t *testing.T) {
