@@ -376,3 +376,171 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	assert.Assert(t, !strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "Status should be cleared after timer fires")
 	assert.Assert(t, strings.Contains(m.View(), " NORMAL "), "Status should be NORMAL again")
 }
+
+func TestModel_Actions_OpenSingleSelectSuccess(t *testing.T) {
+	// Mock ExecCommand
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Move cursor to obj2 and select it
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKey(m, ' ')
+
+	// Move cursor back to obj1 to ensure it operates on the selection, not cursor
+	m, _ = pressKey(m, 'k')
+
+	// Press 'o' to open
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+
+	assert.Assert(t, cmd != nil, "Expected cmd to be returned")
+	assert.Assert(t, strings.Contains(m.View(), "Opening obj2"), "Expected to open selected file")
+}
+
+func TestModel_Actions_EditSingleSelectSuccess(t *testing.T) {
+	// Mock ExecCommand
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Move cursor to obj2 and select it
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKey(m, ' ')
+
+	// Move cursor back to obj1
+	m, _ = pressKey(m, 'k')
+
+	// Press 'e' to edit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+
+	assert.Assert(t, cmd != nil, "Expected cmd to be returned")
+	assert.Assert(t, strings.Contains(m.View(), "Opening obj2"), "Expected to edit selected file")
+}
+
+func TestModel_Actions_OpenMultiSelectError(t *testing.T) {
+	// Mock ExecCommand
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Select obj1
+	m, _ = pressKey(m, ' ')
+	// Move to obj2 and select it
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKey(m, ' ')
+
+	// Press 'o' to open
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+
+	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Cannot open multiple files at once"))
+}
+
+func TestModel_Actions_EditMultiSelectError(t *testing.T) {
+	// Mock ExecCommand
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Select obj1
+	m, _ = pressKey(m, ' ')
+	// Move to obj2 and select it
+	m, _ = pressKey(m, 'j')
+	m, _ = pressKey(m, ' ')
+
+	// Press 'e' to edit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+
+	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Cannot edit multiple files at once"))
+}
+
+func TestModel_Actions_OpenSingleSelectPrefixError(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList(nil, []string{"prefix1/"})
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Select prefix1/
+	m, _ = pressKey(m, ' ')
+
+	// Press 'o' to open
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+
+	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Cannot open a directory"), "Expected error message about opening a directory")
+}
+
+func TestModel_Actions_EditSingleSelectPrefixError(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList(nil, []string{"prefix1/"})
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Select prefix1/
+	m, _ = pressKey(m, ' ')
+
+	// Press 'e' to edit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+
+	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Cannot edit a directory"), "Expected error message about editing a directory")
+}
+
+func TestModel_Actions_OpenHighlightedPrefixError(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList(nil, []string{"prefix1/"})
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Don't select, just let the cursor highlight prefix1/
+
+	// Press 'o' to open
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+
+	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Cannot open a directory"), "Expected error message about opening a directory")
+}
+
+func TestModel_Actions_EditHighlightedPrefixError(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList(nil, []string{"prefix1/"})
+	m, _ := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Don't select, just let the cursor highlight prefix1/
+
+	// Press 'e' to edit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+
+	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Cannot edit a directory"), "Expected error message about editing a directory")
+}

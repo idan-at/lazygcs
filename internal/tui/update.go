@@ -1055,19 +1055,60 @@ func (m Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+type targetError int
+
+const (
+	targetErrNone targetError = iota
+	targetErrMultiple
+	targetErrDirectory
+	targetErrNotSelected
+)
+
+func (m Model) getSingleTargetObject() (string, targetError) {
+	if len(m.selected) > 1 {
+		return "", targetErrMultiple
+	}
+
+	if len(m.selected) == 1 {
+		var targetName string
+		for name := range m.selected {
+			targetName = name
+		}
+		if strings.HasSuffix(targetName, "/") {
+			return "", targetErrDirectory
+		}
+		return targetName, targetErrNone
+	}
+
+	currentPrefixes, currentObjects, _ := m.filteredObjects()
+	if m.cursor < len(currentPrefixes) {
+		return "", targetErrDirectory
+	}
+	if m.cursor >= len(currentPrefixes)+len(currentObjects) {
+		return "", targetErrNotSelected
+	}
+	return currentObjects[m.cursor-len(currentPrefixes)].Name, targetErrNone
+}
+
 func (m Model) handleOpenKey() (tea.Model, tea.Cmd) {
 	if m.state != viewObjects {
 		return m, nil
 	}
 
-	currentPrefixes, currentObjects, _ := m.filteredObjects()
-	if m.cursor < len(currentPrefixes) || m.cursor >= len(currentPrefixes)+len(currentObjects) {
+	targetName, err := m.getSingleTargetObject()
+	switch err {
+	case targetErrMultiple:
+		m.status = "Cannot open multiple files at once"
+		return m, clearStatusCmd()
+	case targetErrDirectory:
+		m.status = "Cannot open a directory"
+		return m, clearStatusCmd()
+	case targetErrNotSelected:
 		return m, nil
 	}
 
-	obj := currentObjects[m.cursor-len(currentPrefixes)]
-	m.status = fmt.Sprintf("Opening %s...", filepath.Base(obj.Name))
-	return m, m.openFile(m.currentBucket, obj.Name)
+	m.status = fmt.Sprintf("Opening %s...", filepath.Base(targetName))
+	return m, m.openFile(m.currentBucket, targetName)
 }
 
 func (m Model) handleEditKey() (tea.Model, tea.Cmd) {
@@ -1075,16 +1116,22 @@ func (m Model) handleEditKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	currentPrefixes, currentObjects, _ := m.filteredObjects()
-	if m.cursor < len(currentPrefixes) || m.cursor >= len(currentPrefixes)+len(currentObjects) {
+	targetName, err := m.getSingleTargetObject()
+	switch err {
+	case targetErrMultiple:
+		m.status = "Cannot edit multiple files at once"
+		return m, clearStatusCmd()
+	case targetErrDirectory:
+		m.status = "Cannot edit a directory"
+		return m, clearStatusCmd()
+	case targetErrNotSelected:
 		return m, nil
 	}
 
-	obj := currentObjects[m.cursor-len(currentPrefixes)]
-	m.status = fmt.Sprintf("Opening %s...", filepath.Base(obj.Name))
+	m.status = fmt.Sprintf("Opening %s...", filepath.Base(targetName))
 	// Save target name for re-upload
-	m.targetPrefixCursor = obj.Name
-	return m, m.editFile(m.currentBucket, obj.Name)
+	m.targetPrefixCursor = targetName
+	return m, m.editFile(m.currentBucket, targetName)
 }
 
 func (m Model) handleEditorFinishedMsg(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
