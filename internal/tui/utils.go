@@ -104,6 +104,8 @@ func humanizeSize(bytes int64) string {
 }
 
 func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string {
+	ext := strings.ToLower(filepath.Ext(name))
+
 	if !useNerdFont {
 		if isBucket {
 			return "📦 "
@@ -111,7 +113,48 @@ func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string
 		if isFolder {
 			return "📁 "
 		}
-		return "📄 "
+		switch ext {
+		case ".go":
+			return "🐹 "
+		case ".md":
+			return "📝 "
+		case ".json":
+			return "⚙️ "
+		case ".txt":
+			return "📄 "
+		case ".csv":
+			return "📊 "
+		case ".yaml", ".yml", ".toml":
+			return "🛠️ "
+		case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
+			return "🖼️ "
+		case ".pdf":
+			return "📕 "
+		case ".zip", ".tar", ".gz", ".tgz":
+			return "📦 "
+		case ".sh", ".bash", ".zsh":
+			return "💻 "
+		case ".py":
+			return "🐍 "
+		case ".js", ".ts", ".jsx", ".tsx":
+			return "📜 "
+		case ".html", ".htm":
+			return "🌐 "
+		case ".css":
+			return "🎨 "
+		case ".xml":
+			return "📋 "
+		case ".java":
+			return "☕ "
+		case ".c", ".cpp", ".h", ".hpp":
+			return "⚙️ "
+		case ".rs":
+			return "🦀 "
+		case ".sql":
+			return "💾 "
+		default:
+			return "📄 "
+		}
 	}
 
 	if isBucket {
@@ -121,7 +164,6 @@ func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string
 		return " " // Folder Nerd Font icon
 	}
 
-	ext := strings.ToLower(filepath.Ext(name))
 	switch ext {
 	case ".go":
 		return "󰟓 "
@@ -142,7 +184,7 @@ func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string
 	case ".zip", ".tar", ".gz", ".tgz":
 		return "󰏗 "
 	case ".sh", ".bash", ".zsh":
-		return " "
+		return " "
 	case ".py":
 		return " "
 	case ".js", ".ts", ".jsx", ".tsx":
@@ -151,6 +193,16 @@ func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string
 		return " "
 	case ".css":
 		return "󰌜 "
+	case ".xml":
+		return "󰗀 "
+	case ".java":
+		return " "
+	case ".c", ".cpp", ".h", ".hpp":
+		return " "
+	case ".rs":
+		return " "
+	case ".sql":
+		return " "
 	default:
 		return "󰈔 " // Default file Nerd Font icon
 	}
