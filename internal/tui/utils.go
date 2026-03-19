@@ -103,109 +103,117 @@ func humanizeSize(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string {
-	ext := strings.ToLower(filepath.Ext(name))
-
-	if !useNerdFont {
-		if isBucket {
-			return "📦 "
-		}
-		if isFolder {
-			return "📁 "
-		}
-		switch ext {
-		case ".go":
-			return "🐹 "
-		case ".md":
-			return "📝 "
-		case ".json":
-			return "⚙️ "
-		case ".txt":
-			return "📄 "
-		case ".csv":
-			return "📊 "
-		case ".yaml", ".yml", ".toml":
-			return "🛠️ "
-		case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
-			return "🖼️ "
-		case ".pdf":
-			return "📕 "
-		case ".zip", ".tar", ".gz", ".tgz":
-			return "📦 "
-		case ".sh", ".bash", ".zsh":
-			return "💻 "
-		case ".py":
-			return "🐍 "
-		case ".js", ".ts", ".jsx", ".tsx":
-			return "📜 "
-		case ".html", ".htm":
-			return "🌐 "
-		case ".css":
-			return "🎨 "
-		case ".xml":
-			return "📋 "
-		case ".java":
-			return "☕ "
-		case ".c", ".cpp", ".h", ".hpp":
-			return "⚙️ "
-		case ".rs":
-			return "🦀 "
-		case ".sql":
-			return "💾 "
-		default:
-			return "📄 "
-		}
+var (
+	fallbackIcons = map[string]string{
+		".go":   "🐹 ",
+		".md":   "📝 ",
+		".json": "⚙️ ",
+		".txt":  "📄 ",
+		".csv":  "📊 ",
+		".yaml": "🛠️ ",
+		".yml":  "🛠️ ",
+		".toml": "🛠️ ",
+		".jpg":  "🖼️ ",
+		".jpeg": "🖼️ ",
+		".png":  "🖼️ ",
+		".gif":  "🖼️ ",
+		".svg":  "🖼️ ",
+		".webp": "🖼️ ",
+		".pdf":  "📕 ",
+		".zip":  "📦 ",
+		".tar":  "📦 ",
+		".gz":   "📦 ",
+		".tgz":  "📦 ",
+		".sh":   "💻 ",
+		".bash": "💻 ",
+		".zsh":  "💻 ",
+		".py":   "🐍 ",
+		".js":   "📜 ",
+		".ts":   "📜 ",
+		".jsx":  "📜 ",
+		".tsx":  "📜 ",
+		".html": "🌐 ",
+		".htm":  "🌐 ",
+		".css":  "🎨 ",
+		".xml":  "📋 ",
+		".java": "☕ ",
+		".c":    "⚙️ ",
+		".cpp":  "⚙️ ",
+		".h":    "⚙️ ",
+		".hpp":  "⚙️ ",
+		".rs":   "🦀 ",
+		".sql":  "💾 ",
 	}
 
+	nerdIcons = map[string]string{
+		".go":   "󰟓 ",
+		".md":   " ",
+		".json": " ",
+		".txt":  "󰈙 ",
+		".csv":  "󰈛 ",
+		".yaml": "󰒓 ",
+		".yml":  "󰒓 ",
+		".toml": "󰒓 ",
+		".jpg":  "󰋩 ",
+		".jpeg": "󰋩 ",
+		".png":  "󰋩 ",
+		".gif":  "󰋩 ",
+		".svg":  "󰋩 ",
+		".webp": "󰋩 ",
+		".pdf":  "󰈦 ",
+		".zip":  "󰏗 ",
+		".tar":  "󰏗 ",
+		".gz":   "󰏗 ",
+		".tgz":  "󰏗 ",
+		".sh":   " ",
+		".bash": " ",
+		".zsh":  " ",
+		".py":   " ",
+		".js":   "󰌞 ",
+		".ts":   "󰌞 ",
+		".jsx":  "󰌞 ",
+		".tsx":  "󰌞 ",
+		".html": " ",
+		".htm":  " ",
+		".css":  "󰌜 ",
+		".xml":  "󰗀 ",
+		".java": " ",
+		".c":    " ",
+		".cpp":  " ",
+		".h":    " ",
+		".hpp":  " ",
+		".rs":   " ",
+		".sql":  " ",
+	}
+)
+
+func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string {
 	if isBucket {
-		return "🪣 " // Bucket Nerd Font icon
+		if useNerdFont {
+			return "🪣 "
+		}
+		return "📦 "
 	}
 	if isFolder {
-		return " " // Folder Nerd Font icon
+		if useNerdFont {
+			return " "
+		}
+		return "📁 "
 	}
 
-	switch ext {
-	case ".go":
-		return "󰟓 "
-	case ".md":
-		return " "
-	case ".json":
-		return " "
-	case ".txt":
-		return "󰈙 "
-	case ".csv":
-		return "󰈛 "
-	case ".yaml", ".yml", ".toml":
-		return "󰒓 "
-	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
-		return "󰋩 "
-	case ".pdf":
-		return "󰈦 "
-	case ".zip", ".tar", ".gz", ".tgz":
-		return "󰏗 "
-	case ".sh", ".bash", ".zsh":
-		return " "
-	case ".py":
-		return " "
-	case ".js", ".ts", ".jsx", ".tsx":
-		return "󰌞 "
-	case ".html", ".htm":
-		return " "
-	case ".css":
-		return "󰌜 "
-	case ".xml":
-		return "󰗀 "
-	case ".java":
-		return " "
-	case ".c", ".cpp", ".h", ".hpp":
-		return " "
-	case ".rs":
-		return " "
-	case ".sql":
-		return " "
-	default:
+	ext := strings.ToLower(filepath.Ext(name))
+
+	if useNerdFont {
+		if icon, ok := nerdIcons[ext]; ok {
+			return icon
+		}
 		return "󰈔 " // Default file Nerd Font icon
 	}
+
+	if icon, ok := fallbackIcons[ext]; ok {
+		return icon
+	}
+	return "📄 "
 }
 
 func getDisplayName(name, currentPrefix string) string {
