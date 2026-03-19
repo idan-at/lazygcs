@@ -103,46 +103,56 @@ func humanizeSize(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-func getIcon(name string, isFolder bool, isBucket bool) string {
+func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string {
+	if !useNerdFont {
+		if isBucket {
+			return "📦 "
+		}
+		if isFolder {
+			return "📁 "
+		}
+		return "📄 "
+	}
+
 	if isBucket {
-		return "📦 " // Bucket icon (Package emoji has stable width)
+		return "🪣 " // Bucket Nerd Font icon
 	}
 	if isFolder {
-		return "📁 " // Folder icon
+		return " " // Folder Nerd Font icon
 	}
 
 	ext := strings.ToLower(filepath.Ext(name))
 	switch ext {
 	case ".go":
-		return "🐹 "
+		return "󰟓 "
 	case ".md":
-		return "📝 "
+		return " "
 	case ".json":
-		return "⚙️ "
+		return " "
 	case ".txt":
-		return "📄 "
+		return "󰈙 "
 	case ".csv":
-		return "📊 "
+		return "󰈛 "
 	case ".yaml", ".yml", ".toml":
-		return "🛠️ "
+		return "󰒓 "
 	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
-		return "🖼️ "
+		return "󰋩 "
 	case ".pdf":
-		return "📕 "
+		return "󰈦 "
 	case ".zip", ".tar", ".gz", ".tgz":
-		return "📦 "
+		return "󰏗 "
 	case ".sh", ".bash", ".zsh":
-		return "💻 "
+		return " "
 	case ".py":
-		return "🐍 "
+		return " "
 	case ".js", ".ts", ".jsx", ".tsx":
-		return "📜 "
+		return "󰌞 "
 	case ".html", ".htm":
-		return "🌐 "
+		return " "
 	case ".css":
-		return "🎨 "
+		return "󰌜 "
 	default:
-		return "📄 " // Default file icon
+		return "󰈔 " // Default file Nerd Font icon
 	}
 }
 

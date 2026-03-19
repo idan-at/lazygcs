@@ -77,7 +77,7 @@ func SetupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16
 	assert.NilError(t, err)
 
 	gcsClient := gcs.NewClient(server.Client())
-	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.Icons)
+	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 	m.SetDeterministicSpinner(true)
 
 	tm := teatest.NewTestModel(t, m)

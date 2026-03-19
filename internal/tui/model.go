@@ -55,7 +55,7 @@ type Model struct {
 	fuzzySearch       bool
 
 	// Settings
-	showIcons bool
+	showNerdIcons bool
 
 	// Download Confirm State
 	pendingDownloadBucket   string
@@ -125,7 +125,7 @@ func (c *RealClipboard) WriteAll(text string) error {
 }
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
-func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showIcons bool) Model {
+func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showNerdIcons bool) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
@@ -142,7 +142,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		client:               client,
 		downloadDir:          downloadDir,
 		fuzzySearch:          fuzzySearch,
-		showIcons:            showIcons,
+		showNerdIcons:        showNerdIcons,
 		width:                120,
 		height:               40,
 		state:                viewBuckets,

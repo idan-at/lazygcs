@@ -71,10 +71,10 @@ download_dir = "/Users/me/Desktop/gcs_downloads"
 # Defaults to true. To use exact substring matching, set this to false.
 fuzzy_search = false
 
-# Optional: Display Nerd Font icons next to buckets, folders, and files.
+# Optional: Replace the default standard emojis with Nerd Font icons.
 # Requires a Nerd Font to be installed and active in your terminal.
-# Defaults to false.
-icons = true
+# Defaults to false (standard emojis are used).
+nerd_icons = true
 ```
 
 ### 🔐 Authentication

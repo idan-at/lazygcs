@@ -325,10 +325,7 @@ func (m Model) objectsView(width int) string {
 
 				displayItem := getDisplayName(originalName, targetPrefix)
 
-				icon := ""
-				if m.showIcons {
-					icon = getIcon(displayItem, isFolder, false)
-				}
+				icon := getIcon(displayItem, isFolder, false, m.showNerdIcons)
 
 				textStyle := lipgloss.NewStyle()
 				isFocused := (m.state != viewBuckets) && (objCursor == i)
@@ -341,8 +338,8 @@ func (m Model) objectsView(width int) string {
 				}
 
 				// Truncate to fit column (account for selection indicator, optional icon, and padding)
-				// Offset: 1 (indicator) + 1 (space) + 3 (icon) = 5
-				truncateLen := width - 5
+				// Offset: 1 (indicator) + 1 (space) + icon width
+				truncateLen := width - 2 - lipgloss.Width(icon)
 				truncatedItem := truncate(displayItem, truncateLen)
 
 				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, icon, truncatedItem)
@@ -427,14 +424,11 @@ func (m Model) bucketsView(width int) string {
 			s.WriteString(content + "\n")
 		} else {
 			// Bucket Item
-			icon := ""
-			if m.showIcons {
-				icon = getIcon(item.BucketName, false, true)
-			}
+			icon := getIcon(item.BucketName, false, true, m.showNerdIcons)
 
 			// Truncate to fit column, account for indentation
-			// Offset: 1 (indicator) + 1 (space) + 3 (icon) = 5
-			truncateLen := width - 5
+			// Offset: 1 (indicator) + 1 (space) + icon width
+			truncateLen := width - 2 - lipgloss.Width(icon)
 			truncatedBucket := truncate(item.BucketName, truncateLen)
 
 			itemContent := fmt.Sprintf("%s %s%s", indicator, icon, truncatedBucket)

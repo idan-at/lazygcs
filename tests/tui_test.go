@@ -465,7 +465,7 @@ func TestRefresh(t *testing.T) {
 	configPath := testutil.CreateConfigFile(t, []string{"p1"}, t.TempDir())
 	cfg, _ := config.Load(configPath)
 
-	m := tui.NewModel(cfg.Projects, client, cfg.DownloadDir, cfg.FuzzySearch, cfg.Icons)
+	m := tui.NewModel(cfg.Projects, client, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 	m.SetDeterministicSpinner(true)
 	tm := teatest.NewTestModel(t, m)
 

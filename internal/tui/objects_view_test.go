@@ -428,13 +428,13 @@ func TestModel_MultiSelect(t *testing.T) {
 
 	// Initially, obj1 is at cursor but not selected
 	view := m.View()
-	assert.Assert(t, !strings.Contains(view, "✓ obj1"))
+	assert.Assert(t, !strings.Contains(view, "✓ 📄 obj1"))
 
 	// Press space to select obj1
 	m, _ = pressKey(m, ' ')
 
 	view = m.View()
-	assert.Assert(t, strings.Contains(view, "✓ obj1"), "obj1 should be selected")
+	assert.Assert(t, strings.Contains(view, "✓ 📄 obj1"), "obj1 should be selected")
 
 	// Move cursor down to obj2
 	m, _ = pressKey(m, 'j')
@@ -443,13 +443,13 @@ func TestModel_MultiSelect(t *testing.T) {
 	m, _ = pressKey(m, ' ')
 
 	view = m.View()
-	assert.Assert(t, strings.Contains(view, "✓ obj1"), "obj1 should still be selected")
-	assert.Assert(t, strings.Contains(view, "✓ obj2"), "obj2 should be selected")
+	assert.Assert(t, strings.Contains(view, "✓ 📄 obj1"), "obj1 should still be selected")
+	assert.Assert(t, strings.Contains(view, "✓ 📄 obj2"), "obj2 should be selected")
 
 	// Press space again to deselect obj2
 	m, _ = pressKey(m, ' ')
 
 	view = m.View()
-	assert.Assert(t, strings.Contains(view, "✓ obj1"), "obj1 should still be selected")
-	assert.Assert(t, !strings.Contains(view, "✓ obj2"), "obj2 should be deselected")
+	assert.Assert(t, strings.Contains(view, "✓ 📄 obj1"), "obj1 should still be selected")
+	assert.Assert(t, !strings.Contains(view, "✓ 📄 obj2"), "obj2 should be deselected")
 }

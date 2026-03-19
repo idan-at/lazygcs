@@ -49,7 +49,7 @@ Configuration:
   projects = ["my-gcp-project-1", "my-gcp-project-2"]
   download_dir = "~/Downloads"
   fuzzy_search = true
-  icons = true
+  nerd_icons = true
 
 Controls:
   Use arrow keys or h/j/k/l to navigate.
@@ -101,7 +101,7 @@ For more details, see the ? help menu inside the application.
 		client = gcs.NewClient(storageClient)
 	}
 
-	m := tui.NewModel(cfg.Projects, client, cfg.DownloadDir, cfg.FuzzySearch, cfg.Icons)
+	m := tui.NewModel(cfg.Projects, client, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

@@ -19,8 +19,8 @@ type Config struct {
 	DownloadDir string `toml:"download_dir"`
 	// FuzzySearch enables fuzzy matching for filtering lists.
 	FuzzySearch bool `toml:"fuzzy_search"`
-	// Icons enables rendering of Nerd Font icons next to items.
-	Icons bool `toml:"icons"`
+	// NerdIcons enables rendering of Nerd Font icons next to items.
+	NerdIcons bool `toml:"nerd_icons"`
 }
 
 func defaultDownloadDir() string {

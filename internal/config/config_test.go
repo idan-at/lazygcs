@@ -74,16 +74,16 @@ fuzzy_search = false
 			},
 		},
 		{
-			name: "OverrideIcons",
+			name: "OverrideNerdIcons",
 			content: `
 projects = ["p1"]
-icons = true
+nerd_icons = true
 `,
 			expected: &config.Config{
 				Projects:    []string{"p1"},
 				DownloadDir: defaultDownload,
 				FuzzySearch: true,
-				Icons:       true,
+				NerdIcons:   true,
 			},
 		},
 	}
@@ -110,7 +110,7 @@ icons = true
 			}
 			assert.Equal(t, cfg.DownloadDir, tt.expected.DownloadDir)
 			assert.Equal(t, cfg.FuzzySearch, tt.expected.FuzzySearch)
-			assert.Equal(t, cfg.Icons, tt.expected.Icons)
+			assert.Equal(t, cfg.NerdIcons, tt.expected.NerdIcons)
 		})
 	}
 }

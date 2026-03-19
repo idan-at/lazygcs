@@ -110,7 +110,7 @@ func main() {
 projects = ["demo-project"]
 download_dir = "` + downloadDir + `"
 fuzzy_search = true
-icons = true
+nerd_icons = true
 `
 	configFile := filepath.Join(tmpDir, "config.toml")
 	if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
