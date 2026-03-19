@@ -256,10 +256,11 @@ func TestSnapshot_MultiSelectionView(t *testing.T) {
 	// Select file2.txt
 	tm.Type(" ")
 
-	// Wait for selection to be visible (✓ symbol)
+	// Wait for the second selection to be processed and rendered.
+	// We wait for "content2" (the preview of file2.txt) to appear to ensure a stable, deterministic state before quitting.
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		return strings.Contains(string(bts), "✓")
-	}, teatest.WithDuration(2*time.Second))
+		return strings.Contains(string(bts), "content2")
+	}, teatest.WithDuration(3*time.Second))
 
 	// Trigger quit
 	_ = tm.Quit()
