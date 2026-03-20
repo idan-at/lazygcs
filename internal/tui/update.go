@@ -853,10 +853,13 @@ func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 	case viewObjects:
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
-		// If there is a selection, copy all selected items
-		if len(m.selected) > 0 {
-			// We need to iterate over everything to maintain order, or just collect from map.
-			// Let's collect from map for simplicity, but order might be random.
+		if len(m.selected) > 1 {
+			m.status = "Cannot copy multiple files at once"
+			return m, clearStatusCmd()
+		}
+
+		// If there is a single selection, copy it
+		if len(m.selected) == 1 {
 			for name := range m.selected {
 				uris = append(uris, "gs://"+m.currentBucket+"/"+name)
 			}

@@ -80,10 +80,25 @@ func TestModel_Actions_CopyURI(t *testing.T) {
 	m, _ = pressKey(m, ' ') // select obj2
 
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	// Check content (order depends on map iteration, but both should be there)
-	assert.Assert(t, strings.Contains(cb.content, "gs://b1/obj1"))
-	assert.Assert(t, strings.Contains(cb.content, "gs://b1/obj2"))
-	assert.Assert(t, strings.Contains(m.View(), "Copied 2 URIs to clipboard"))
+	assert.Assert(t, strings.Contains(m.View(), "Cannot copy multiple files at once"))
+}
+
+func TestModel_Actions_CopyURIDirectory(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, []string{"dir1/"})
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
+
+	cb := &mockClipboard{}
+	m.SetClipboard(cb)
+
+	m = enterBucket(m, projects, "b1", objects)
+
+	// 'k' to hover dir1/ assuming it's above obj1 or first. Actually, simpleObjectList puts prefixes before objects.
+	// We need to ensure we hover the prefix. The initial cursor is at 0, which is "dir1/".
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	assert.Equal(t, cb.content, "gs://b1/dir1/")
+	assert.Assert(t, strings.Contains(m.View(), "Copied gs://b1/dir1/ to clipboard"))
 }
 
 func TestModel_Actions_Open(t *testing.T) {
