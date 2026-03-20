@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/idan-at/lazygcs/internal/tui"
 	"gotest.tools/v3/assert"
 )
@@ -89,4 +90,18 @@ func TestModel_ClearStatusMsg(t *testing.T) {
 
 	// The status pill should now be hidden
 	assert.Assert(t, m.HideStatusPill(), "hideStatusPill should be true after the latest message clears")
+}
+
+func TestMessagesView_ToggleWithNoMessages(t *testing.T) {
+	m, _ := setupTestModel(nil, nil, "/tmp")
+
+	// Ensure there are no messages
+	assert.Equal(t, len(m.Messages()), 0)
+	assert.Equal(t, m.ShowMessages(), false)
+
+	// Press 'm'
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+
+	// Verify that showMessages is true (currently it will be false because of the bug)
+	assert.Equal(t, m.ShowMessages(), true, "Messages view should be shown even if there are no messages")
 }

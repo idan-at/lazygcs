@@ -453,12 +453,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Messages):
-		if len(m.msgQueue.Messages()) > 0 {
-			m.showMessages = true
-			m.msgQueue.MessagesScroll = len(m.msgQueue.Messages()) - 15
-			if m.msgQueue.MessagesScroll < 0 {
-				m.msgQueue.MessagesScroll = 0
-			}
+		m.showMessages = true
+		m.msgQueue.MessagesScroll = len(m.msgQueue.Messages()) - 15
+		if m.msgQueue.MessagesScroll < 0 {
+			m.msgQueue.MessagesScroll = 0
 		}
 		return m, nil
 

@@ -205,6 +205,11 @@ func (m Model) HideStatusPill() bool {
 	return m.msgQueue.HideStatusPill
 }
 
+// ShowMessages returns whether the messages view is currently shown.
+func (m Model) ShowMessages() bool {
+	return m.showMessages
+}
+
 // AddMessage appends a new message and returns a command to clear it from the status bar after a delay.
 func (m Model) AddMessage(level MsgLevel, text string) tea.Cmd {
 	return m.msgQueue.AddMessage(level, text)
