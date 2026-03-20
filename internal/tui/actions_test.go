@@ -289,12 +289,19 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 
 	// Assert that we are prompted for confirmation
-	assert.Assert(t, cmd != nil, "Command should be returned to clear the prompt message")
+	assert.Assert(t, cmd == nil, "Command should NOT be returned to clear the prompt message (persistent prompt)")
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "File exists"), "Message should indicate file exists")
 	assert.Assert(t, strings.Contains(view, "(o)verwrite"), "Message should present overwrite option")
 	assert.Assert(t, strings.Contains(view, "(a)bort"), "Message should present abort option")
 	assert.Assert(t, strings.Contains(view, "(r)ename"), "Message should present rename option")
+
+	// Press 'j' which is invalid in the confirm prompt
+	m, jCmd := pressKey(m, 'j')
+	assert.Assert(t, jCmd != nil, "Pressing an invalid key should return a command")
+	msg := jCmd()
+	_, ok := msg.(tui.BeepMsg)
+	assert.Assert(t, ok, "Expected BeepMsg for invalid key press during prompt")
 
 	// Press 'a' to abort
 	m, cmd = pressKey(m, 'a')

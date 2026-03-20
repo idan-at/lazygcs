@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -108,6 +109,15 @@ type UploadMsg struct {
 // ClearStatusMsg is sent to clear the status bar.
 type ClearStatusMsg struct {
 	ID string
+}
+
+// BeepMsg is sent when the user presses an invalid key.
+type BeepMsg struct{}
+
+// BeepCmd rings the terminal bell and returns a BeepMsg.
+func BeepCmd() tea.Msg {
+	_, _ = os.Stdout.Write([]byte("\a"))
+	return BeepMsg{}
 }
 
 // MsgLevel defines the severity of a log message.

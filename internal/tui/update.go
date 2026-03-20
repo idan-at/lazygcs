@@ -587,8 +587,9 @@ func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.state = viewObjects
 		return m.startDownloadTask(newDest)
+	default:
+		return m, BeepCmd
 	}
-	return m, nil
 }
 
 func (m Model) handleSelectKey() (tea.Model, tea.Cmd) {

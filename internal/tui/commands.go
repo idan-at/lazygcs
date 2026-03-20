@@ -205,8 +205,8 @@ func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 	// Check if file already exists
 	if _, err := os.Stat(task.dest); err == nil {
 		m.state = viewDownloadConfirm
-		cmd := m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest)))
-		return m, cmd
+		_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest)))
+		return m, nil
 	}
 
 	m.state = viewObjects
