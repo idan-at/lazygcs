@@ -275,7 +275,7 @@ func TestSnapshot_MultiSelectionView(t *testing.T) {
 	teatest.RequireEqualOutput(t, buf.Bytes())
 }
 
-func TestSnapshot_ErrorsModal(t *testing.T) {
+func TestSnapshot_MessagesView(t *testing.T) {
 	objects := []fakestorage.Object{
 		{
 			ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "assets", Name: "init"},
@@ -300,10 +300,10 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 	tm.Send(tui.BucketsPageMsg{Err: errors.New("simulated permission denied error")})
 	tm.Send(tui.BucketsPageMsg{Err: errors.New("simulated network timeout")})
 
-	// Open messages modal
+	// Open messages view
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
 
-	// Wait for errors modal to appear
+	// Wait for messages view to appear
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		out := string(bts)
 		return strings.Contains(out, "MESSAGES") || strings.Contains(out, "simulated permission denied")
