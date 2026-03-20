@@ -95,14 +95,14 @@ func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	}
 }
 
-func (m Model) fetchDownload(bucketName, objectName, dest string, isPrefix bool) tea.Cmd {
+func (m Model) fetchDownload(bucketName, objectName, dest, taskID string, isPrefix bool) tea.Cmd {
 	return func() tea.Msg {
 		if isPrefix {
 			err := m.client.DownloadPrefixAsZip(context.Background(), bucketName, objectName, dest)
-			return DownloadMsg{Path: dest, Err: err}
+			return DownloadMsg{Path: dest, TaskID: taskID, Err: err}
 		}
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
-		return DownloadMsg{Path: dest, Err: err}
+		return DownloadMsg{Path: dest, TaskID: taskID, Err: err}
 	}
 }
 
@@ -169,6 +169,26 @@ func (m Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
 	}
 }
 
+func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
+	var msgText string
+	if m.downloadTotal > 1 {
+		msgText = fmt.Sprintf("Downloading %d/%d as %s...", m.downloadFinished+1, m.downloadTotal, filepath.Base(dest))
+	} else {
+		msgText = fmt.Sprintf("Downloading as %s...", filepath.Base(dest))
+	}
+
+	taskID := fmt.Sprintf("dl-%s-%d", dest, time.Now().UnixNano())
+	m.activeTasks[taskID] = Task{
+		ID:       taskID,
+		Name:     msgText,
+		Started:  time.Now(),
+		Progress: 0,
+	}
+
+	cmd := m.AddMessage(LevelInfo, msgText)
+	return m, tea.Batch(cmd, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, dest, taskID, m.pendingDownloadIsPrefix))
+}
+
 func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 	if len(m.downloadQueue) == 0 {
 		return m, nil
@@ -177,29 +197,30 @@ func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 	task := m.downloadQueue[0]
 	m.downloadQueue = m.downloadQueue[1:]
 
+	m.pendingDownloadBucket = task.bucket
+	m.pendingDownloadObject = task.object
+	m.pendingDownloadDest = task.dest
+	m.pendingDownloadIsPrefix = task.isPrefix
+
 	// Check if file already exists
 	if _, err := os.Stat(task.dest); err == nil {
 		m.state = viewDownloadConfirm
-		m.pendingDownloadBucket = task.bucket
-		m.pendingDownloadObject = task.object
-		m.pendingDownloadDest = task.dest
-		m.pendingDownloadIsPrefix = task.isPrefix
-		m.status = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest))
-		return m, nil
+		cmd := m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest)))
+		return m, cmd
 	}
 
-	if m.downloadTotal > 1 {
-		m.status = fmt.Sprintf("Downloading %d/%d: %s...", m.downloadFinished+1, m.downloadTotal, filepath.Base(task.dest))
-	} else {
-		m.status = fmt.Sprintf("Downloading %s...", filepath.Base(task.dest))
-	}
-	return m, m.fetchDownload(task.bucket, task.object, task.dest, task.isPrefix)
+	m.state = viewObjects
+	return m.startDownloadTask(task.dest)
 }
 
+// StatusMessageDuration is the duration a status message is shown in the footer.
+// It can be overridden in tests.
+var StatusMessageDuration = 3 * time.Second
+
 // clearStatusCmd returns a command that clears the status after a short delay.
-func clearStatusCmd() tea.Cmd {
-	return tea.Tick(time.Second*3, func(time.Time) tea.Msg {
-		return ClearStatusMsg{}
+func clearStatusCmd(id string) tea.Cmd {
+	return tea.Tick(StatusMessageDuration, func(time.Time) tea.Msg {
+		return ClearStatusMsg{ID: id}
 	})
 }
 

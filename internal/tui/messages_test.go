@@ -1,0 +1,92 @@
+package tui_test
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/idan-at/lazygcs/internal/tui"
+	"gotest.tools/v3/assert"
+)
+
+func TestModel_AddMessage_Bounding(t *testing.T) {
+	client := &mockGCSClient{}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+
+	// Add 600 messages (assuming limit is 500)
+	for i := 0; i < 600; i++ {
+		_ = m.AddMessage(tui.LevelInfo, fmt.Sprintf("message %d", i))
+	}
+
+	// Verify that the number of messages is bounded at 500
+	assert.Equal(t, len(m.Messages()), 500, "Messages queue should be bounded at 500, got %d", len(m.Messages()))
+}
+
+func TestModel_ErrorCount_Tracking(t *testing.T) {
+	client := &mockGCSClient{}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+
+	_ = m.AddMessage(tui.LevelInfo, "info 1")
+	_ = m.AddMessage(tui.LevelError, "error 1")
+	_ = m.AddMessage(tui.LevelWarn, "warn 1")
+	_ = m.AddMessage(tui.LevelError, "error 2")
+
+	// This method ErrorCount doesn't exist yet
+	assert.Equal(t, m.ErrorCount(), 2, "ErrorCount should be 2")
+}
+
+func TestModel_ErrorCount_Bounding(t *testing.T) {
+	client := &mockGCSClient{}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+
+	// Add 500 errors
+	for i := 0; i < 500; i++ {
+		_ = m.AddMessage(tui.LevelError, fmt.Sprintf("error %d", i))
+	}
+	assert.Equal(t, m.ErrorCount(), 500, "ErrorCount should be 500")
+
+	// Add 1 more error, it should still be 500 because one error was pushed out
+	_ = m.AddMessage(tui.LevelError, "one more error")
+	assert.Equal(t, m.ErrorCount(), 500, "ErrorCount should stay at 500 after overflow")
+
+	// Add 1 info message, it should push out an error
+	_ = m.AddMessage(tui.LevelInfo, "info message")
+	assert.Equal(t, m.ErrorCount(), 499, "ErrorCount should decrease to 499 as error is pushed out by info")
+}
+
+func TestModel_ClearStatusMsg(t *testing.T) {
+	client := &mockGCSClient{}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+
+	// Add an initial message
+	cmd1 := m.AddMessage(tui.LevelInfo, "first message")
+	msg1 := m.Messages()[len(m.Messages())-1]
+
+	// The status pill should be visible initially
+	assert.Assert(t, !m.HideStatusPill(), "hideStatusPill should be false after adding a message")
+
+	// Add a second message before the first clears
+	cmd2 := m.AddMessage(tui.LevelInfo, "second message")
+	msg2 := m.Messages()[len(m.Messages())-1]
+
+	// Simulate the first command's timer firing
+	tick1 := cmd1()
+	clearMsg1, ok := tick1.(tui.ClearStatusMsg)
+	assert.Assert(t, ok, "Expected ClearStatusMsg")
+	assert.Equal(t, clearMsg1.ID, msg1.ID, "ClearStatusMsg should have the ID of the first message")
+
+	m, _ = updateModel(m, clearMsg1)
+
+	// The status pill should STILL be visible because a newer message was added
+	assert.Assert(t, !m.HideStatusPill(), "hideStatusPill should remain false because a newer message exists")
+
+	// Simulate the second command's timer firing
+	tick2 := cmd2()
+	clearMsg2, ok := tick2.(tui.ClearStatusMsg)
+	assert.Assert(t, ok, "Expected ClearStatusMsg")
+	assert.Equal(t, clearMsg2.ID, msg2.ID, "ClearStatusMsg should have the ID of the second message")
+
+	m, _ = updateModel(m, clearMsg2)
+
+	// The status pill should now be hidden
+	assert.Assert(t, m.HideStatusPill(), "hideStatusPill should be true after the latest message clears")
+}

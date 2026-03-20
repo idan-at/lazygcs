@@ -300,13 +300,13 @@ func TestSnapshot_ErrorsModal(t *testing.T) {
 	tm.Send(tui.BucketsPageMsg{Err: errors.New("simulated permission denied error")})
 	tm.Send(tui.BucketsPageMsg{Err: errors.New("simulated network timeout")})
 
-	// Open errors modal
-	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlE})
+	// Open messages modal
+	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
 
 	// Wait for errors modal to appear
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
 		out := string(bts)
-		return strings.Contains(out, "ERRORS") || strings.Contains(out, "simulated permission denied")
+		return strings.Contains(out, "MESSAGES") || strings.Contains(out, "simulated permission denied")
 	}, teatest.WithDuration(2*time.Second))
 
 	// Trigger quit so FinalOutput can return

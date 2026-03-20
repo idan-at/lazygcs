@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/idan-at/lazygcs/internal/gcs"
@@ -120,6 +121,22 @@ func simpleObjectList(names []string, prefixes []string) *gcs.ObjectList {
 }
 
 func updateModel(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
+	if msg == nil {
+		return m, nil
+	}
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		var finalCmds []tea.Cmd
+		for _, cmd := range batchMsg {
+			if cmd != nil {
+				resM, resCmd := updateModel(m, cmd())
+				m = resM
+				if resCmd != nil {
+					finalCmds = append(finalCmds, resCmd)
+				}
+			}
+		}
+		return m, tea.Batch(finalCmds...)
+	}
 	updatedM, cmd := m.Update(msg)
 	return updatedM.(tui.Model), cmd
 }
@@ -157,35 +174,45 @@ func resolveFetchCmd(cmd tea.Cmd) tea.Msg {
 		return nil
 	}
 	msg := cmd()
-	if batchMsg, ok := msg.(tea.BatchMsg); ok {
-		// Just take the first valid DebouncePreviewMsg or HoverPrefetchTickMsg
-		for _, c := range batchMsg {
-			if c != nil {
-				subMsg := c()
-				if dMsg, ok := subMsg.(tui.DebouncePreviewMsg); ok {
-					if dMsg.FetchCmd != nil {
-						return dMsg.FetchCmd()
-					}
-				}
-				if hMsg, ok := subMsg.(tui.HoverPrefetchTickMsg); ok {
-					if hMsg.FetchCmd != nil {
-						return hMsg.FetchCmd()
+
+	// Helper to resolve nested messages (like from AddMessage or Debounce)
+	var resolve func(tea.Msg) tea.Msg
+	resolve = func(m tea.Msg) tea.Msg {
+		if m == nil {
+			return nil
+		}
+		if batchMsg, ok := m.(tea.BatchMsg); ok {
+			for _, c := range batchMsg {
+				if c != nil {
+					res := resolve(c())
+					if res != nil {
+						return res
 					}
 				}
 			}
+			return nil
 		}
-	}
-	if dMsg, ok := msg.(tui.DebouncePreviewMsg); ok {
-		if dMsg.FetchCmd != nil {
-			return dMsg.FetchCmd()
+		if dMsg, ok := m.(tui.DebouncePreviewMsg); ok {
+			if dMsg.FetchCmd != nil {
+				return resolve(dMsg.FetchCmd())
+			}
 		}
-	}
-	if hMsg, ok := msg.(tui.HoverPrefetchTickMsg); ok {
-		if hMsg.FetchCmd != nil {
-			return hMsg.FetchCmd()
+		if hMsg, ok := m.(tui.HoverPrefetchTickMsg); ok {
+			if hMsg.FetchCmd != nil {
+				return resolve(hMsg.FetchCmd())
+			}
 		}
+		// Skip UI infrastructure messages
+		if _, ok := m.(tui.ClearStatusMsg); ok {
+			return nil
+		}
+		if _, ok := m.(spinner.TickMsg); ok {
+			return nil
+		}
+		return m
 	}
-	return msg
+
+	return resolve(msg)
 }
 
 func TestModel_UI_WrappingBug(t *testing.T) {

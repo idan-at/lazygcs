@@ -82,8 +82,9 @@ type ContentMsg struct {
 
 // DownloadMsg is sent when a download operation completes.
 type DownloadMsg struct {
-	Path string
-	Err  error
+	Path   string
+	TaskID string
+	Err    error
 }
 
 // FileOpenedMsg is sent when a file opening operation completes.
@@ -105,7 +106,35 @@ type UploadMsg struct {
 }
 
 // ClearStatusMsg is sent to clear the status bar.
-type ClearStatusMsg struct{}
+type ClearStatusMsg struct {
+	ID string
+}
+
+// MsgLevel defines the severity of a log message.
+type MsgLevel int
+
+// Predefined log levels
+const (
+	LevelInfo MsgLevel = iota
+	LevelWarn
+	LevelError
+)
+
+// LogMessage represents a unified, timestamped log entry.
+type LogMessage struct {
+	Timestamp time.Time
+	Level     MsgLevel
+	Text      string
+	ID        string // Unique identifier for the message/transaction
+}
+
+// Task represents a tracked background operation.
+type Task struct {
+	ID       string // Unique ID (e.g., destination path or UUID)
+	Name     string // Display name (e.g., "Downloading file.txt")
+	Started  time.Time
+	Progress int // 0-100 (for future progress bar support)
+}
 
 // DebouncePreviewMsg is sent after a delay to trigger a preview fetch.
 type DebouncePreviewMsg struct {

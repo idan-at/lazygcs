@@ -120,10 +120,18 @@ func TestModel_Actions_Open(t *testing.T) {
 	assert.Assert(t, cmd != nil)
 	assert.Assert(t, strings.Contains(m.View(), "Opening obj1..."))
 
-	// Resolve the command (which triggers the download and exec)
+	// Resolve the command (which is a batch containing openFile and clearStatusCmd)
 	msg := cmd()
-	// FileOpenedMsg is returned by openFile
-	_, _ = updateModel(m, msg)
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batchMsg {
+			if c != nil {
+				subMsg := c()
+				if foMsg, ok := subMsg.(tui.FileOpenedMsg); ok {
+					_, _ = updateModel(m, foMsg)
+				}
+			}
+		}
+	}
 
 	// Verify mock client was called for download
 	assert.Equal(t, client.lastDownload.Bucket, "b1")
@@ -191,7 +199,7 @@ func TestModel_DownloadAction(t *testing.T) {
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 
 	assert.Assert(t, cmd != nil)
-	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."), "View should show downloading status with filename")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1..."), "View should show downloading status with filename")
 
 	// Simulate download completion
 	m, _ = updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1"})
@@ -236,7 +244,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	assert.Assert(t, cmd2 != nil, "Expected a second download command to be queued")
 	assert.Assert(t, strings.Contains(m.View(), "Downloading 2/2"), "View should show batch downloading progress for the second item")
 
-	msg2 := cmd2()
+	msg2 := resolveFetchCmd(cmd2)
 	dl2, ok2 := msg2.(tui.DownloadMsg)
 	assert.Assert(t, ok2, "Expected a tui.DownloadMsg for the second item")
 
@@ -280,18 +288,19 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	// Press 'd' to download
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 
-	// Assert that we are prompted for confirmation and no command is returned yet
-	assert.Assert(t, cmd == nil, "No command should be returned when asking for confirmation")
-	assert.Assert(t, strings.Contains(m.View(), "File exists"), "View should indicate file exists")
-	assert.Assert(t, strings.Contains(m.View(), "(o)verwrite"), "View should present overwrite option")
-	assert.Assert(t, strings.Contains(m.View(), "(a)bort"), "View should present abort option")
-	assert.Assert(t, strings.Contains(m.View(), "(r)ename"), "View should present rename option")
+	// Assert that we are prompted for confirmation
+	assert.Assert(t, cmd != nil, "Command should be returned to clear the prompt message")
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "File exists"), "Message should indicate file exists")
+	assert.Assert(t, strings.Contains(view, "(o)verwrite"), "Message should present overwrite option")
+	assert.Assert(t, strings.Contains(view, "(a)bort"), "Message should present abort option")
+	assert.Assert(t, strings.Contains(view, "(r)ename"), "Message should present rename option")
 
 	// Press 'a' to abort
 	m, cmd = pressKey(m, 'a')
 
-	assert.Assert(t, cmd == nil, "No command should be returned after abort")
-	assert.Assert(t, strings.Contains(m.View(), "Download aborted"), "View should indicate abortion")
+	assert.Assert(t, cmd != nil, "A clear status command should be returned after abort")
+	assert.Assert(t, strings.Contains(m.View(), "Download aborted"), "Message should indicate abortion")
 }
 
 func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
@@ -317,12 +326,16 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
 
 	assert.Assert(t, cmd != nil, "Cmd should be returned for overwrite")
-	assert.Assert(t, strings.Contains(m.View(), "Downloading (overwriting)..."), "View should show overwriting status")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1..."), "View should show overwriting status")
+	assert.Assert(t, strings.Contains(m.View(), "⟳ 1 Tasks"), "Expected task to be tracked in footer")
 
 	msg := resolveFetchCmd(cmd)
 	downloadMsg, ok := msg.(tui.DownloadMsg)
 	assert.Assert(t, ok, "Expected DownloadMsg")
 	assert.Equal(t, downloadMsg.Path, existingFile)
+
+	m, _ = updateModel(m, downloadMsg)
+	assert.Assert(t, !strings.Contains(m.View(), "⟳ 1 Tasks"), "Expected task to be removed after download completes")
 }
 
 func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
@@ -349,12 +362,17 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 
 	assert.Assert(t, cmd != nil, "Cmd should be returned for rename")
 
+	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1_1..."), "View should show downloading renamed file status")
+	assert.Assert(t, strings.Contains(m.View(), "⟳ 1 Tasks"), "Expected task to be tracked in footer")
+
 	msg := resolveFetchCmd(cmd)
 	downloadMsg, ok := msg.(tui.DownloadMsg)
 	assert.Assert(t, ok, "Expected DownloadMsg")
 	expectedNewPath := filepath.Join(downloadDir, "obj1_1")
 	assert.Equal(t, downloadMsg.Path, expectedNewPath)
-	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1_1..."), "View should show downloading renamed file status")
+
+	m, _ = updateModel(m, downloadMsg)
+	assert.Assert(t, !strings.Contains(m.View(), "⟳ 1 Tasks"), "Expected task to be removed after download completes")
 }
 
 func TestModel_DownloadStatusAutoClear(t *testing.T) {
@@ -368,13 +386,13 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 
 	// Trigger download status
 	m, _ = pressKey(m, 'd')
-	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."))
+	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1..."))
 
 	// Move cursor down
 	m, _ = pressKey(m, 'j')
 
 	// Status should PERSIST during navigation while downloading
-	assert.Assert(t, strings.Contains(m.View(), "Downloading obj1..."), "Download status should persist after navigation")
+	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1..."), "Download status should persist after navigation")
 
 	// Trigger download success
 	m, cmd := updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1"})
@@ -384,7 +402,7 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 	assert.Assert(t, cmd != nil, "Expected a command to clear the status")
 
 	// Execute the command (simulate timer firing)
-	msg := resolveFetchCmd(cmd)
+	msg := cmd()
 	m, _ = updateModel(m, msg)
 
 	// Status should be CLEARED

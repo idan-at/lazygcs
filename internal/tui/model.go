@@ -7,6 +7,7 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/idan-at/lazygcs/internal/gcs"
 	"github.com/idan-at/lazygcs/internal/preview"
@@ -46,7 +47,6 @@ type Model struct {
 	state          viewState
 	previewContent string
 	showHelp       bool
-	showErrors     bool
 
 	// Search State
 	searchMode        bool
@@ -84,9 +84,10 @@ type Model struct {
 	loading         bool
 	loadingProjects map[string]bool
 	bgJobs          int
-	status          string
+	activeTasks     map[string]Task
+	showMessages    bool
+	msgQueue        *MessageQueue
 	err             error
-	errorsList      []error
 	help            help.Model
 	spinner         spinner.Model
 	previewRegistry *preview.Registry
@@ -149,6 +150,8 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		loading:              true,
 		loadingProjects:      loadingProjects,
 		bgJobs:               len(projectIDs),
+		msgQueue:             NewMessageQueue(),
+		activeTasks:          make(map[string]Task),
 		selected:             make(map[string]struct{}),
 		collapsedProjects:    make(map[string]struct{}),
 		help:                 help.New(),
@@ -187,15 +190,33 @@ func (m Model) Prefixes() []gcs.PrefixMetadata {
 	return m.prefixes
 }
 
+// Messages returns the current list of log messages.
+func (m Model) Messages() []LogMessage {
+	return m.msgQueue.Messages()
+}
+
+// ErrorCount returns the number of log messages with LevelError.
+func (m Model) ErrorCount() int {
+	return m.msgQueue.ErrorCount
+}
+
+// HideStatusPill returns whether the status pill is currently hidden.
+func (m Model) HideStatusPill() bool {
+	return m.msgQueue.HideStatusPill
+}
+
+// AddMessage appends a new message and returns a command to clear it from the status bar after a delay.
+func (m Model) AddMessage(level MsgLevel, text string) tea.Cmd {
+	return m.msgQueue.AddMessage(level, text)
+}
+
 func (m Model) resetObjectsState() Model {
 	m.objects = nil
 	m.prefixes = nil
 	m.cursor = 0
 	m.loading = true
 	m.bgJobs++
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
+	// Removed status clear logic
 	m.selected = make(map[string]struct{})
 	return m
 }

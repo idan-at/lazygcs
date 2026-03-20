@@ -192,9 +192,6 @@ func (m Model) footerView() string {
 	} else if q != "" {
 		statusText = fmt.Sprintf(" FILTER: %s ", q)
 		statusStyle = statusStyle.Background(lipgloss.Color("61")).Foreground(lipgloss.Color("15"))
-	} else if m.status != "" {
-		statusText = fmt.Sprintf(" %s ", m.status)
-		statusStyle = statusStyle.Background(lipgloss.Color("130")).Foreground(lipgloss.Color("15"))
 	} else if m.bgJobs > len(m.loadingProjects) {
 		statusText = m.renderSpinner()
 		statusStyle = lipgloss.NewStyle().Padding(0, 1)
@@ -202,14 +199,40 @@ func (m Model) footerView() string {
 
 	pill := statusStyle.Render(statusText)
 
+	var tasksPill string
+	if len(m.activeTasks) > 0 {
+		tasksPill = " " + lipgloss.NewStyle().
+			Bold(true).
+			Padding(0, 1).
+			Background(lipgloss.Color("130")).
+			Foreground(lipgloss.Color("15")).
+			Render(fmt.Sprintf("⟳ %d Tasks", len(m.activeTasks)))
+	}
+
+	var msgPill string
+	if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
+		latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
+		style := lipgloss.NewStyle().Padding(0, 1)
+		switch latest.Level {
+		case LevelError:
+			style = style.Background(lipgloss.Color("196")).Foreground(lipgloss.Color("15"))
+		case LevelWarn:
+			style = style.Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0"))
+		default:
+			style = style.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
+		}
+		msgPill = " " + style.Render(latest.Text)
+	}
+
 	var errorsPill string
-	if len(m.errorsList) > 0 {
+	errCount := m.msgQueue.ErrorCount
+	if errCount > 0 {
 		errorsPill = " " + lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
 			Background(lipgloss.Color("196")). // Red background
 			Foreground(lipgloss.Color("15")).
-			Render(fmt.Sprintf("%d ERRORS", len(m.errorsList)))
+			Render(fmt.Sprintf("%d ERRORS", errCount))
 	}
 
 	// Right side: Help hints
@@ -220,13 +243,14 @@ func (m Model) footerView() string {
 
 	// Build the ribbon
 	rightPadding := 1
-	gapWidth := m.width - lipgloss.Width(pill) - lipgloss.Width(errorsPill) - lipgloss.Width(helpView) - rightPadding
+	leftContent := pill + tasksPill + msgPill + errorsPill
+	gapWidth := m.width - lipgloss.Width(leftContent) - lipgloss.Width(helpView) - rightPadding
 	if gapWidth < 0 {
 		gapWidth = 0
 	}
 	gap := strings.Repeat(" ", gapWidth)
 
-	return "\n" + pill + errorsPill + gap + helpView + strings.Repeat(" ", rightPadding)
+	return "\n" + leftContent + gap + helpView + strings.Repeat(" ", rightPadding)
 }
 
 func (m Model) maxItemsVisible() int {
@@ -495,14 +519,14 @@ func (m Model) View() string {
 	}
 
 	result := view
-	if m.showErrors {
+	if m.showMessages {
 		// Use lipgloss.Place to center the errors modal.
 		result = lipgloss.Place(
 			m.width,
 			m.height,
 			lipgloss.Center,
 			lipgloss.Center,
-			m.errorsView(),
+			m.messagesView(),
 			lipgloss.WithWhitespaceChars(" "),
 			lipgloss.WithWhitespaceForeground(lipgloss.Color("236")),
 		)
@@ -561,25 +585,46 @@ func (m Model) helpView() string {
 	return box
 }
 
-func (m Model) errorsView() string {
+func (m Model) messagesView() string {
 	var s strings.Builder
 
 	title := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("204")).
-		Render(fmt.Sprintf("ERRORS (%d)", len(m.errorsList)))
+		Foreground(lipgloss.Color("69")).
+		Render(fmt.Sprintf("MESSAGES (%d)", len(m.msgQueue.Messages())))
 
 	s.WriteString(title + "\n\n")
 
-	// Limit to last 10 errors to avoid huge modals
-	start := 0
-	if len(m.errorsList) > 10 {
-		start = len(m.errorsList) - 10
+	start := m.msgQueue.MessagesScroll
+	end := start + 15
+	if end > len(m.msgQueue.Messages()) {
+		end = len(m.msgQueue.Messages())
 	}
 
-	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	for i := start; i < len(m.errorsList); i++ {
-		s.WriteString("• " + errStyle.Render(m.errorsList[i].Error()) + "\n")
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+
+	for i := start; i < end; i++ {
+		msg := m.msgQueue.Messages()[i]
+		timeStr := msg.Timestamp.Format("15:04:05")
+		if m.deterministicSpinner {
+			timeStr = "12:00:00"
+		}
+
+		levelStr := "[INFO] "
+		style := infoStyle
+		switch msg.Level {
+		case LevelWarn:
+			levelStr = "[WARN] "
+			style = warnStyle
+		case LevelError:
+			levelStr = "[ERROR]"
+			style = errStyle
+		}
+
+		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(levelStr), textStyle.Render(msg.Text))
 	}
 
 	footer := lipgloss.NewStyle().
@@ -587,19 +632,22 @@ func (m Model) errorsView() string {
 		MarginTop(1).
 		Render("Press esc or q to close")
 
-	s.WriteString(footer)
+	s.WriteString("\n" + footer)
 
-	boxWidth := m.width / 2
+	boxWidth := m.width - 10
 	if boxWidth < 50 {
 		boxWidth = 50
 	}
 	if boxWidth > m.width-4 {
 		boxWidth = m.width - 4
+		if boxWidth < 10 {
+			boxWidth = 10
+		}
 	}
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("204")).
+		BorderForeground(lipgloss.Color("69")).
 		Padding(1, 2).
 		Width(boxWidth).
 		Render(s.String())

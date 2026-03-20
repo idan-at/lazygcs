@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
@@ -32,11 +31,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleDownloadMsg(msg)
 	case FileOpenedMsg:
 		if msg.Err != nil {
-			m.status = fmt.Sprintf("Error opening file: %v", msg.Err)
-			return m, clearStatusCmd()
+			statusCmd := m.AddMessage(LevelError, fmt.Sprintf("Error opening file: %v", msg.Err))
+			return m, statusCmd
 		}
 		// The status is already set to "Opening...", which gets cleared naturally or we can clear it.
-		return m, clearStatusCmd()
+		return m, nil
 	case EditorFinishedMsg:
 		return m.handleEditorFinishedMsg(msg)
 	case UploadMsg:
@@ -60,9 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case ClearStatusMsg:
-		if !strings.HasPrefix(m.status, "Downloading") {
-			m.status = ""
-		}
+		m.msgQueue.ClearStatusPill(msg.ID)
 		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -82,14 +79,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		m.errorsList = append(m.errorsList, msg.Err)
+		cmd := m.AddMessage(LevelError, msg.Err.Error())
 		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 {
 			m.bgJobs = 0
 		}
 		delete(m.loadingProjects, msg.ProjectID)
-		return m, nil
+		return m, cmd
 	}
 
 	// Find if project already exists in m.projects
@@ -180,8 +177,8 @@ func (m Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		m.bgJobs = 0
 	}
 	if msg.Err != nil {
-		m.errorsList = append(m.errorsList, msg.Err)
-		return m, nil
+		cmd := m.AddMessage(LevelError, msg.Err.Error())
+		return m, cmd
 	}
 
 	cacheKey := msg.Bucket + "::" + msg.Prefix
@@ -239,13 +236,13 @@ func (m Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.Err != nil {
-		m.errorsList = append(m.errorsList, msg.Err)
+		cmd := m.AddMessage(LevelError, msg.Err.Error())
 		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 {
 			m.bgJobs = 0
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	isFirstPage := len(m.objects) == 0 && len(m.prefixes) == 0
@@ -328,6 +325,7 @@ func (m Model) handleMetadataMsg(msg MetadataMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleContentMsg(msg ContentMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	// Make sure the content is for the currently selected object (respecting filters)
 	if m.state == viewObjects {
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
@@ -340,7 +338,7 @@ func (m Model) handleContentMsg(msg ContentMsg) (tea.Model, tea.Cmd) {
 					} else {
 						m.previewContent = msg.Content // Show whatever content we got (fallback)
 					}
-					m.errorsList = append(m.errorsList, msg.Err)
+					cmd = m.AddMessage(LevelError, msg.Err.Error())
 				} else {
 					m.previewContent = msg.Content
 					cacheKey := m.currentBucket + "::" + msg.ObjectName
@@ -349,26 +347,28 @@ func (m Model) handleContentMsg(msg ContentMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	return m, nil
+	return m, cmd
 }
 
 func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
+	delete(m.activeTasks, msg.TaskID)
+	var cmd tea.Cmd
 	if msg.Err != nil {
-		m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf("Download failed: %v", msg.Err))
+		cmd = m.AddMessage(LevelError, fmt.Sprintf("Download failed: %v", msg.Err))
 	} else {
 		m.downloadFinished++
 		if len(m.downloadQueue) == 0 && m.downloadTotal > 1 {
-			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded %d files", m.downloadTotal))
+			cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Downloaded %d files", m.downloadTotal))
 		} else if len(m.downloadQueue) == 0 {
-			m.status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("Downloaded to %s", msg.Path))
+			cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Downloaded to %s", msg.Path))
 		}
 	}
 
 	if len(m.downloadQueue) > 0 {
-		m, cmd := m.processDownloadQueue()
-		return m, cmd
+		m, nextCmd := m.processDownloadQueue()
+		return m, tea.Batch(cmd, nextCmd)
 	}
-	return m, clearStatusCmd()
+	return m, cmd
 }
 
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -380,10 +380,46 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showErrors {
+	if m.showMessages {
 		switch {
-		case key.Matches(msg, keys.Errors), key.Matches(msg, keys.Quit), key.Matches(msg, keys.Esc):
-			m.showErrors = false
+		case key.Matches(msg, keys.Messages), key.Matches(msg, keys.Quit), key.Matches(msg, keys.Esc):
+			m.showMessages = false
+		case key.Matches(msg, keys.Up):
+			m.msgQueue.MessagesScroll--
+			if m.msgQueue.MessagesScroll < 0 {
+				m.msgQueue.MessagesScroll = 0
+			}
+		case key.Matches(msg, keys.Down):
+			m.msgQueue.MessagesScroll++
+			maxScroll := len(m.msgQueue.Messages()) - 15
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			if m.msgQueue.MessagesScroll > maxScroll {
+				m.msgQueue.MessagesScroll = maxScroll
+			}
+		case key.Matches(msg, keys.PageUp), key.Matches(msg, keys.HalfPageUp):
+			m.msgQueue.MessagesScroll -= 15
+			if m.msgQueue.MessagesScroll < 0 {
+				m.msgQueue.MessagesScroll = 0
+			}
+		case key.Matches(msg, keys.PageDown), key.Matches(msg, keys.HalfPageDown):
+			m.msgQueue.MessagesScroll += 15
+			maxScroll := len(m.msgQueue.Messages()) - 15
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			if m.msgQueue.MessagesScroll > maxScroll {
+				m.msgQueue.MessagesScroll = maxScroll
+			}
+		case key.Matches(msg, keys.Top):
+			m.msgQueue.MessagesScroll = 0
+		case key.Matches(msg, keys.Bottom):
+			maxScroll := len(m.msgQueue.Messages()) - 15
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			m.msgQueue.MessagesScroll = maxScroll
 		}
 		return m, nil
 	}
@@ -416,9 +452,13 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = true
 		return m, nil
 
-	case key.Matches(msg, keys.Errors):
-		if len(m.errorsList) > 0 {
-			m.showErrors = true
+	case key.Matches(msg, keys.Messages):
+		if len(m.msgQueue.Messages()) > 0 {
+			m.showMessages = true
+			m.msgQueue.MessagesScroll = len(m.msgQueue.Messages()) - 15
+			if m.msgQueue.MessagesScroll < 0 {
+				m.msgQueue.MessagesScroll = 0
+			}
 		}
 		return m, nil
 
@@ -479,7 +519,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleCopyKey()
 
 	case key.Matches(msg, keys.Refresh):
-		return m.handleRefreshKey()
+		return m.handleRefreshKey(false)
 
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
@@ -532,25 +572,23 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "o":
-		m.status = "Downloading (overwriting)..."
 		m.state = viewObjects
-		return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, m.pendingDownloadDest, m.pendingDownloadIsPrefix)
+		return m.startDownloadTask(m.pendingDownloadDest)
 	case "a", "q", "ctrl+c", "esc":
-		m.status = "Download aborted."
+		cmd := m.AddMessage(LevelInfo, "Download aborted.")
 		m.state = viewObjects
 		m.downloadQueue = nil // Clear the rest of the queue
-		return m, nil
+		return m, cmd
 	case "r":
 		newDest, err := autoRename(m.pendingDownloadDest)
 		if err != nil {
-			m.status = fmt.Sprintf("Rename failed: %v", err)
+			cmd := m.AddMessage(LevelError, fmt.Sprintf("Rename failed: %v", err))
 			m.state = viewObjects
 			m.downloadQueue = nil
-			return m, nil
+			return m, cmd
 		}
-		m.status = fmt.Sprintf("Downloading as %s...", filepath.Base(newDest))
 		m.state = viewObjects
-		return m, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, newDest, m.pendingDownloadIsPrefix)
+		return m.startDownloadTask(newDest)
 	}
 	return m, nil
 }
@@ -616,9 +654,6 @@ func (m Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -638,9 +673,6 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -660,9 +692,6 @@ func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleHalfPageDownKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -689,9 +718,6 @@ func (m Model) handleHalfPageDownKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleHalfPageUpKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -718,9 +744,6 @@ func (m Model) handleHalfPageUpKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handlePageDownKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -747,9 +770,6 @@ func (m Model) handlePageDownKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handlePageUpKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -776,9 +796,6 @@ func (m Model) handlePageUpKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleTopKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	oldCursor := m.cursor
 	m.cursor = 0
@@ -786,9 +803,6 @@ func (m Model) handleTopKey() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleBottomKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = ""
-	}
 
 	var itemsCount int
 	switch m.state {
@@ -807,9 +821,10 @@ func (m Model) handleBottomKey() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleRefreshKey() (tea.Model, tea.Cmd) {
-	if !strings.HasPrefix(m.status, "Downloading") {
-		m.status = "Refreshing..."
+func (m Model) handleRefreshKey(silent bool) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	if !silent {
+		cmd = m.AddMessage(LevelInfo, "Refreshing...")
 	}
 
 	switch m.state {
@@ -821,6 +836,7 @@ func (m Model) handleRefreshKey() (tea.Model, tea.Cmd) {
 			m.loadingProjects[id] = true
 		}
 		var cmds []tea.Cmd
+		cmds = append(cmds, cmd)
 		for _, pID := range m.projectIDs {
 			cmds = append(cmds, m.fetchBucketsPage(pID, ""))
 		}
@@ -833,9 +849,9 @@ func (m Model) handleRefreshKey() (tea.Model, tea.Cmd) {
 		// Invalidate cache for current prefix
 		cacheKey := m.currentBucket + "::" + m.currentPrefix
 		delete(m.listCache, cacheKey)
-		return m, m.fetchObjects()
+		return m, tea.Batch(cmd, m.fetchObjects())
 	}
-	return m, nil
+	return m, cmd
 }
 
 func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
@@ -854,8 +870,8 @@ func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
 		if len(m.selected) > 1 {
-			m.status = "Cannot copy multiple files at once"
-			return m, clearStatusCmd()
+			statusCmd := m.AddMessage(LevelError, "Cannot copy multiple files at once")
+			return m, statusCmd
 		}
 
 		// If there is a single selection, copy it
@@ -883,17 +899,18 @@ func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 	content := strings.Join(uris, "\n")
 	err := m.clipboard.WriteAll(content)
 	if err != nil {
-		m.status = fmt.Sprintf("Clipboard error: %v", err)
-		return m, nil
+		cmd := m.AddMessage(LevelInfo, fmt.Sprintf("Clipboard error: %v", err))
+		return m, cmd
 	}
 
+	var cmd tea.Cmd
 	if len(uris) == 1 {
-		m.status = fmt.Sprintf("Copied %s to clipboard", uris[0])
+		cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Copied %s to clipboard", uris[0]))
 	} else {
-		m.status = fmt.Sprintf("Copied %d URIs to clipboard", len(uris))
+		cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Copied %d URIs to clipboard", len(uris)))
 	}
 
-	return m, clearStatusCmd()
+	return m, cmd
 }
 
 func (m Model) handleRootKey() (tea.Model, tea.Cmd) {
@@ -1101,17 +1118,17 @@ func (m Model) handleOpenKey() (tea.Model, tea.Cmd) {
 	targetName, err := m.getSingleTargetObject()
 	switch err {
 	case targetErrMultiple:
-		m.status = "Cannot open multiple files at once"
-		return m, clearStatusCmd()
+		statusCmd := m.AddMessage(LevelError, "Cannot open multiple files at once")
+		return m, statusCmd
 	case targetErrDirectory:
-		m.status = "Cannot open a directory"
-		return m, clearStatusCmd()
+		statusCmd := m.AddMessage(LevelError, "Cannot open a directory")
+		return m, statusCmd
 	case targetErrNotSelected:
 		return m, nil
 	}
 
-	m.status = fmt.Sprintf("Opening %s...", filepath.Base(targetName))
-	return m, m.openFile(m.currentBucket, targetName)
+	statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Opening %s...", filepath.Base(targetName)))
+	return m, tea.Batch(m.openFile(m.currentBucket, targetName), statusCmd)
 }
 
 func (m Model) handleEditKey() (tea.Model, tea.Cmd) {
@@ -1122,53 +1139,57 @@ func (m Model) handleEditKey() (tea.Model, tea.Cmd) {
 	targetName, err := m.getSingleTargetObject()
 	switch err {
 	case targetErrMultiple:
-		m.status = "Cannot edit multiple files at once"
-		return m, clearStatusCmd()
+		statusCmd := m.AddMessage(LevelError, "Cannot edit multiple files at once")
+		return m, statusCmd
 	case targetErrDirectory:
-		m.status = "Cannot edit a directory"
-		return m, clearStatusCmd()
+		statusCmd := m.AddMessage(LevelError, "Cannot edit a directory")
+		return m, statusCmd
 	case targetErrNotSelected:
 		return m, nil
 	}
 
-	m.status = fmt.Sprintf("Opening %s...", filepath.Base(targetName))
+	cmd := m.AddMessage(LevelInfo, fmt.Sprintf("Opening %s...", filepath.Base(targetName)))
 	// Save target name for re-upload
 	m.targetPrefixCursor = targetName
-	return m, m.editFile(m.currentBucket, targetName)
+	return m, tea.Batch(cmd, m.editFile(m.currentBucket, targetName))
 }
 
 func (m Model) handleEditorFinishedMsg(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		m.status = fmt.Sprintf("Editor error: %v", msg.Err)
-		return m, clearStatusCmd()
+		statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Editor error: %v", msg.Err))
+		return m, statusCmd
 	}
 
 	info, err := os.Stat(msg.TempPath)
 	if err != nil {
-		m.status = fmt.Sprintf("Error checking file: %v", err)
-		return m, clearStatusCmd()
+		statusCmd := m.AddMessage(LevelError, fmt.Sprintf("Error checking file: %v", err))
+		return m, statusCmd
 	}
 
 	if info.ModTime().After(msg.OriginalModTime) {
-		m.status = fmt.Sprintf("Uploading changes to %s...", filepath.Base(msg.TempPath))
+		cmd := m.AddMessage(LevelInfo, fmt.Sprintf("Uploading changes to %s...", filepath.Base(msg.TempPath)))
 		// m.targetPrefixCursor stores the object name from handleEditKey
-		return m, m.uploadFile(m.currentBucket, m.targetPrefixCursor, msg.TempPath)
+		return m, tea.Batch(cmd, m.uploadFile(m.currentBucket, m.targetPrefixCursor, msg.TempPath))
 	}
 
-	m.status = "No changes made"
-	return m, clearStatusCmd()
+	statusCmd := m.AddMessage(LevelInfo, "No changes made")
+	return m, statusCmd
 }
 
 func (m Model) handleUploadMsg(msg UploadMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	if msg.Err != nil {
-		m.status = fmt.Sprintf("Upload failed: %v", msg.Err)
+		cmd = m.AddMessage(LevelError, fmt.Sprintf("Upload failed: %v", msg.Err))
 	} else {
-		m.status = fmt.Sprintf("Uploaded %s", filepath.Base(msg.ObjectName))
+		cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Uploaded %s", filepath.Base(msg.ObjectName)))
 		cacheKey := m.currentBucket + "::" + msg.ObjectName
 		delete(m.contentCache, cacheKey)
 		delete(m.metadataCache, cacheKey)
 		// Refresh view to show updated metadata (size/time)
-		return m.handleRefreshKey()
+		var refreshCmd tea.Cmd
+		var newModel tea.Model
+		newModel, refreshCmd = m.handleRefreshKey(true)
+		return newModel, tea.Batch(cmd, refreshCmd)
 	}
-	return m, clearStatusCmd()
+	return m, cmd
 }

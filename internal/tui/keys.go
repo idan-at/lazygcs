@@ -24,7 +24,7 @@ type keyMap struct {
 	Search       key.Binding
 	Esc          key.Binding
 	Help         key.Binding
-	Errors       key.Binding
+	Messages     key.Binding
 	Quit         key.Binding
 }
 
@@ -55,7 +55,7 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.HalfPageUp,
 		k.HalfPageDown,
 		k.Root,
-		k.Errors,
+		k.Messages,
 		k.Help,
 		k.Quit,
 	}
@@ -67,7 +67,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Left, k.Right, k.Root},                               // Navigation
 		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown}, // Pagination
 		{k.Select, k.Download, k.Copy, k.Open, k.Edit, k.Refresh, k.Search},   // Actions
-		{k.Esc, k.Errors, k.Help, k.Quit},                                     // App
+		{k.Esc, k.Messages, k.Help, k.Quit},                                   // App
 	}
 }
 
@@ -152,9 +152,9 @@ var keys = keyMap{
 		key.WithKeys("?"),
 		key.WithHelp("?", "toggle help"),
 	),
-	Errors: key.NewBinding(
-		key.WithKeys("ctrl+e"),
-		key.WithHelp("ctrl+e", "toggle errors"),
+	Messages: key.NewBinding(
+		key.WithKeys("m"),
+		key.WithHelp("m", "messages"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
