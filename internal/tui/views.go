@@ -627,10 +627,13 @@ func (m Model) messagesView() string {
 		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(levelStr), textStyle.Render(msg.Text))
 	}
 
-	footer := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		MarginTop(1).
-		Render("Press esc or q to close")
+	keyStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)
+	descStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+
+	line1 := descStyleFooter.Render("Use ") + keyStyleFooter.Render("j/k") + descStyleFooter.Render(" to scroll")
+	line2 := keyStyleFooter.Render("esc") + descStyleFooter.Render(" or ") + keyStyleFooter.Render("q") + descStyleFooter.Render(" to close")
+
+	footer := lipgloss.NewStyle().MarginTop(1).Render(line1 + "\n" + line2)
 
 	s.WriteString("\n" + footer)
 
