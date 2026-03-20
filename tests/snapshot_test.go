@@ -253,13 +253,19 @@ func TestSnapshot_MultiSelectionView(t *testing.T) {
 	tm.Type(" ")
 	// Move to file2.txt
 	tm.Type("j")
+	// We wait for "content2" (the preview of file2.txt) to appear to ensure a stable, deterministic state before selecting.
+	teatest.WaitFor(t, tee, func(bts []byte) bool {
+		return strings.Contains(string(bts), "content2")
+	}, teatest.WithDuration(3*time.Second))
+
 	// Select file2.txt
 	tm.Type(" ")
 
-	// Wait for the second selection to be processed and rendered.
-	// We wait for "content2" (the preview of file2.txt) to appear to ensure a stable, deterministic state before quitting.
+	// Wait for the second selection to be processed and rendered
+	// Since Bubbletea uses partial redraws, the new bts will only contain the updated line for file2.txt.
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		return strings.Contains(string(bts), "content2")
+		s := string(bts)
+		return strings.Contains(s, "✓") && strings.Contains(s, "file2")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Trigger quit
