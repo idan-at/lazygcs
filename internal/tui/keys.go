@@ -14,7 +14,7 @@ type keyMap struct {
 	HalfPageDown key.Binding
 	Left         key.Binding
 	Right        key.Binding
-	Root         key.Binding
+	Home         key.Binding
 	Select       key.Binding
 	Download     key.Binding
 	Copy         key.Binding
@@ -54,7 +54,7 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.PageDown,
 		k.HalfPageUp,
 		k.HalfPageDown,
-		k.Root,
+		k.Home,
 		k.Messages,
 		k.Help,
 		k.Quit,
@@ -64,7 +64,7 @@ func (k keyMap) OrderedHelp() []key.Binding {
 // FullHelp returns keybindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right, k.Root},                               // Navigation
+		{k.Up, k.Down, k.Left, k.Right, k.Home},                               // Navigation
 		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown}, // Pagination
 		{k.Select, k.Download, k.Copy, k.Open, k.Edit, k.Refresh, k.Search},   // Actions
 		{k.Esc, k.Messages, k.Help, k.Quit},                                   // App
@@ -112,9 +112,9 @@ var keys = keyMap{
 		key.WithKeys("right", "l", "enter"),
 		key.WithHelp("→/l", "enter"),
 	),
-	Root: key.NewBinding(
+	Home: key.NewBinding(
 		key.WithKeys("H"),
-		key.WithHelp("H", "root"),
+		key.WithHelp("H", "home"),
 	),
 	Select: key.NewBinding(
 		key.WithKeys(" "),

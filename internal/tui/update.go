@@ -501,8 +501,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Left):
 		return m.handleLeftKey()
 
-	case key.Matches(msg, keys.Root):
-		return m.handleRootKey()
+	case key.Matches(msg, keys.Home):
+		return m.handleHomeKey()
 
 	case key.Matches(msg, keys.Download):
 		return m.handleDownloadKey()
@@ -911,7 +911,7 @@ func (m Model) handleCopyKey() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleRootKey() (tea.Model, tea.Cmd) {
+func (m Model) handleHomeKey() (tea.Model, tea.Cmd) {
 	if m.state == viewBuckets {
 		return m, nil
 	}

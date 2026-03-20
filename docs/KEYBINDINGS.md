@@ -13,7 +13,7 @@ This document provides a comprehensive list of all keybindings available in `laz
 *   `Ctrl+u`: Move cursor half-page up
 *   `l` or `Enter` or `→`: Enter a bucket, directory, or expand/collapse a project header.
 *   `h` or `←`: Go back to the parent directory, bucket list, or collapse a project header.
-*   `H`: Jump all the way back to the bucket list.
+*   `H`: Jump all the way back to the bucket list (home).
 
 ## Actions
 *   `space`: Toggle selection of the highlighted item (Multi-select)
