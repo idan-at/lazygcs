@@ -2,7 +2,10 @@ package tui_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/idan-at/lazygcs/internal/gcs"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/idan-at/lazygcs/internal/tui"
@@ -104,4 +107,27 @@ func TestMessagesView_ToggleWithNoMessages(t *testing.T) {
 
 	// Verify that showMessages is true (currently it will be false because of the bug)
 	assert.Equal(t, m.ShowMessages(), true, "Messages view should be shown even if there are no messages")
+}
+
+func TestMessagesView_ClearsKittyImages(t *testing.T) {
+	m, client := setupTestModel(
+		[]gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		simpleObjectList([]string{"obj1"}, nil),
+		"/tmp",
+	)
+
+	// Navigate to object to set preview content
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Simulate receiving a kitty image for the object preview
+	m, _ = updateModel(m, tui.ContentMsg{
+		ObjectName: "obj1",
+		Content:    "\x1b_Ga=T,f=100;AAAA\x1b\\",
+	})
+
+	// Show messages
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+
+	view := m.View()
+	assert.Assert(t, strings.HasPrefix(view, "\x1b_Ga=d,d=A\x1b\\"), "View should clear kitty images when messages are shown")
 }

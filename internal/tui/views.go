@@ -530,6 +530,12 @@ func (m Model) View() string {
 			lipgloss.WithWhitespaceChars(" "),
 			lipgloss.WithWhitespaceForeground(lipgloss.Color("236")),
 		)
+		// We add the kitty image clear code here to clear out any rendered images
+		// since they are drawn over the text otherwise
+		if strings.HasPrefix(m.previewContent, "\x1b_G") {
+			return "\x1b_Ga=d,d=A\x1b\\" + result
+		}
+		return result
 	}
 
 	if strings.HasPrefix(m.previewContent, "\x1b_Ga=d,d=A\x1b\\") {
