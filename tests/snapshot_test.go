@@ -81,8 +81,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		s := string(bts)
-		return s != "" && s != "Loading..."
+		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Force terminal size
@@ -128,8 +127,7 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		s := string(bts)
-		return s != "" && s != "Loading..."
+		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -166,8 +164,7 @@ func TestSnapshot_SearchView(t *testing.T) {
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		s := string(bts)
-		return s != "" && s != "Loading..."
+		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -228,8 +225,7 @@ func TestSnapshot_MultiSelectionView(t *testing.T) {
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		s := string(bts)
-		return s != "" && s != "Loading..."
+		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -290,8 +286,7 @@ func TestSnapshot_MessagesView(t *testing.T) {
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tee, func(bts []byte) bool {
-		s := string(bts)
-		return s != "" && s != "Loading..."
+		return strings.Contains(string(bts), "assets")
 	}, teatest.WithDuration(3*time.Second))
 
 	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})

@@ -572,17 +572,38 @@ func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "o":
 		m.state = viewObjects
 		return m.startDownloadTask(m.pendingDownloadDest)
-	case "a", "q", "ctrl+c", "esc":
-		cmd := m.AddMessage(LevelInfo, "Download aborted.")
+	case "a":
+		m.downloadTotal--
+		m.state = viewObjects
+		msgText := fmt.Sprintf("Aborted %s", filepath.Base(m.pendingDownloadDest))
+		if len(m.downloadQueue) > 0 {
+			m, nextCmd := m.processDownloadQueue()
+			cmd := m.AddMessage(LevelInfo, msgText)
+			return m, tea.Batch(cmd, nextCmd)
+		}
+		cmd := m.AddMessage(LevelInfo, msgText)
+		if m.downloadTotal > 1 && m.downloadFinished > 0 {
+			nextCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Downloaded %d files", m.downloadTotal))
+			return m, tea.Batch(cmd, nextCmd)
+		}
+		return m, cmd
+	case "q", "ctrl+c", "esc":
+		cmd := m.AddMessage(LevelInfo, "Downloads cancelled.")
 		m.state = viewObjects
 		m.downloadQueue = nil // Clear the rest of the queue
 		return m, cmd
 	case "r":
 		newDest, err := autoRename(m.pendingDownloadDest)
 		if err != nil {
-			cmd := m.AddMessage(LevelError, fmt.Sprintf("Rename failed: %v", err))
+			m.downloadTotal--
 			m.state = viewObjects
-			m.downloadQueue = nil
+			msgText := fmt.Sprintf("Rename failed: %v", err)
+			if len(m.downloadQueue) > 0 {
+				m, nextCmd := m.processDownloadQueue()
+				cmd := m.AddMessage(LevelError, msgText)
+				return m, tea.Batch(cmd, nextCmd)
+			}
+			cmd := m.AddMessage(LevelError, msgText)
 			return m, cmd
 		}
 		m.state = viewObjects

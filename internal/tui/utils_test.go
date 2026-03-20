@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +41,22 @@ func TestAutoRename_PermissionError(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("autoRename hit an infinite loop due to an unhandled os.Stat error")
 	}
+}
+
+func TestAutoRename_Limit(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "test.txt")
+
+	// Create 100 files to reach the limit
+	_ = os.WriteFile(filePath, []byte("original"), 0600)
+	for i := 1; i <= 100; i++ {
+		p := filepath.Join(tempDir, fmt.Sprintf("test_%d.txt", i))
+		_ = os.WriteFile(p, []byte("exists"), 0600)
+	}
+
+	_, err := autoRename(filePath)
+	assert.Assert(t, err != nil, "Expected autoRename to return an error after 100 attempts")
+	assert.Assert(t, strings.Contains(err.Error(), "after 100 attempts"), "Expected error message to mention 100 attempts")
 }
 
 func TestGetDisplayName(t *testing.T) {

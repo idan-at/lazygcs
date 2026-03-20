@@ -23,7 +23,7 @@ func autoRename(path string) (string, error) {
 	ext := filepath.Ext(base)
 	name := strings.TrimSuffix(base, ext)
 
-	for i := 1; ; i++ {
+	for i := 1; i <= 100; i++ {
 		newPath := filepath.Join(dir, fmt.Sprintf("%s_%d%s", name, i, ext))
 		_, err := os.Stat(newPath)
 		if os.IsNotExist(err) {
@@ -33,6 +33,7 @@ func autoRename(path string) (string, error) {
 			return "", fmt.Errorf("failed to check path %q: %w", newPath, err)
 		}
 	}
+	return "", fmt.Errorf("failed to find a free name for %q after 100 attempts", base)
 }
 
 func isBinary(s string) bool {

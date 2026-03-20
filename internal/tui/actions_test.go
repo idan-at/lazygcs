@@ -1,6 +1,7 @@
 package tui_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -307,7 +308,7 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	m, cmd = pressKey(m, 'a')
 
 	assert.Assert(t, cmd != nil, "A clear status command should be returned after abort")
-	assert.Assert(t, strings.Contains(m.View(), "Download aborted"), "Message should indicate abortion")
+	assert.Assert(t, strings.Contains(m.View(), "Aborted"), "Message should indicate abortion")
 }
 
 func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
@@ -583,4 +584,225 @@ func TestModel_Actions_EditHighlightedPrefixError(t *testing.T) {
 
 	assert.Assert(t, cmd != nil, "Expected clearStatusCmd")
 	assert.Assert(t, strings.Contains(m.View(), "Cannot edit a directory"), "Expected error message about editing a directory")
+}
+
+func TestModel_DownloadAction_MultiSelect_FileExists_Abort(t *testing.T) {
+	downloadDir := t.TempDir()
+
+	// Create dummy files that already exist
+	existingFile1 := filepath.Join(downloadDir, "obj1")
+	err := os.WriteFile(existingFile1, []byte("existing content 1"), 0600)
+	assert.NilError(t, err)
+
+	existingFile2 := filepath.Join(downloadDir, "obj2")
+	err = os.WriteFile(existingFile2, []byte("existing content 2"), 0600)
+	assert.NilError(t, err)
+
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Select obj1 and obj2
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj1
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj2
+
+	// Press 'd' to download
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+
+	// Prompt for the first file
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "(a)bort"), "Message should present abort option")
+
+	// Press 'a' to abort the first one
+	m, _ = pressKey(m, 'a')
+
+	// After aborting the first one, it should prompt for the second file
+	foundPrompt := false
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "(a)bort") && strings.Contains(msg.Text, "obj2") {
+			foundPrompt = true
+			break
+		}
+	}
+	assert.Assert(t, foundPrompt, "Message should present abort option for the next file")
+}
+
+func TestModel_DownloadAction_MultiSelect_FileExists_OverwriteRename(t *testing.T) {
+	downloadDir := t.TempDir()
+
+	// Create dummy files that already exist
+	existingFile1 := filepath.Join(downloadDir, "obj1")
+	err := os.WriteFile(existingFile1, []byte("existing content 1"), 0600)
+	assert.NilError(t, err)
+
+	existingFile2 := filepath.Join(downloadDir, "obj2")
+	err = os.WriteFile(existingFile2, []byte("existing content 2"), 0600)
+	assert.NilError(t, err)
+
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Select obj1 and obj2
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj1
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj2
+
+	// Press 'd' to download
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+
+	// Prompt for the first file (obj1)
+	assert.Assert(t, strings.Contains(m.View(), "File exists: obj1"), "Should prompt for obj1")
+
+	// Press 'o' to overwrite obj1
+	m, cmd := pressKey(m, 'o')
+	assert.Assert(t, cmd != nil, "Should start download task")
+
+	// startDownloadTask returns a Batch of (AddMessage, fetchDownload)
+	batch, ok := cmd().(tea.BatchMsg)
+	assert.Assert(t, ok, "Expected tea.BatchMsg")
+
+	var dlMsg tui.DownloadMsg
+	found := false
+	for _, c := range batch {
+		if c == nil {
+			continue
+		}
+		msg := c()
+		if dm, ok := msg.(tui.DownloadMsg); ok {
+			dlMsg = dm
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "Should have found DownloadMsg in batch")
+
+	res, cmd := m.Update(dlMsg)
+	m = res.(tui.Model)
+	// cmd should be nil because there's still 1 item in the queue and it prompted (processDownloadQueue returned nil)
+	assert.Assert(t, cmd == nil, "Should trigger processDownloadQueue which returns nil as it prompts")
+
+	// Now it should prompt for the second file (obj2)
+	assert.Assert(t, strings.Contains(m.View(), "File exists: obj2"), "Should prompt for obj2")
+
+	// Press 'r' to rename obj2
+	m, cmd = pressKey(m, 'r')
+	assert.Assert(t, cmd != nil, "Should start download task with renamed destination")
+
+	batch, ok = cmd().(tea.BatchMsg)
+	assert.Assert(t, ok, "Expected tea.BatchMsg")
+
+	found = false
+	for _, c := range batch {
+		if c == nil {
+			continue
+		}
+		msg := c()
+		if dm, ok := msg.(tui.DownloadMsg); ok {
+			dlMsg = dm
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "Should have found DownloadMsg in batch")
+	assert.Assert(t, strings.Contains(dlMsg.Path, "obj2_1"), "Should have renamed path: %s", dlMsg.Path)
+
+	res, cmd = m.Update(dlMsg)
+	m = res.(tui.Model)
+	// downloadQueue is now empty, so it should finish
+	assert.Assert(t, cmd != nil, "Should return clearStatusCmd")
+	assert.Assert(t, strings.Contains(m.View(), "Downloaded 2 files"), "Should indicate all files downloaded")
+}
+
+func TestModel_DownloadAction_MultiSelect_FileExists_RenameError(t *testing.T) {
+	downloadDir := t.TempDir()
+
+	// Make the downloadDir read-only to cause rename to fail (autoRename might check permission or fail later)
+	// Actually autoRename just checks if file exists, it doesn't do the rename itself.
+	// It returns error if it can't find a free suffix after 100 attempts.
+
+	existingFile1 := filepath.Join(downloadDir, "obj1")
+	err := os.WriteFile(existingFile1, []byte("existing content 1"), 0600)
+	assert.NilError(t, err)
+
+	existingFile2 := filepath.Join(downloadDir, "obj2")
+	err = os.WriteFile(existingFile2, []byte("existing content 2"), 0600)
+	assert.NilError(t, err)
+
+	// Create 100 files to make autoRename fail
+	for i := 0; i < 101; i++ {
+		var name string
+		if i == 0 {
+			name = "obj1"
+		} else {
+			name = fmt.Sprintf("obj1_%d", i)
+		}
+		path := filepath.Join(downloadDir, name)
+		_ = os.WriteFile(path, []byte("existing"), 0600)
+	}
+
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Select obj1 and obj2
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj1
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj2
+
+	// Press 'd' to download
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+
+	// Press 'r' to rename obj1 (should fail)
+	m, _ = pressKey(m, 'r')
+
+	// Should show error and continue to obj2
+	foundErr := false
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "Rename failed") {
+			foundErr = true
+			break
+		}
+	}
+	assert.Assert(t, foundErr, "Should have added a 'Rename failed' message")
+
+	// Since rename failed, it should have triggered processDownloadQueue for next file
+	// It returns tea.Batch(cmd, nextCmd)
+	// m is already updated by pressKey (which calls handleDownloadConfirmKey)
+
+	// Now it should have prompted for the second file (obj2)
+	foundPrompt := false
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "File exists: obj2") {
+			foundPrompt = true
+			break
+		}
+	}
+	assert.Assert(t, foundPrompt, "Should have prompted for obj2. Messages: %+v", m.Messages())
+
+	// And the error should also be there
+	foundErr = false
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "Rename failed") {
+			foundErr = true
+			break
+		}
+	}
+	assert.Assert(t, foundErr, "Should have added a 'Rename failed' message")
 }
