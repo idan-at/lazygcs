@@ -209,16 +209,13 @@ func TestModel_DownloadAction(t *testing.T) {
 }
 
 func TestModel_DownloadAction_MultiSelect(t *testing.T) {
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2", "obj3"}, nil),
-	}
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2", "obj3"}, nil)
 	downloadDir := t.TempDir()
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	m, client := setupTestModel(projects, objects, downloadDir)
 
 	// Enter bucket and load objects
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1
 	m, _ = pressKey(m, ' ')
@@ -296,15 +293,12 @@ func TestModel_DownloadAction_FileExists_Abort(t *testing.T) {
 	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
 	// Enter bucket and load objects
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Press 'd' to download
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -338,14 +332,11 @@ func TestModel_DownloadAction_FileExists_Overwrite(t *testing.T) {
 	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Press 'd' to download
 	m, _ = pressKey(m, 'd')
@@ -373,14 +364,11 @@ func TestModel_DownloadAction_FileExists_Rename(t *testing.T) {
 	err := os.WriteFile(existingFile, []byte("existing content"), 0600)
 	assert.NilError(t, err)
 
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Press 'd' to download
 	m, _ = pressKey(m, 'd')
@@ -618,14 +606,11 @@ func TestModel_DownloadAction_MultiSelect_FileExists_Abort(t *testing.T) {
 	err = os.WriteFile(existingFile2, []byte("existing content 2"), 0600)
 	assert.NilError(t, err)
 
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1 and obj2
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj1
@@ -665,14 +650,11 @@ func TestModel_DownloadAction_MultiSelect_FileExists_OverwriteRename(t *testing.
 	err = os.WriteFile(existingFile2, []byte("existing content 2"), 0600)
 	assert.NilError(t, err)
 
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1 and obj2
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj1
@@ -772,14 +754,11 @@ func TestModel_DownloadAction_MultiSelect_FileExists_RenameError(t *testing.T) {
 		_ = os.WriteFile(path, []byte("existing"), 0600)
 	}
 
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1 and obj2
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")}) // Select obj1
@@ -828,16 +807,13 @@ func TestModel_DownloadAction_MultiSelect_FileExists_RenameError(t *testing.T) {
 }
 
 func TestModel_DownloadAction_MultipleConcurrentBatches(t *testing.T) {
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2", "obj3", "obj4", "obj5", "obj6", "obj7"}, nil),
-	}
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2", "obj3", "obj4", "obj5", "obj6", "obj7"}, nil)
 	downloadDir := t.TempDir()
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	m, client := setupTestModel(projects, objects, downloadDir)
 
 	// Enter bucket and load objects
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1, obj2, obj3, obj4, obj5, obj6
 	for i := 0; i < 6; i++ {
@@ -903,19 +879,16 @@ func TestModel_DownloadAction_MultipleConcurrentBatches(t *testing.T) {
 }
 
 func TestModel_DownloadAction_ProcessQueueWhileConfirming(t *testing.T) {
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
 	downloadDir := t.TempDir()
 
 	// Pre-create obj2 to trigger "File exists" confirmation later
 	_ = os.WriteFile(filepath.Join(downloadDir, "obj2"), []byte("exist"), 0600)
 
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Start two jobs
 	// Job 1 (obj1)
@@ -943,19 +916,16 @@ func TestModel_DownloadAction_ProcessQueueWhileConfirming(t *testing.T) {
 }
 
 func TestModel_DownloadAction_LostAbortProgressMessage(t *testing.T) {
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
-	}
 	downloadDir := t.TempDir()
 
 	// Pre-create obj2 to trigger "File exists" confirmation on the second file
 	_ = os.WriteFile(filepath.Join(downloadDir, "obj2"), []byte("exist"), 0600)
 
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1, obj2
 	m, _ = pressKey(m, ' ') // Select obj1
@@ -992,21 +962,19 @@ func TestModel_DownloadAction_LostAbortProgressMessage(t *testing.T) {
 }
 
 func TestModel_DownloadAction_QueueStallFix(t *testing.T) {
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1", "obj2", "obj3"}, nil),
-	}
 	downloadDir := t.TempDir()
 
 	// Pre-create obj1 so it triggers a prompt
 	err := os.WriteFile(filepath.Join(downloadDir, "obj1"), []byte("exists"), 0600)
 	assert.NilError(t, err)
 
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2", "obj3"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 	m.SetDeterministicSpinner(true)
 
 	// Enter bucket and load objects
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// Select obj1, obj2, obj3
 	m, _ = pressKey(m, ' ') // Select obj1
@@ -1052,17 +1020,15 @@ func TestModel_DownloadAction_QueueStallFix(t *testing.T) {
 }
 
 func TestModel_DownloadAction_ActivelyDownloadingPrompt(t *testing.T) {
-	client := &mockGCSClient{
-		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
-		objects:  simpleObjectList([]string{"obj1"}, nil),
-	}
 	downloadDir := t.TempDir()
 
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, downloadDir)
 	m.SetDeterministicSpinner(true)
 
 	// Enter bucket and load objects
-	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+	m = enterBucket(m, projects, "b1", client.objects)
 
 	// First batch: download obj1
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})

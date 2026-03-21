@@ -147,7 +147,7 @@ func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, down
 		objects:  objects,
 	}
 	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
-	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 150, Height: 50})
 	return m, client
 }
 

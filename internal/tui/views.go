@@ -210,37 +210,14 @@ func (m Model) footerView() string {
 			Render(fmt.Sprintf("⟳ %d Tasks", len(m.activeTasks)))
 	}
 
-	var msgPill string
-	if m.state == viewDownloadConfirm {
-		style := lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0"))
-		if m.activeDestinations != nil && m.activeDestinations[m.pendingDownloadDest] {
-			msgPill = " " + style.Render(fmt.Sprintf("File is actively downloading: %s - (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(m.pendingDownloadDest)))
-		} else {
-			msgPill = " " + style.Render(fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(m.pendingDownloadDest)))
-		}
-	} else if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
-		latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
-		style := lipgloss.NewStyle().Padding(0, 1)
-		switch latest.Level {
-		case LevelError:
-			style = style.Background(lipgloss.Color("196")).Foreground(lipgloss.Color("15"))
-		case LevelWarn:
-			style = style.Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0"))
-		default:
-			style = style.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
-		}
-		msgPill = " " + style.Render(latest.Text)
-	}
-
 	var errorsPill string
-	errCount := m.msgQueue.ErrorCount
-	if errCount > 0 {
+	if m.msgQueue.ErrorCount > 0 {
 		errorsPill = " " + lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
 			Background(lipgloss.Color("196")). // Red background
 			Foreground(lipgloss.Color("15")).
-			Render(fmt.Sprintf("%d ERRORS", errCount))
+			Render(fmt.Sprintf("%d ERRORS", m.msgQueue.ErrorCount))
 	}
 
 	// Right side: Help hints
@@ -249,8 +226,45 @@ func (m Model) footerView() string {
 	m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	helpView := m.help.View(keys)
 
-	// Build the ribbon
+	// Calculate available width for msgPill
 	rightPadding := 1
+	leftBase := pill + tasksPill + errorsPill
+	availableWidth := m.width - lipgloss.Width(leftBase) - lipgloss.Width(helpView) - rightPadding - 2
+
+	var msgPill string
+	if m.state == viewDownloadConfirm {
+		style := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("214")).Faint(true)
+		icon := getLevelIcon(LevelWarn, m.showNerdIcons)
+		var text string
+		if m.activeDestinations != nil && m.activeDestinations[m.pendingDownloadDest] {
+			text = fmt.Sprintf("File is actively downloading: %s - (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(m.pendingDownloadDest))
+		} else {
+			text = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(m.pendingDownloadDest))
+		}
+		if lipgloss.Width(icon+text) > availableWidth {
+			text = truncate(text, availableWidth-lipgloss.Width(icon))
+		}
+		msgPill = " " + style.Render(icon+text)
+	} else if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
+		latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
+		style := lipgloss.NewStyle().Padding(0, 1).Faint(true)
+		switch latest.Level {
+		case LevelError:
+			style = style.Foreground(lipgloss.Color("196"))
+		case LevelWarn:
+			style = style.Foreground(lipgloss.Color("214"))
+		default:
+			style = style.Foreground(lipgloss.Color("42"))
+		}
+		icon := getLevelIcon(latest.Level, m.showNerdIcons)
+		text := latest.Text
+		if lipgloss.Width(icon+text) > availableWidth {
+			text = truncate(text, availableWidth-lipgloss.Width(icon))
+		}
+		msgPill = " " + style.Render(icon+text)
+	}
+
+	// Build the ribbon
 	leftContent := pill + tasksPill + msgPill + errorsPill
 	gapWidth := m.width - lipgloss.Width(leftContent) - lipgloss.Width(helpView) - rightPadding
 	if gapWidth < 0 {
@@ -615,7 +629,7 @@ func (m Model) messagesView() string {
 		end = len(m.msgQueue.Messages())
 	}
 
-	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
@@ -627,18 +641,16 @@ func (m Model) messagesView() string {
 			timeStr = "12:00:00"
 		}
 
-		levelStr := "[INFO] "
 		style := infoStyle
 		switch msg.Level {
 		case LevelWarn:
-			levelStr = "[WARN] "
 			style = warnStyle
 		case LevelError:
-			levelStr = "[ERROR]"
 			style = errStyle
 		}
 
-		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(levelStr), textStyle.Render(msg.Text))
+		icon := getLevelIcon(msg.Level, m.showNerdIcons)
+		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(icon), textStyle.Render(msg.Text))
 	}
 
 	keyStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)

@@ -223,3 +223,25 @@ func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string
 func getDisplayName(name, currentPrefix string) string {
 	return strings.TrimPrefix(name, currentPrefix)
 }
+
+func getLevelIcon(level MsgLevel, useNerdFont bool) string {
+	if useNerdFont {
+		switch level {
+		case LevelError:
+			return "󰅙 "
+		case LevelWarn:
+			return "󱈸 "
+		case LevelInfo:
+			return "󰋽 "
+		}
+	}
+	switch level {
+	case LevelError:
+		return "❌ "
+	case LevelWarn:
+		return "⚠️ "
+	case LevelInfo:
+		return "ℹ️ "
+	}
+	return ""
+}

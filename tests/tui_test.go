@@ -187,7 +187,7 @@ func TestSearch(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter}) // Enter to finish search mode
 
 	// Force a full redraw
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 
 	// Verify only test-bucket-1 is visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -208,22 +208,22 @@ func TestNavigationUp(t *testing.T) {
 	// Enter bucket b1
 	tm.Type("j")
 	tm.Type("l")
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder1/") }, teatest.WithDuration(3*time.Second))
 
 	// Enter folder1/
 	tm.Type("l")
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
 
 	// Go back to bucket root
 	tm.Type("h")
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder1/") }, teatest.WithDuration(3*time.Second))
 
 	// Go back to bucket list
 	tm.Type("h")
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "Buckets") }, teatest.WithDuration(3*time.Second))
 }
 
@@ -247,13 +247,13 @@ func TestDownloadOverwrite(t *testing.T) {
 	// Enter bucket
 	tm.Type("j")
 	tm.Type("l")
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
 
 	// Attempt download
 	tm.Type("d")
 	time.Sleep(100 * time.Millisecond)
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 
 	// Wait for overwrite prompt
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -307,7 +307,7 @@ func TestJumpTopBottom(t *testing.T) {
 	// Enter bucket
 	tm.Type("j")
 	tm.Type("l")
-	tm.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 
 	// Wait for objects
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file01.txt") }, teatest.WithDuration(3*time.Second))
@@ -376,10 +376,12 @@ func TestDownloadAbortRename(t *testing.T) {
 	// Navigate to file
 	tm.Type("j")
 	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
 
 	// 1. Test Abort
 	tm.Type("d")
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "(a)bort") }, teatest.WithDuration(2*time.Second))
 	tm.Type("a")
 	time.Sleep(100 * time.Millisecond)
