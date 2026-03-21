@@ -137,8 +137,8 @@ var keys = keyMap{
 		key.WithHelp("e", "edit"),
 	),
 	Refresh: key.NewBinding(
-		key.WithKeys("r"),
-		key.WithHelp("r", "refresh"),
+		key.WithKeys("R"),
+		key.WithHelp("R", "refresh"),
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),

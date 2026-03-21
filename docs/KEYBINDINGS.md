@@ -18,7 +18,7 @@ This document provides a comprehensive list of all keybindings available in `laz
 ## Actions
 *   `space`: Toggle selection of the highlighted item (Multi-select)
 *   `y`: Copy the `gs://` URI of the highlighted item (or all selected items) to the system clipboard.
-*   `r`: Refresh the current view/prefix.
+*   `R`: Refresh the current view/prefix.
 *   `o`: Open the highlighted file using the system's default application. *Note: Does not support multi-selection.*
 *   `e`: Edit the highlighted file using `$EDITOR`. Changes are re-uploaded automatically. *Note: Does not support multi-selection.*
 *   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.

@@ -478,7 +478,7 @@ func TestRefresh(t *testing.T) {
 	server.CreateBucketWithOpts(fakestorage.CreateBucketOpts{Name: "new-bucket"})
 
 	// Refresh
-	tm.Type("r")
+	tm.Type("R")
 
 	// Wait for new bucket to appear
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {

@@ -25,8 +25,8 @@ func TestModel_Actions_Refresh(t *testing.T) {
 	// Verify we have 1 object
 	assert.Equal(t, len(m.Objects()), 1)
 
-	// Press 'r' to refresh
-	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	// Press 'R' to refresh
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
 	assert.Assert(t, cmd != nil)
 
 	// Simulate receipt of refreshed objects (same object list)
