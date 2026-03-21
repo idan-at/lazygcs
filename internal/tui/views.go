@@ -220,11 +220,16 @@ func (m Model) footerView() string {
 			Render(fmt.Sprintf("%d ERRORS", m.msgQueue.ErrorCount))
 	}
 
-	// Right side: Help hints
-	m.help.ShowAll = false
-	m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	helpView := m.help.View(keys)
+	hasMessage := m.state == viewDownloadConfirm || (len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill)
+
+	// Right side: Help hints (omitted if message is shown to allow longer messages)
+	var helpView string
+	if !hasMessage {
+		m.help.ShowAll = false
+		m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+		m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		helpView = m.help.View(keys)
+	}
 
 	// Calculate available width for msgPill
 	rightPadding := 1

@@ -2,6 +2,8 @@ package tui_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -130,4 +132,51 @@ func TestMessagesView_ClearsKittyImages(t *testing.T) {
 
 	view := m.View()
 	assert.Assert(t, strings.HasPrefix(view, "\x1b_Ga=d,d=A\x1b\\"), "View should clear kitty images when messages are shown")
+}
+
+func TestFooterView_HideHelpOnMessage(t *testing.T) {
+	client := &mockGCSClient{}
+	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+
+	// Set width via WindowSizeMsg
+	mModel, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = mModel.(tui.Model)
+
+	// Initially, help should be visible in footerView (NORMAL state)
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "filter"), "Help hints should be visible initially")
+	assert.Assert(t, strings.Contains(view, "select"), "Help hints should be visible initially")
+
+	// Add a message
+	_ = m.AddMessage(tui.LevelInfo, "test message")
+
+	// Now help should be hidden
+	view = m.View()
+	assert.Assert(t, strings.Contains(view, "test message"), "Message should be visible")
+	assert.Assert(t, !strings.Contains(view, "filter"), "Help hints should be hidden when a message is shown")
+	assert.Assert(t, !strings.Contains(view, "select"), "Help hints should be hidden when a message is shown")
+}
+
+func TestFooterView_HideHelpOnDownloadConfirm(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	downloadDir := t.TempDir()
+	m, client := setupTestModel(projects, objects, downloadDir)
+	_ = client
+
+	// 1. Navigate to object view
+	m = enterBucket(m, projects, "b1", objects)
+
+	// 2. Create a file with the same name on disk to trigger confirm
+	err := os.WriteFile(filepath.Join(downloadDir, "obj1"), []byte("exists"), 0600)
+	assert.NilError(t, err)
+
+	// 3. Press 'd' to download, should trigger confirm
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+
+	// 4. Verify help is hidden
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "File exists"), "Should show confirmation message")
+	assert.Assert(t, !strings.Contains(view, "filter"), "Help hints should be hidden in viewDownloadConfirm state")
+	assert.Assert(t, !strings.Contains(view, "select"), "Help hints should be hidden in viewDownloadConfirm state")
 }
