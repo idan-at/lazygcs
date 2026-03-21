@@ -157,6 +157,9 @@ type JobProgress struct {
 	FailedFiles []string
 }
 
+// ProgressVisibilityThreshold is the time a task must be active before it's shown in the footer.
+const ProgressVisibilityThreshold = 1 * time.Second
+
 // Task represents a tracked background operation.
 type Task struct {
 	ID         string // Unique ID (e.g., destination path or UUID)

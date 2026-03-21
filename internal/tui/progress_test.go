@@ -51,7 +51,7 @@ func TestProgress_Tracking(t *testing.T) {
 	assert.Equal(t, task.TotalBytes, int64(1000))
 }
 
-func TestProgress_2SecondRule(t *testing.T) {
+func TestProgress_VisibilityThreshold(t *testing.T) {
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1"}, nil)
 	m, _ := setupTestModel(projects, objects, t.TempDir())
@@ -65,7 +65,7 @@ func TestProgress_2SecondRule(t *testing.T) {
 		break
 	}
 
-	// Send progress at 1 second - progress bar should NOT be in footer
+	// Send progress immediately - progress bar should NOT be in footer
 	m, _ = updateModel(m, tui.DownloadProgressMsg{
 		TaskID:  taskID,
 		Current: 500,
@@ -74,21 +74,19 @@ func TestProgress_2SecondRule(t *testing.T) {
 
 	// We need a way to mock/control time or just check the view
 	// For now, let's assume the task Started time is what matters.
-	// Since it just started, it's < 2s.
+	// Since it just started, it's < ProgressVisibilityThreshold.
 	view := m.View()
-	assert.Assert(t, !strings.Contains(view, "[====>    ]"), "Progress bar should not be visible in footer within 2 seconds")
+	assert.Assert(t, !strings.Contains(view, "[====>    ]"), "Progress bar should not be visible in footer within threshold")
 
-	// Update task started time to 3 seconds ago
+	// Update task started time to exceed threshold
 	tasks := m.ActiveTasks()
 	task := tasks[taskID]
-	task.Started = time.Now().Add(-3 * time.Second)
+	task.Started = time.Now().Add(-(tui.ProgressVisibilityThreshold + time.Second))
 	tasks[taskID] = task
-	// We might need to set it back to the model if it's not a pointer/map reference
-	// Model has activeTasks as a map, so it should be fine.
 
 	view = m.View()
-	// Now it should be visible (once implemented)
-	assert.Assert(t, strings.Contains(view, "50%"), "Progress percentage should be visible in footer after 2 seconds")
+	// Now it should be visible
+	assert.Assert(t, strings.Contains(view, "50%"), "Progress percentage should be visible in footer after threshold")
 }
 
 func TestProgress_StaysVisibleAfterTimeout(t *testing.T) {
@@ -121,10 +119,10 @@ func TestProgress_StaysVisibleAfterTimeout(t *testing.T) {
 
 	assert.Assert(t, clearMsg.ID != "", "Should have received a ClearStatusMsg")
 
-	// Update task to be > 2s old so it's visible
+	// Update task to exceed threshold so it's visible
 	tasks := m.ActiveTasks()
 	task := tasks[taskID]
-	task.Started = time.Now().Add(-3 * time.Second)
+	task.Started = time.Now().Add(-(tui.ProgressVisibilityThreshold + time.Second))
 	task.Progress = 45
 	task.TotalBytes = 100
 	task.Current = 45
@@ -133,7 +131,7 @@ func TestProgress_StaysVisibleAfterTimeout(t *testing.T) {
 	// Initial check: progress bar should be visible
 	assert.Assert(t, strings.Contains(m.View(), "45%"), "Progress should be visible initially")
 
-	// Simulate the clear message arriving after 3 seconds
+	// Simulate the clear message arriving
 	m, _ = updateModel(m, clearMsg)
 
 	// ASSERTION: Progress should STILL be visible because the task is still active
@@ -170,10 +168,10 @@ func TestProgress_AggregateCalculation(t *testing.T) {
 
 	// Total: 1000/2000 (50%)
 	// We need a way to get aggregate progress, maybe a method on Model
-	// For now let's just check the view if we can force > 2s
+	// For now let's just check the view if we can force > threshold
 	for id := range tasks {
 		t := tasks[id]
-		t.Started = time.Now().Add(-3 * time.Second)
+		t.Started = time.Now().Add(-(tui.ProgressVisibilityThreshold + time.Second))
 		tasks[id] = t
 	}
 

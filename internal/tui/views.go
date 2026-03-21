@@ -263,7 +263,7 @@ func (m *Model) footerView() string {
 				activeDlCount++
 				totalBytes += t.TotalBytes
 				currentBytes += t.Current
-				if time.Since(t.Started) > 2*time.Second {
+				if time.Since(t.Started) > ProgressVisibilityThreshold {
 					showProgressBar = true
 				}
 			}
