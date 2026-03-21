@@ -169,18 +169,19 @@ func (m Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
 	}
 }
 
-func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
-	jobNum := m.pendingDownloadJobNum
+func (m Model) startDownloadTaskDirectly(task downloadTask) (Model, tea.Cmd) {
+	jobNum := task.jobNum
+	m.activeDownloads++
 
 	var msgText string
 	if progress, ok := m.jobProgress[jobNum]; ok && progress.Total > 1 {
 		progress.Started++
-		msgText = fmt.Sprintf("[Job #%d] Downloading %d/%d as %s...", jobNum, progress.Started, progress.Total, filepath.Base(dest))
+		msgText = fmt.Sprintf("[Job #%d] Downloading %d/%d as %s...", jobNum, progress.Started, progress.Total, filepath.Base(task.dest))
 	} else {
-		msgText = fmt.Sprintf("[Job #%d] Downloading as %s...", jobNum, filepath.Base(dest))
+		msgText = fmt.Sprintf("[Job #%d] Downloading as %s...", jobNum, filepath.Base(task.dest))
 	}
 
-	taskID := fmt.Sprintf("dl-%s-%d", dest, time.Now().UnixNano())
+	taskID := fmt.Sprintf("dl-%s-%d", task.dest, time.Now().UnixNano())
 	m.activeTasks[taskID] = Task{
 		ID:       taskID,
 		Name:     msgText,
@@ -189,37 +190,73 @@ func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
 		Progress: 0,
 	}
 
+	m.activeDestinations[task.dest] = true
 	cmd := m.AddMessage(LevelInfo, msgText)
-	return m, tea.Batch(cmd, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, dest, taskID, jobNum, m.pendingDownloadIsPrefix))
+	return m, tea.Batch(cmd, m.fetchDownload(task.bucket, task.object, task.dest, taskID, jobNum, task.isPrefix))
+}
+
+func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
+	task := downloadTask{
+		bucket:   m.pendingDownloadBucket,
+		object:   m.pendingDownloadObject,
+		dest:     dest,
+		isPrefix: m.pendingDownloadIsPrefix,
+		jobNum:   m.pendingDownloadJobNum,
+	}
+	return m.startDownloadTaskDirectly(task)
 }
 
 func (m Model) processDownloadQueue() (Model, tea.Cmd) {
-	if len(m.downloadQueue) == 0 {
+	var cmds []tea.Cmd
+
+	for len(m.downloadQueue) > 0 && m.activeDownloads < maxConcurrentDownloads {
+		if m.state == viewDownloadConfirm {
+			break
+		}
+
+		task := m.downloadQueue[0]
+
+		// Check if file already exists OR is already being downloaded concurrently
+		_, fileExists := os.Stat(task.dest)
+		if m.activeDestinations[task.dest] {
+			m.state = viewDownloadConfirm
+			m.pendingDownloadBucket = task.bucket
+			m.pendingDownloadObject = task.object
+			m.pendingDownloadDest = task.dest
+			m.pendingDownloadIsPrefix = task.isPrefix
+			m.pendingDownloadJobNum = task.jobNum
+			// Persistent prompt: ignore the auto-clear command
+			_ = m.AddMessage(LevelWarn, fmt.Sprintf("File is actively downloading: %s - (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)))
+			m.downloadQueue = m.downloadQueue[1:]
+			break
+		} else if fileExists == nil {
+			m.state = viewDownloadConfirm
+			m.pendingDownloadBucket = task.bucket
+			m.pendingDownloadObject = task.object
+			m.pendingDownloadDest = task.dest
+			m.pendingDownloadIsPrefix = task.isPrefix
+			m.pendingDownloadJobNum = task.jobNum
+			// Persistent prompt: ignore the auto-clear command
+			_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)))
+			m.downloadQueue = m.downloadQueue[1:]
+			break
+		}
+
+		m.downloadQueue = m.downloadQueue[1:]
+		var cmd tea.Cmd
+		m, cmd = m.startDownloadTaskDirectly(task)
+		cmds = append(cmds, cmd)
+	}
+
+	if len(cmds) == 0 {
 		return m, nil
 	}
 
-	if m.state == viewDownloadConfirm {
-		return m, nil
+	if m.state != viewDownloadConfirm {
+		m.state = viewObjects
 	}
 
-	task := m.downloadQueue[0]
-	m.downloadQueue = m.downloadQueue[1:]
-
-	m.pendingDownloadBucket = task.bucket
-	m.pendingDownloadObject = task.object
-	m.pendingDownloadDest = task.dest
-	m.pendingDownloadIsPrefix = task.isPrefix
-	m.pendingDownloadJobNum = task.jobNum
-
-	// Check if file already exists
-	if _, err := os.Stat(task.dest); err == nil {
-		m.state = viewDownloadConfirm
-		_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)))
-		return m, nil
-	}
-
-	m.state = viewObjects
-	return m.startDownloadTask(task.dest)
+	return m, tea.Batch(cmds...)
 }
 
 // StatusMessageDuration is the duration a status message is shown in the footer.

@@ -30,7 +30,7 @@ func TestAutoRename_PermissionError(t *testing.T) {
 	done := make(chan error)
 
 	go func() {
-		_, err := autoRename(filePath)
+		_, err := autoRename(filePath, nil)
 		done <- err
 	}()
 
@@ -54,9 +54,29 @@ func TestAutoRename_Limit(t *testing.T) {
 		_ = os.WriteFile(p, []byte("exists"), 0600)
 	}
 
-	_, err := autoRename(filePath)
+	_, err := autoRename(filePath, nil)
 	assert.Assert(t, err != nil, "Expected autoRename to return an error after 100 attempts")
 	assert.Assert(t, strings.Contains(err.Error(), "after 100 attempts"), "Expected error message to mention 100 attempts")
+}
+
+func TestAutoRename_ActiveDestinations(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "test.txt")
+
+	// 1. Base file exists on disk
+	_ = os.WriteFile(filePath, []byte("exists"), 0600)
+
+	// 2. test_1.txt doesn't exist on disk, BUT it's in activeDestinations (simulating an active download)
+	active := map[string]bool{
+		filepath.Join(tempDir, "test_1.txt"): true,
+	}
+
+	// 3. autoRename should skip test_1.txt and pick test_2.txt
+	got, err := autoRename(filePath, active)
+	assert.NilError(t, err)
+
+	expected := filepath.Join(tempDir, "test_2.txt")
+	assert.Equal(t, got, expected, "Should have skipped active destination test_1.txt and picked test_2.txt")
 }
 
 func TestGetDisplayName(t *testing.T) {

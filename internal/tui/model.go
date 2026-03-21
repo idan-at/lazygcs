@@ -36,6 +36,8 @@ type BucketListItem struct {
 	BucketName string
 }
 
+const maxConcurrentDownloads = 5
+
 // Model maintains the state of the TUI application.
 type Model struct {
 	client      GCSClient
@@ -59,6 +61,8 @@ type Model struct {
 	showNerdIcons bool
 
 	// Download Confirm State
+	activeDownloads         int
+	activeDestinations      map[string]bool
 	pendingDownloadBucket   string
 	pendingDownloadObject   string
 	pendingDownloadDest     string
@@ -156,6 +160,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		jobProgress:          make(map[int]*JobProgress),
 		msgQueue:             NewMessageQueue(),
 		activeTasks:          make(map[string]Task),
+		activeDestinations:   make(map[string]bool),
 		selected:             make(map[string]struct{}),
 		collapsedProjects:    make(map[string]struct{}),
 		help:                 help.New(),

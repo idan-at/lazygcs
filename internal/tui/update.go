@@ -383,6 +383,8 @@ func (m Model) buildCompletionCmd(jobNum int, progress *JobProgress, singlePath 
 
 func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
 	delete(m.activeTasks, msg.TaskID)
+	delete(m.activeDestinations, msg.Path)
+	m.activeDownloads--
 	var cmd tea.Cmd
 
 	if progress, ok := m.jobProgress[msg.JobNum]; ok {
@@ -636,8 +638,13 @@ func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	jobNum := m.pendingDownloadJobNum
 	switch msg.String() {
 	case "o":
+		if m.activeDestinations != nil && m.activeDestinations[m.pendingDownloadDest] {
+			return m, BeepCmd // Cannot overwrite an actively downloading file
+		}
 		m.state = viewObjects
-		return m.startDownloadTask(m.pendingDownloadDest)
+		var cmd tea.Cmd
+		m, cmd = m.startDownloadTask(m.pendingDownloadDest)
+		return m.resumeDownloadQueue(cmd)
 	case "a":
 		m.state = viewObjects
 		msgText := fmt.Sprintf("Aborted %s", filepath.Base(m.pendingDownloadDest))
@@ -673,7 +680,7 @@ func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.resumeDownloadQueue(cmd)
 	case "r":
-		newDest, err := autoRename(m.pendingDownloadDest)
+		newDest, err := autoRename(m.pendingDownloadDest, m.activeDestinations)
 		if err != nil {
 			m.state = viewObjects
 			msgText := fmt.Sprintf("Rename failed: %v", err)
@@ -682,7 +689,9 @@ func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.resumeDownloadQueue(cmd)
 		}
 		m.state = viewObjects
-		return m.startDownloadTask(newDest)
+		var cmd tea.Cmd
+		m, cmd = m.startDownloadTask(newDest)
+		return m.resumeDownloadQueue(cmd)
 	default:
 		return m, BeepCmd
 	}

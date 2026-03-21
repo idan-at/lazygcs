@@ -215,6 +215,40 @@ func resolveFetchCmd(cmd tea.Cmd) tea.Msg {
 	return resolve(msg)
 }
 
+func resolveAllFetchCmds(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	var msgs []tea.Msg
+
+	var resolve func(tea.Msg)
+	resolve = func(m tea.Msg) {
+		if m == nil {
+			return
+		}
+		if batchMsg, ok := m.(tea.BatchMsg); ok {
+			for _, c := range batchMsg {
+				if c != nil {
+					resolve(c())
+				}
+			}
+			return
+		}
+		// Skip UI infrastructure messages
+		if _, ok := m.(tui.ClearStatusMsg); ok {
+			return
+		}
+		if _, ok := m.(spinner.TickMsg); ok {
+			return
+		}
+		msgs = append(msgs, m)
+	}
+
+	resolve(msg)
+	return msgs
+}
+
 func TestModel_UI_WrappingBug(t *testing.T) {
 	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
 	objects := simpleObjectList([]string{"obj1"}, nil)
