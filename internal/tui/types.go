@@ -85,6 +85,7 @@ type ContentMsg struct {
 type DownloadMsg struct {
 	Path   string
 	TaskID string
+	JobNum int
 	Err    error
 }
 
@@ -138,10 +139,20 @@ type LogMessage struct {
 	ID        string // Unique identifier for the message/transaction
 }
 
+// JobProgress tracks the progress of a batch download operation.
+type JobProgress struct {
+	Total       int
+	Started     int
+	Finished    int
+	Succeeded   int
+	FailedFiles []string
+}
+
 // Task represents a tracked background operation.
 type Task struct {
 	ID       string // Unique ID (e.g., destination path or UUID)
 	Name     string // Display name (e.g., "Downloading file.txt")
+	JobNum   int    // Job number for matching messages
 	Started  time.Time
 	Progress int // 0-100 (for future progress bar support)
 }

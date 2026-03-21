@@ -26,6 +26,7 @@ type downloadTask struct {
 	object   string
 	dest     string
 	isPrefix bool
+	jobNum   int
 }
 
 // BucketListItem ...
@@ -62,9 +63,9 @@ type Model struct {
 	pendingDownloadObject   string
 	pendingDownloadDest     string
 	pendingDownloadIsPrefix bool
+	pendingDownloadJobNum   int
 	downloadQueue           []downloadTask
-	downloadTotal           int
-	downloadFinished        int
+	jobProgress             map[int]*JobProgress
 
 	// Buckets View
 	projects          []gcs.ProjectBuckets
@@ -85,6 +86,7 @@ type Model struct {
 	loadingProjects map[string]bool
 	bgJobs          int
 	activeTasks     map[string]Task
+	nextJobNum      int
 	showMessages    bool
 	msgQueue        *MessageQueue
 	err             error
@@ -150,6 +152,8 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		loading:              true,
 		loadingProjects:      loadingProjects,
 		bgJobs:               len(projectIDs),
+		nextJobNum:           1,
+		jobProgress:          make(map[int]*JobProgress),
 		msgQueue:             NewMessageQueue(),
 		activeTasks:          make(map[string]Task),
 		selected:             make(map[string]struct{}),

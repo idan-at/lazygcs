@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -210,7 +211,10 @@ func (m Model) footerView() string {
 	}
 
 	var msgPill string
-	if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
+	if m.state == viewDownloadConfirm {
+		style := lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0"))
+		msgPill = " " + style.Render(fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(m.pendingDownloadDest)))
+	} else if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
 		latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
 		style := lipgloss.NewStyle().Padding(0, 1)
 		switch latest.Level {

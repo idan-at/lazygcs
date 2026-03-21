@@ -350,27 +350,71 @@ func (m Model) handleContentMsg(msg ContentMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
-	delete(m.activeTasks, msg.TaskID)
-	var cmd tea.Cmd
-	if msg.Err != nil {
-		cmd = m.AddMessage(LevelError, fmt.Sprintf("Download failed: %v", msg.Err))
-	} else {
-		m.downloadFinished++
-		if len(m.downloadQueue) == 0 && m.downloadTotal > 1 {
-			cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Downloaded %d files", m.downloadTotal))
-		} else if len(m.downloadQueue) == 0 {
-			cmd = m.AddMessage(LevelInfo, fmt.Sprintf("Downloaded to %s", msg.Path))
-		}
-	}
-
+func (m Model) resumeDownloadQueue(cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	if len(m.downloadQueue) > 0 {
-		m, nextCmd := m.processDownloadQueue()
-		return m, tea.Batch(cmd, nextCmd)
+		var nextCmd tea.Cmd
+		m, nextCmd = m.processDownloadQueue()
+		if cmd != nil && nextCmd != nil {
+			return m, tea.Batch(cmd, nextCmd)
+		} else if nextCmd != nil {
+			return m, nextCmd
+		}
 	}
 	return m, cmd
 }
 
+func (m Model) buildCompletionCmd(jobNum int, progress *JobProgress, singlePath string) tea.Cmd {
+	if progress.Total <= 0 {
+		return nil
+	}
+	if progress.Total == 1 && progress.Succeeded == 1 && singlePath != "" {
+		return m.AddMessage(LevelInfo, fmt.Sprintf("[Job #%d] Downloaded to %s", jobNum, singlePath))
+	}
+
+	switch progress.Succeeded {
+	case progress.Total:
+		return m.AddMessage(LevelInfo, fmt.Sprintf("[Job #%d] Downloaded %d files", jobNum, progress.Total))
+	case 0:
+		return m.AddMessage(LevelError, fmt.Sprintf("[Job #%d] Failed to download %d files: %s", jobNum, len(progress.FailedFiles), strings.Join(progress.FailedFiles, ", ")))
+	default:
+		return m.AddMessage(LevelWarn, fmt.Sprintf("[Job #%d] Downloaded %d/%d files. Failed: %s", jobNum, progress.Succeeded, progress.Total, strings.Join(progress.FailedFiles, ", ")))
+	}
+}
+
+func (m Model) handleDownloadMsg(msg DownloadMsg) (tea.Model, tea.Cmd) {
+	delete(m.activeTasks, msg.TaskID)
+	var cmd tea.Cmd
+
+	if progress, ok := m.jobProgress[msg.JobNum]; ok {
+		progress.Finished++
+		if msg.Err != nil {
+			progress.FailedFiles = append(progress.FailedFiles, filepath.Base(msg.Path))
+			cmd = m.AddMessage(LevelError, fmt.Sprintf("[Job #%d] Download failed for %s: %v", msg.JobNum, filepath.Base(msg.Path), msg.Err))
+		} else {
+			progress.Succeeded++
+		}
+
+		if progress.Finished == progress.Total {
+			completionCmd := m.buildCompletionCmd(msg.JobNum, progress, msg.Path)
+
+			if cmd != nil && completionCmd != nil {
+				cmd = tea.Batch(cmd, completionCmd)
+			} else if completionCmd != nil {
+				cmd = completionCmd
+			}
+
+			delete(m.jobProgress, msg.JobNum)
+		}
+	} else {
+		if msg.Err != nil {
+			cmd = m.AddMessage(LevelError, fmt.Sprintf("[Job #%d] Download failed for %s: %v", msg.JobNum, filepath.Base(msg.Path), msg.Err))
+		} else {
+			cmd = m.AddMessage(LevelInfo, fmt.Sprintf("[Job #%d] Downloaded to %s", msg.JobNum, msg.Path))
+		}
+	}
+
+	return m.resumeDownloadQueue(cmd)
+}
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showHelp {
 		switch {
@@ -567,44 +611,75 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) abortJobItem(jobNum int, msgText string, level MsgLevel) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	if progress, ok := m.jobProgress[jobNum]; ok {
+		progress.Total--
+		if progress.Finished >= progress.Total {
+			completionCmd := m.buildCompletionCmd(jobNum, progress, "")
+			if completionCmd != nil {
+				cmd = tea.Batch(m.AddMessage(level, msgText), completionCmd)
+			} else {
+				cmd = m.AddMessage(level, msgText)
+			}
+			delete(m.jobProgress, jobNum)
+		} else {
+			cmd = m.AddMessage(level, msgText)
+		}
+	} else {
+		cmd = m.AddMessage(level, msgText)
+	}
+	return m, cmd
+}
+
 func (m Model) handleDownloadConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	jobNum := m.pendingDownloadJobNum
 	switch msg.String() {
 	case "o":
 		m.state = viewObjects
 		return m.startDownloadTask(m.pendingDownloadDest)
 	case "a":
-		m.downloadTotal--
 		m.state = viewObjects
 		msgText := fmt.Sprintf("Aborted %s", filepath.Base(m.pendingDownloadDest))
-		if len(m.downloadQueue) > 0 {
-			m, nextCmd := m.processDownloadQueue()
-			cmd := m.AddMessage(LevelInfo, msgText)
-			return m, tea.Batch(cmd, nextCmd)
-		}
-		cmd := m.AddMessage(LevelInfo, msgText)
-		if m.downloadTotal > 1 && m.downloadFinished > 0 {
-			nextCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Downloaded %d files", m.downloadTotal))
-			return m, tea.Batch(cmd, nextCmd)
-		}
-		return m, cmd
+		var cmd tea.Cmd
+		m, cmd = m.abortJobItem(jobNum, msgText, LevelInfo)
+		return m.resumeDownloadQueue(cmd)
 	case "q", "ctrl+c", "esc":
-		cmd := m.AddMessage(LevelInfo, "Downloads cancelled.")
 		m.state = viewObjects
-		m.downloadQueue = nil // Clear the rest of the queue
-		return m, cmd
+
+		var newQueue []downloadTask
+		var cancelledCount int
+		for _, t := range m.downloadQueue {
+			if t.jobNum != jobNum {
+				newQueue = append(newQueue, t)
+			} else {
+				cancelledCount++
+			}
+		}
+		m.downloadQueue = newQueue
+
+		var completionCmd tea.Cmd
+		if progress, ok := m.jobProgress[jobNum]; ok {
+			progress.Total -= (1 + cancelledCount)
+			if progress.Finished >= progress.Total {
+				completionCmd = m.buildCompletionCmd(jobNum, progress, "")
+				delete(m.jobProgress, jobNum)
+			}
+		}
+
+		cmd := m.AddMessage(LevelInfo, fmt.Sprintf("[Job #%d] Downloads cancelled.", jobNum))
+		if completionCmd != nil {
+			cmd = tea.Batch(cmd, completionCmd)
+		}
+		return m.resumeDownloadQueue(cmd)
 	case "r":
 		newDest, err := autoRename(m.pendingDownloadDest)
 		if err != nil {
-			m.downloadTotal--
 			m.state = viewObjects
 			msgText := fmt.Sprintf("Rename failed: %v", err)
-			if len(m.downloadQueue) > 0 {
-				m, nextCmd := m.processDownloadQueue()
-				cmd := m.AddMessage(LevelError, msgText)
-				return m, tea.Batch(cmd, nextCmd)
-			}
-			cmd := m.AddMessage(LevelError, msgText)
-			return m, cmd
+			var cmd tea.Cmd
+			m, cmd = m.abortJobItem(jobNum, msgText, LevelError)
+			return m.resumeDownloadQueue(cmd)
 		}
 		m.state = viewObjects
 		return m.startDownloadTask(newDest)
@@ -1049,18 +1124,20 @@ func (m Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
 		var toDownload []downloadTask
+		jobNum := m.nextJobNum
+
 		if len(m.selected) > 0 {
 			// Download all selected objects and prefixes
 			for _, p := range m.prefixes {
 				if _, ok := m.selected[p.Name]; ok {
 					dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(p.Name), "/")+".zip")
-					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: p.Name, dest: dest, isPrefix: true})
+					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: p.Name, dest: dest, isPrefix: true, jobNum: jobNum})
 				}
 			}
 			for _, obj := range m.objects {
 				if _, ok := m.selected[obj.Name]; ok {
 					dest := filepath.Join(m.downloadDir, filepath.Base(obj.Name))
-					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: obj.Name, dest: dest, isPrefix: false})
+					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: obj.Name, dest: dest, isPrefix: false, jobNum: jobNum})
 				}
 			}
 		} else {
@@ -1068,20 +1145,23 @@ func (m Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 			if m.cursor < len(currentPrefixes) {
 				name := currentPrefixes[m.cursor].Name
 				dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(name), "/")+".zip")
-				toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: true})
+				toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: true, jobNum: jobNum})
 			} else if m.cursor >= len(currentPrefixes) {
 				idx := m.cursor - len(currentPrefixes)
 				if idx < len(currentObjects) {
 					name := currentObjects[idx].Name
 					dest := filepath.Join(m.downloadDir, filepath.Base(name))
-					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: false})
+					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: false, jobNum: jobNum})
 				}
 			}
 		}
 
 		if len(toDownload) > 0 {
-			m.downloadTotal = len(toDownload)
-			m.downloadFinished = 0
+			m.jobProgress[jobNum] = &JobProgress{
+				Total:    len(toDownload),
+				Finished: 0,
+			}
+			m.nextJobNum++
 
 			m.downloadQueue = append(m.downloadQueue, toDownload...)
 

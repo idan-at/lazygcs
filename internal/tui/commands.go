@@ -95,14 +95,14 @@ func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	}
 }
 
-func (m Model) fetchDownload(bucketName, objectName, dest, taskID string, isPrefix bool) tea.Cmd {
+func (m Model) fetchDownload(bucketName, objectName, dest, taskID string, jobNum int, isPrefix bool) tea.Cmd {
 	return func() tea.Msg {
 		if isPrefix {
 			err := m.client.DownloadPrefixAsZip(context.Background(), bucketName, objectName, dest)
-			return DownloadMsg{Path: dest, TaskID: taskID, Err: err}
+			return DownloadMsg{Path: dest, TaskID: taskID, JobNum: jobNum, Err: err}
 		}
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
-		return DownloadMsg{Path: dest, TaskID: taskID, Err: err}
+		return DownloadMsg{Path: dest, TaskID: taskID, JobNum: jobNum, Err: err}
 	}
 }
 
@@ -170,27 +170,35 @@ func (m Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
 }
 
 func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
+	jobNum := m.pendingDownloadJobNum
+
 	var msgText string
-	if m.downloadTotal > 1 {
-		msgText = fmt.Sprintf("Downloading %d/%d as %s...", m.downloadFinished+1, m.downloadTotal, filepath.Base(dest))
+	if progress, ok := m.jobProgress[jobNum]; ok && progress.Total > 1 {
+		progress.Started++
+		msgText = fmt.Sprintf("[Job #%d] Downloading %d/%d as %s...", jobNum, progress.Started, progress.Total, filepath.Base(dest))
 	} else {
-		msgText = fmt.Sprintf("Downloading as %s...", filepath.Base(dest))
+		msgText = fmt.Sprintf("[Job #%d] Downloading as %s...", jobNum, filepath.Base(dest))
 	}
 
 	taskID := fmt.Sprintf("dl-%s-%d", dest, time.Now().UnixNano())
 	m.activeTasks[taskID] = Task{
 		ID:       taskID,
 		Name:     msgText,
+		JobNum:   jobNum,
 		Started:  time.Now(),
 		Progress: 0,
 	}
 
 	cmd := m.AddMessage(LevelInfo, msgText)
-	return m, tea.Batch(cmd, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, dest, taskID, m.pendingDownloadIsPrefix))
+	return m, tea.Batch(cmd, m.fetchDownload(m.pendingDownloadBucket, m.pendingDownloadObject, dest, taskID, jobNum, m.pendingDownloadIsPrefix))
 }
 
 func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 	if len(m.downloadQueue) == 0 {
+		return m, nil
+	}
+
+	if m.state == viewDownloadConfirm {
 		return m, nil
 	}
 
@@ -201,11 +209,12 @@ func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 	m.pendingDownloadObject = task.object
 	m.pendingDownloadDest = task.dest
 	m.pendingDownloadIsPrefix = task.isPrefix
+	m.pendingDownloadJobNum = task.jobNum
 
 	// Check if file already exists
 	if _, err := os.Stat(task.dest); err == nil {
 		m.state = viewDownloadConfirm
-		_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename?", filepath.Base(task.dest)))
+		_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)))
 		return m, nil
 	}
 

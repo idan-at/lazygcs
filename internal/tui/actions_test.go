@@ -200,12 +200,12 @@ func TestModel_DownloadAction(t *testing.T) {
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 
 	assert.Assert(t, cmd != nil)
-	assert.Assert(t, strings.Contains(m.View(), "Downloading as obj1..."), "View should show downloading status with filename")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloading as obj1..."), "View should show downloading status with job number and filename")
 
 	// Simulate download completion
-	m, _ = updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1"})
+	m, _ = updateModel(m, tui.DownloadMsg{Path: "/tmp/obj1", JobNum: 1})
 
-	assert.Assert(t, strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "View should show success status")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloaded to /tmp/obj1"), "View should show success status with job number")
 }
 
 func TestModel_DownloadAction_MultiSelect(t *testing.T) {
@@ -231,7 +231,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 
 	assert.Assert(t, cmd != nil, "Cmd should not be nil")
-	assert.Assert(t, strings.Contains(m.View(), "Downloading 1/2"), "View should show batch downloading progress")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloading 1/2"), "View should show batch downloading progress with job number")
 
 	// With the queue system, the first command is a single download fetch
 	msg := resolveFetchCmd(cmd)
@@ -243,7 +243,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 	m = updatedM.(tui.Model)
 
 	assert.Assert(t, cmd2 != nil, "Expected a second download command to be queued")
-	assert.Assert(t, strings.Contains(m.View(), "Downloading 2/2"), "View should show batch downloading progress for the second item")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloading 2/2"), "View should show batch downloading progress for the second item with job number")
 
 	msg2 := resolveFetchCmd(cmd2)
 	dl2, ok2 := msg2.(tui.DownloadMsg)
@@ -251,7 +251,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 
 	// Update model with the final download result
 	m, _ = updateModel(m, dl2)
-	assert.Assert(t, strings.Contains(m.View(), "Downloaded 2 files"), "View should show final batch success message")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloaded 2 files"), "View should show final batch success message")
 
 	// We expect the paths to be obj1 and obj2 in any order
 	paths := map[string]bool{
@@ -805,4 +805,186 @@ func TestModel_DownloadAction_MultiSelect_FileExists_RenameError(t *testing.T) {
 		}
 	}
 	assert.Assert(t, foundErr, "Should have added a 'Rename failed' message")
+}
+
+func TestModel_DownloadAction_MultipleConcurrentBatches(t *testing.T) {
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1", "obj2", "obj3", "obj4"}, nil),
+	}
+	downloadDir := t.TempDir()
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket and load objects
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// --- Batch 1 ---
+	// Select obj1, obj2
+	m, _ = pressKey(m, ' ') // Select obj1
+	m, _ = pressKey(m, 'j') // Move to obj2
+	m, _ = pressKey(m, ' ') // Select obj2
+
+	// Start Batch 1 (Job 1)
+	m, cmd1 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	assert.Assert(t, cmd1 != nil, "Batch 1 start cmd should not be nil")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloading 1/2 as obj1"), "Batch 1 view")
+
+	msg1 := resolveFetchCmd(cmd1)
+	dl1, ok1 := msg1.(tui.DownloadMsg)
+	assert.Assert(t, ok1, "Should return download message")
+	assert.Assert(t, strings.HasSuffix(dl1.Path, "obj1"), "First item popped should be obj1")
+
+	// --- Batch 2 ---
+	// Move to obj3, obj4
+	m, _ = pressKey(m, 'j') // Move to obj3
+	m, _ = pressKey(m, ' ') // Select obj3
+	m, _ = pressKey(m, 'j') // Move to obj4
+	m, _ = pressKey(m, ' ') // Select obj4
+
+	// Start Batch 2 (Job 2)
+	// Because of how processDownloadQueue works, pressing 'd' will pop the next item (obj2 from Job 1) and start it concurrently!
+	m, cmd2 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	assert.Assert(t, cmd2 != nil, "Batch 2 start cmd should not be nil")
+	assert.Assert(t, strings.Contains(m.View(), "[Job #1] Downloading 2/2 as obj2"), "Job 1 second item started concurrently")
+
+	msg2 := resolveFetchCmd(cmd2)
+	dl2, ok2 := msg2.(tui.DownloadMsg)
+	assert.Assert(t, ok2, "Should return download message for second item in queue (obj2)")
+	assert.Assert(t, strings.HasSuffix(dl2.Path, "obj2"), "The popped item should be obj2 from Job 1")
+
+	// Now finish dl1 (from Job 1, obj1)
+	m, cmd3 := updateModel(m, dl1)
+
+	// Finishing dl1 pops the next item from the queue, which is obj3!
+	assert.Assert(t, strings.Contains(m.View(), "[Job #2] Downloading 1/2 as obj3"), "Job 2 first item started")
+	msg3 := resolveFetchCmd(cmd3)
+	dl3, ok3 := msg3.(tui.DownloadMsg)
+	assert.Assert(t, ok3, "Should return download message for third item in queue (obj3)")
+	assert.Assert(t, strings.HasSuffix(dl3.Path, "obj3"), "The popped item should be obj3 from Job 2")
+
+	// Now finish dl2 (from Job 1, obj2)
+	m, cmd4 := updateModel(m, dl2)
+
+	// AT THIS POINT: Job 1 has finished both its files!
+	foundCompletion := false
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "[Job #1] Downloaded 2 files") {
+			foundCompletion = true
+			break
+		}
+	}
+	assert.Assert(t, foundCompletion, "Job 1 completion message is missing in message queue")
+
+	// Finishing dl2 pops the next item from the queue, which is obj4!
+	assert.Assert(t, strings.Contains(m.View(), "[Job #2] Downloading 2/2 as obj4"), "Job 2 second item started")
+	msg4 := resolveFetchCmd(cmd4)
+	dl4, ok4 := msg4.(tui.DownloadMsg)
+	assert.Assert(t, ok4, "Should return download message for fourth item in queue (obj4)")
+	assert.Assert(t, strings.HasSuffix(dl4.Path, "obj4"), "The popped item should be obj4 from Job 2")
+
+	// Finish dl3 (from Job 2, obj3)
+	m, _ = updateModel(m, dl3)
+
+	// Finish dl4 (from Job 2, obj4)
+	m, _ = updateModel(m, dl4)
+
+	// Finally, Job 2 should also show completion
+	foundCompletion2 := false
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "[Job #2] Downloaded 2 files") {
+			foundCompletion2 = true
+			break
+		}
+	}
+	assert.Assert(t, foundCompletion2, "Job 2 completion message is missing")
+}
+
+func TestModel_DownloadAction_ProcessQueueWhileConfirming(t *testing.T) {
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	downloadDir := t.TempDir()
+
+	// Pre-create obj2 to trigger "File exists" confirmation later
+	_ = os.WriteFile(filepath.Join(downloadDir, "obj2"), []byte("exist"), 0600)
+
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Start two jobs
+	// Job 1 (obj1)
+	m, _ = pressKey(m, ' ') // Select obj1
+	m, cmd1 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	assert.Assert(t, cmd1 != nil, "Cmd1 should not be nil")
+
+	msg1 := resolveFetchCmd(cmd1)
+	dlMsg1, ok := msg1.(tui.DownloadMsg)
+	assert.Assert(t, ok, "Expected DownloadMsg")
+
+	// Job 2 (obj2)
+	m, _ = pressKey(m, 'j') // Move to obj2
+	m, _ = pressKey(m, ' ') // Select obj2
+	m, cmd2 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	// cmd2 triggers processDownloadQueue which returns nil because it enters confirmation state for obj2
+	assert.Assert(t, cmd2 == nil, "Cmd2 should be nil because it enters confirmation state")
+	assert.Assert(t, strings.Contains(m.View(), "File exists: obj2"), "View should show confirmation prompt")
+
+	// Now finish Job 1 while Job 2 is waiting for confirmation
+	m, _ = updateModel(m, dlMsg1)
+
+	// Verify that finishing Job 1 didn't overwrite Job 2's confirmation state
+	assert.Assert(t, strings.Contains(m.View(), "File exists: obj2"), "View should STILL show confirmation prompt for obj2, not be interrupted by background task completion")
+}
+
+func TestModel_DownloadAction_LostAbortProgressMessage(t *testing.T) {
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
+	}
+	downloadDir := t.TempDir()
+
+	// Pre-create obj2 to trigger "File exists" confirmation on the second file
+	_ = os.WriteFile(filepath.Join(downloadDir, "obj2"), []byte("exist"), 0600)
+
+	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Select obj1, obj2
+	m, _ = pressKey(m, ' ') // Select obj1
+	m, _ = pressKey(m, 'j') // Move to obj2
+	m, _ = pressKey(m, ' ') // Select obj2
+
+	// Start Download
+	m, cmd1 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	assert.Assert(t, cmd1 != nil, "Cmd should start obj1")
+
+	msg := resolveFetchCmd(cmd1)
+	dlMsg, ok := msg.(tui.DownloadMsg)
+	assert.Assert(t, ok, "Expected DownloadMsg")
+
+	// Finish obj1
+	m, cmd2 := updateModel(m, dlMsg)
+
+	// cmd2 should be processing obj2, which exists, so cmd2 is nil, state is confirmation
+	assert.Assert(t, cmd2 == nil, "obj2 should prompt for confirmation")
+	assert.Assert(t, strings.Contains(m.View(), "File exists: obj2"), "View should show confirmation prompt")
+
+	// Abort obj2
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+
+	// We aborted obj2. obj1 succeeded. We should see "Downloaded 1 files" in messages.
+	found := false
+	for _, logMsg := range m.Messages() {
+		if strings.Contains(logMsg.Text, "Downloaded 1 files") {
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "Should see success message for the 1 completed file even if 1 was aborted")
 }
