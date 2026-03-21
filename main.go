@@ -103,7 +103,9 @@ For more details, see the ? help menu inside the application.
 
 	m := tui.NewModel(cfg.Projects, client, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(&m, tea.WithAltScreen())
+	m.SetSendMsg(p.Send)
+
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("alas, it seems we've encountered an error: %w", err)
 	}

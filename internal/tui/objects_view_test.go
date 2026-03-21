@@ -97,7 +97,8 @@ func TestModel_ObjectPreview_Error(t *testing.T) {
 		objects:      simpleObjectList([]string{"obj1"}, nil),
 		contentError: fmt.Errorf("permission denied"),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket and load objects
@@ -120,7 +121,8 @@ func TestModel_PrefixMetadata_VirtualDirectory(t *testing.T) {
 			Prefixes: []gcs.PrefixMetadata{{Name: "folder1/"}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket and load objects
@@ -174,7 +176,8 @@ func TestModel_Update_ObjectCursorCycle(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
@@ -193,7 +196,8 @@ func TestModel_EnterPrefix(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"file1"}, []string{"folder1/"}),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
@@ -235,7 +239,8 @@ func TestModel_SelectObject(t *testing.T) {
 			}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
@@ -256,7 +261,8 @@ func TestModel_SelectPrefix(t *testing.T) {
 			Objects:  []gcs.ObjectMetadata{{Name: "file1"}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// 1. Enter bucket
@@ -294,7 +300,8 @@ func TestModel_Pagination_Objects(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList(objects, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 10})
 
@@ -342,7 +349,8 @@ func TestModel_Truncation(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{longName}}},
 		objects:  simpleObjectList([]string{longName}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	// Set a specific width where we know it should truncate everywhere
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 40, Height: 50})
@@ -369,7 +377,8 @@ func TestModel_PreviewBinaryContent(t *testing.T) {
 		objects:  simpleObjectList([]string{"binary_obj"}, nil),
 	}
 	client.contentError = nil
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", nil)
@@ -398,7 +407,8 @@ func TestModel_PreviewContentTooManyLines(t *testing.T) {
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
 	client.contentError = nil
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 

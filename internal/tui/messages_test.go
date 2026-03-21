@@ -16,11 +16,12 @@ import (
 
 func TestModel_AddMessage_Bounding(t *testing.T) {
 	client := &mockGCSClient{}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	// Add 600 messages (assuming limit is 500)
 	for i := 0; i < 600; i++ {
-		_ = m.AddMessage(tui.LevelInfo, fmt.Sprintf("message %d", i))
+		_ = m.AddMessage(tui.LevelInfo, fmt.Sprintf("message %d", i), 0, "")
 	}
 
 	// Verify that the number of messages is bounded at 500
@@ -29,12 +30,13 @@ func TestModel_AddMessage_Bounding(t *testing.T) {
 
 func TestModel_ErrorCount_Tracking(t *testing.T) {
 	client := &mockGCSClient{}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
-	_ = m.AddMessage(tui.LevelInfo, "info 1")
-	_ = m.AddMessage(tui.LevelError, "error 1")
-	_ = m.AddMessage(tui.LevelWarn, "warn 1")
-	_ = m.AddMessage(tui.LevelError, "error 2")
+	_ = m.AddMessage(tui.LevelInfo, "info 1", 0, "")
+	_ = m.AddMessage(tui.LevelError, "error 1", 0, "")
+	_ = m.AddMessage(tui.LevelWarn, "warn 1", 0, "")
+	_ = m.AddMessage(tui.LevelError, "error 2", 0, "")
 
 	// This method ErrorCount doesn't exist yet
 	assert.Equal(t, m.ErrorCount(), 2, "ErrorCount should be 2")
@@ -42,36 +44,38 @@ func TestModel_ErrorCount_Tracking(t *testing.T) {
 
 func TestModel_ErrorCount_Bounding(t *testing.T) {
 	client := &mockGCSClient{}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	// Add 500 errors
 	for i := 0; i < 500; i++ {
-		_ = m.AddMessage(tui.LevelError, fmt.Sprintf("error %d", i))
+		_ = m.AddMessage(tui.LevelError, fmt.Sprintf("error %d", i), 0, "")
 	}
 	assert.Equal(t, m.ErrorCount(), 500, "ErrorCount should be 500")
 
 	// Add 1 more error, it should still be 500 because one error was pushed out
-	_ = m.AddMessage(tui.LevelError, "one more error")
+	_ = m.AddMessage(tui.LevelError, "one more error", 0, "")
 	assert.Equal(t, m.ErrorCount(), 500, "ErrorCount should stay at 500 after overflow")
 
 	// Add 1 info message, it should push out an error
-	_ = m.AddMessage(tui.LevelInfo, "info message")
+	_ = m.AddMessage(tui.LevelInfo, "info message", 0, "")
 	assert.Equal(t, m.ErrorCount(), 499, "ErrorCount should decrease to 499 as error is pushed out by info")
 }
 
 func TestModel_ClearStatusMsg(t *testing.T) {
 	client := &mockGCSClient{}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	// Add an initial message
-	cmd1 := m.AddMessage(tui.LevelInfo, "first message")
+	cmd1 := m.AddMessage(tui.LevelInfo, "first message", 0, "")
 	msg1 := m.Messages()[len(m.Messages())-1]
 
 	// The status pill should be visible initially
 	assert.Assert(t, !m.HideStatusPill(), "hideStatusPill should be false after adding a message")
 
 	// Add a second message before the first clears
-	cmd2 := m.AddMessage(tui.LevelInfo, "second message")
+	cmd2 := m.AddMessage(tui.LevelInfo, "second message", 0, "")
 	msg2 := m.Messages()[len(m.Messages())-1]
 
 	// Simulate the first command's timer firing
@@ -101,7 +105,7 @@ func TestMessagesView_ToggleWithNoMessages(t *testing.T) {
 	m, _ := setupTestModel(nil, nil, "/tmp")
 
 	// Ensure there are no messages
-	assert.Equal(t, len(m.Messages()), 0)
+	assert.Equal(t, len(m.Messages()), 0, "")
 	assert.Equal(t, m.ShowMessages(), false)
 
 	// Press 'm'
@@ -136,11 +140,12 @@ func TestMessagesView_ClearsKittyImages(t *testing.T) {
 
 func TestFooterView_HideHelpOnMessage(t *testing.T) {
 	client := &mockGCSClient{}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	// Set width via WindowSizeMsg
-	mModel, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
-	m = mModel.(tui.Model)
+	res, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = res.(*tui.Model)
 
 	// Initially, help should be visible in footerView (NORMAL state)
 	view := m.View()
@@ -148,7 +153,7 @@ func TestFooterView_HideHelpOnMessage(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "select"), "Help hints should be visible initially")
 
 	// Add a message
-	_ = m.AddMessage(tui.LevelInfo, "test message")
+	_ = m.AddMessage(tui.LevelInfo, "test message", 0, "")
 
 	// Now help should be hidden
 	view = m.View()

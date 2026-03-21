@@ -245,3 +245,19 @@ func getLevelIcon(level MsgLevel, useNerdFont bool) string {
 	}
 	return ""
 }
+
+func renderProgressBar(width int, progress int) string {
+	if width < 5 {
+		return ""
+	}
+	filledWidth := int(float64(width) * float64(progress) / 100)
+	emptyWidth := width - filledWidth
+
+	filled := strings.Repeat("=", filledWidth)
+	if filledWidth > 0 && filledWidth < width {
+		filled = filled[:len(filled)-1] + ">"
+	}
+	empty := strings.Repeat(" ", emptyWidth)
+
+	return "[" + filled + empty + "]"
+}

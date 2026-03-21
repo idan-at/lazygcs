@@ -691,7 +691,7 @@ func TestModel_DownloadAction_MultiSelect_FileExists_OverwriteRename(t *testing.
 	assert.Assert(t, found, "Should have found DownloadMsg in batch")
 
 	res, cmd := m.Update(dlMsg)
-	m = res.(tui.Model)
+	m = res.(*tui.Model)
 	// cmd should be nil because there's still 1 item in the queue and it prompted (processDownloadQueue returned nil)
 	assert.Assert(t, cmd == nil, "Should trigger processDownloadQueue which returns nil as it prompts")
 
@@ -721,7 +721,7 @@ func TestModel_DownloadAction_MultiSelect_FileExists_OverwriteRename(t *testing.
 	assert.Assert(t, strings.Contains(dlMsg.Path, "obj2_1"), "Should have renamed path: %s", dlMsg.Path)
 
 	res, cmd = m.Update(dlMsg)
-	m = res.(tui.Model)
+	m = res.(*tui.Model)
 	// downloadQueue is now empty, so it should finish
 	assert.Assert(t, cmd != nil, "Should return clearStatusCmd")
 	assert.Assert(t, strings.Contains(m.View(), "Downloaded 2 files"), "Should indicate all files downloaded")
@@ -1053,7 +1053,7 @@ func TestModel_DownloadAction_ActivelyDownloadingPrompt(t *testing.T) {
 	assert.Assert(t, strings.Contains(m.View(), "File is actively downloading: obj1"), "Should still be prompting because overwrite was rejected")
 
 	// If the user chooses rename, it should rename it
-	m, cmd4 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	_, cmd4 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
 
 	msgs := resolveAllFetchCmds(cmd4)
 	assert.Assert(t, len(msgs) > 0, "Should return fetch command")

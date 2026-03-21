@@ -44,7 +44,8 @@ func TestModel_SearchFilter(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Load buckets
@@ -74,7 +75,8 @@ func TestModel_FuzzySearch(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot"}}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", true, false) // true enables fuzzy search
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", true, false) // true enables fuzzy search
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Load buckets

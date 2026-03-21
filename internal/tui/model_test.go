@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -81,7 +82,7 @@ func (f *mockGCSClient) GetObjectContent(_ context.Context, _, objectName string
 	return "", fmt.Errorf("not found")
 }
 
-func (f *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest string) error {
+func (f *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest string, _ gcs.ProgressFunc) error {
 	f.lastDownload.Bucket = bucket
 	f.lastDownload.Object = object
 	f.lastDownload.Dest = dest
@@ -95,7 +96,7 @@ func (f *mockGCSClient) UploadObject(_ context.Context, bucket, object, src stri
 	return nil
 }
 
-func (f *mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string) error {
+func (f *mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string, _ gcs.ProgressFunc) error {
 	return nil
 }
 
@@ -120,7 +121,7 @@ func simpleObjectList(names []string, prefixes []string) *gcs.ObjectList {
 	return &gcs.ObjectList{Objects: objects, Prefixes: prefs}
 }
 
-func updateModel(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
+func updateModel(m *tui.Model, msg tea.Msg) (*tui.Model, tea.Cmd) {
 	if msg == nil {
 		return m, nil
 	}
@@ -138,20 +139,21 @@ func updateModel(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
 		return m, tea.Batch(finalCmds...)
 	}
 	updatedM, cmd := m.Update(msg)
-	return updatedM.(tui.Model), cmd
+	return updatedM.(*tui.Model), cmd
 }
 
-func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, downloadDir string) (tui.Model, *mockGCSClient) {
+func setupTestModel(projects []gcs.ProjectBuckets, objects *gcs.ObjectList, downloadDir string) (*tui.Model, *mockGCSClient) {
 	client := &mockGCSClient{
 		projects: projects,
 		objects:  objects,
 	}
-	m := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, downloadDir, false, false)
+	m := &mModel
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 150, Height: 50})
 	return m, client
 }
 
-func enterBucket(m tui.Model, projects []gcs.ProjectBuckets, bucket string, objects *gcs.ObjectList) tui.Model {
+func enterBucket(m *tui.Model, projects []gcs.ProjectBuckets, bucket string, objects *gcs.ObjectList) *tui.Model {
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: projects[0].ProjectID, Buckets: projects[0].Buckets})
 	m, _ = pressKey(m, 'j')
 	m, _ = pressKeyType(m, tea.KeyEnter)
@@ -161,11 +163,11 @@ func enterBucket(m tui.Model, projects []gcs.ProjectBuckets, bucket string, obje
 	return m
 }
 
-func pressKey(m tui.Model, key rune) (tui.Model, tea.Cmd) {
+func pressKey(m *tui.Model, key rune) (*tui.Model, tea.Cmd) {
 	return updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
 }
 
-func pressKeyType(m tui.Model, keyType tea.KeyType) (tui.Model, tea.Cmd) {
+func pressKeyType(m *tui.Model, keyType tea.KeyType) (*tui.Model, tea.Cmd) {
 	return updateModel(m, tea.KeyMsg{Type: keyType})
 }
 
@@ -315,7 +317,8 @@ func TestModel_HelpMenu(t *testing.T) {
 
 func TestModel_Update_Quit(t *testing.T) {
 	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
@@ -350,7 +353,8 @@ func TestModel_LayoutIntegrity(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	width := 100
 	height := 20
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: width, Height: height})
@@ -378,7 +382,8 @@ func TestModel_LayoutIntegrity(t *testing.T) {
 func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
 	// This test specifically checks if the rendered columns have the expected height.
 	// If wrapping occurs, the number of lines will exceed columnHeight.
-	m := tui.NewModel([]string{"p1"}, nil, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, nil, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20})
 
 	// maxVisible = 10. columnHeight = 12.
@@ -394,4 +399,10 @@ func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
 	lines := strings.Split(view, "\n")
 
 	assert.Assert(t, len(lines) <= 20, "View height %d exceeded terminal height 20. Wrapping likely occurred!", len(lines))
+}
+
+var ansiRegexp = regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*((?:[a-zA-Z\\d\\s:;?=-]|\\x07)*[a-zA-Z\\d\\s:;?=-])")
+
+func stripAnsi(s string) string {
+	return ansiRegexp.ReplaceAllString(s, "")
 }

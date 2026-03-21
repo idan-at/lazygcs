@@ -10,14 +10,14 @@ import (
 	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
-func (m Model) renderSpinner() string {
+func (m *Model) renderSpinner() string {
 	if m.deterministicSpinner {
 		return "*"
 	}
 	return m.spinner.View()
 }
 
-func (m Model) fullPath() string {
+func (m *Model) fullPath() string {
 	if m.state == viewBuckets {
 		filtered := m.filteredBuckets()
 		if m.cursor < len(filtered) && !filtered[m.cursor].IsProject {
@@ -47,7 +47,7 @@ func (m Model) fullPath() string {
 	return path
 }
 
-func (m Model) previewView(width int) string {
+func (m *Model) previewView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
 		s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
@@ -164,7 +164,7 @@ func (m Model) previewView(width int) string {
 	return s.String()
 }
 
-func (m Model) headerView() string {
+func (m *Model) headerView() string {
 	return lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("229")).
@@ -173,7 +173,7 @@ func (m Model) headerView() string {
 		Render(truncate(m.fullPath(), m.width-2))
 }
 
-func (m Model) footerView() string {
+func (m *Model) footerView() string {
 	// Left side: Status Pill
 	statusText := " NORMAL "
 	statusStyle := lipgloss.NewStyle().
@@ -250,23 +250,55 @@ func (m Model) footerView() string {
 			text = truncate(text, availableWidth-lipgloss.Width(icon))
 		}
 		msgPill = " " + style.Render(icon+text)
-	} else if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
-		latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
-		style := lipgloss.NewStyle().Padding(0, 1).Faint(true)
-		switch latest.Level {
-		case LevelError:
-			style = style.Foreground(lipgloss.Color("196"))
-		case LevelWarn:
-			style = style.Foreground(lipgloss.Color("214"))
-		default:
-			style = style.Foreground(lipgloss.Color("42"))
+	} else {
+		// Calculate aggregate progress for active downloads
+		var totalProgress int
+		var activeDlCount int
+		var totalBytes int64
+		var currentBytes int64
+		showProgressBar := false
+
+		for _, t := range m.activeTasks {
+			if strings.Contains(t.Name, "Downloading") {
+				activeDlCount++
+				totalBytes += t.TotalBytes
+				currentBytes += t.Current
+				if time.Since(t.Started) > 2*time.Second {
+					showProgressBar = true
+				}
+			}
 		}
-		icon := getLevelIcon(latest.Level, m.showNerdIcons)
-		text := latest.Text
-		if lipgloss.Width(icon+text) > availableWidth {
-			text = truncate(text, availableWidth-lipgloss.Width(icon))
+
+		if activeDlCount > 0 && totalBytes > 0 {
+			totalProgress = int(float64(currentBytes) / float64(totalBytes) * 100)
 		}
-		msgPill = " " + style.Render(icon+text)
+
+		if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
+			latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
+			style := lipgloss.NewStyle().Padding(0, 1).Faint(true)
+			switch latest.Level {
+			case LevelError:
+				style = style.Foreground(lipgloss.Color("196"))
+			case LevelWarn:
+				style = style.Foreground(lipgloss.Color("214"))
+			default:
+				style = style.Foreground(lipgloss.Color("42"))
+			}
+			icon := getLevelIcon(latest.Level, m.showNerdIcons)
+			text := latest.Text
+
+			// If it's a download message and we should show progress, append the bar
+			if showProgressBar && strings.Contains(text, "Downloading") {
+				barWidth := 12
+				bar := renderProgressBar(barWidth, totalProgress)
+				text = fmt.Sprintf("%s %s %d%%", text, bar, totalProgress)
+			}
+
+			if lipgloss.Width(icon+text) > availableWidth {
+				text = truncate(text, availableWidth-lipgloss.Width(icon))
+			}
+			msgPill = " " + style.Render(icon+text)
+		}
 	}
 
 	// Build the ribbon
@@ -280,7 +312,7 @@ func (m Model) footerView() string {
 	return "\n" + leftContent + gap + helpView + strings.Repeat(" ", rightPadding)
 }
 
-func (m Model) maxItemsVisible() int {
+func (m *Model) maxItemsVisible() int {
 	v := m.height - 10
 	if m.showHelp {
 		v -= 12 // Space for the shorter, wider help box
@@ -291,7 +323,7 @@ func (m Model) maxItemsVisible() int {
 	return v
 }
 
-func (m Model) objectsView(width int) string {
+func (m *Model) objectsView(width int) string {
 	var s strings.Builder
 
 	var targetBucket string
@@ -408,7 +440,7 @@ func (m Model) objectsView(width int) string {
 	return s.String()
 }
 
-func (m Model) bucketsView(width int) string {
+func (m *Model) bucketsView(width int) string {
 	var s strings.Builder
 	s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width)) + "\n\n")
 
@@ -492,7 +524,7 @@ func (m Model) bucketsView(width int) string {
 }
 
 // View renders the current state of the application as a string.
-func (m Model) View() string {
+func (m *Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n(press q to quit)", m.err)
 	}
@@ -571,7 +603,7 @@ func (m Model) View() string {
 	return result
 }
 
-func (m Model) helpView() string {
+func (m *Model) helpView() string {
 	groups := keys.FullHelp()
 	headers := []string{"Navigation", "Pagination", "Actions", "App"}
 
@@ -618,7 +650,7 @@ func (m Model) helpView() string {
 	return box
 }
 
-func (m Model) messagesView() string {
+func (m *Model) messagesView() string {
 	var s strings.Builder
 
 	title := lipgloss.NewStyle().
@@ -654,8 +686,33 @@ func (m Model) messagesView() string {
 			style = errStyle
 		}
 
+		statusIcon := ""
+		progressText := ""
+
+		// Find associated task
+		var task *Task
+		if msg.TaskID != "" {
+			if t, ok := m.activeTasks[msg.TaskID]; ok {
+				task = &t
+			}
+		}
+
+		if task != nil {
+			statusIcon = "[>] "
+			bar := renderProgressBar(10, task.Progress)
+			progressText = fmt.Sprintf(" %s %d%% (%s/%s)",
+				bar,
+				task.Progress,
+				humanizeSize(task.Current),
+				humanizeSize(task.TotalBytes))
+		} else if strings.Contains(msg.Text, "Downloaded") || strings.Contains(msg.Text, "Uploaded") {
+			statusIcon = "[✔] "
+		} else if msg.Level == LevelError && (strings.Contains(msg.Text, "Download failed") || strings.Contains(msg.Text, "Upload failed")) {
+			statusIcon = "[✘] "
+		}
+
 		icon := getLevelIcon(msg.Level, m.showNerdIcons)
-		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(icon), style.Render(msg.Text))
+		fmt.Fprintf(&s, "%s %s %s%s%s\n", textStyle.Render(timeStr), style.Render(icon), style.Render(statusIcon), style.Render(msg.Text), textStyle.Faint(true).Render(progressText))
 	}
 
 	keyStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)

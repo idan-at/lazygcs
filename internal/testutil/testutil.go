@@ -80,7 +80,9 @@ func SetupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16
 	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 	m.SetDeterministicSpinner(true)
 
-	tm := teatest.NewTestModel(t, m)
+	tm := teatest.NewTestModel(t, &m)
+	// Set the message sender so async updates work in teatest
+	m.SetSendMsg(tm.Send)
 	t.Cleanup(func() {
 		_ = tm.Quit()
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))

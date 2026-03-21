@@ -28,7 +28,7 @@ func NewMessageQueue() *MessageQueue {
 }
 
 // AddMessage appends a new message and returns a command to clear it from the status bar after a delay.
-func (mq *MessageQueue) AddMessage(level MsgLevel, text string) tea.Cmd {
+func (mq *MessageQueue) AddMessage(level MsgLevel, text string, jobNum int, taskID string) tea.Cmd {
 	mq.nextMsgID++
 	id := fmt.Sprintf("%d", mq.nextMsgID)
 	msg := LogMessage{
@@ -36,6 +36,8 @@ func (mq *MessageQueue) AddMessage(level MsgLevel, text string) tea.Cmd {
 		Level:     level,
 		Text:      text,
 		ID:        id,
+		JobNum:    jobNum,
+		TaskID:    taskID,
 	}
 
 	wasAtBottom := mq.MessagesScroll >= mq.count-1-15
@@ -85,10 +87,19 @@ func (mq *MessageQueue) Messages() []LogMessage {
 	return res
 }
 
-// ClearStatusPill hides the status pill if the ID matches the latest message.
-func (mq *MessageQueue) ClearStatusPill(id string) {
+// ClearStatusPill hides the status pill if the ID matches the latest message and it's not a sticky download.
+func (mq *MessageQueue) ClearStatusPill(id string, activeTasks map[string]Task) {
 	msgs := mq.Messages()
-	if len(msgs) > 0 && msgs[len(msgs)-1].ID == id {
-		mq.HideStatusPill = true
+	if len(msgs) > 0 {
+		latest := msgs[len(msgs)-1]
+		if latest.ID == id {
+			// Don't hide if it's a download that's still active
+			for _, t := range activeTasks {
+				if t.JobNum == latest.JobNum {
+					return // Keep it visible
+				}
+			}
+			mq.HideStatusPill = true
+		}
 	}
 }

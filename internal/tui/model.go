@@ -98,6 +98,7 @@ type Model struct {
 	spinner         spinner.Model
 	previewRegistry *preview.Registry
 	clipboard       ClipboardWriter
+	sendMsg         func(tea.Msg)
 
 	// Test settings
 	deterministicSpinner bool
@@ -133,6 +134,11 @@ func (c *RealClipboard) WriteAll(text string) error {
 
 // NewModel creates a Model initialized with the provided projects and GCS client.
 func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showNerdIcons bool) Model {
+	return NewModelWithSender(projectIDs, client, downloadDir, fuzzySearch, showNerdIcons, nil)
+}
+
+// NewModelWithSender creates a Model initialized with a message sender for async updates.
+func NewModelWithSender(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showNerdIcons bool, sendMsg func(tea.Msg)) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
@@ -167,6 +173,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 		spinner:              s,
 		previewRegistry:      reg,
 		clipboard:            &RealClipboard{},
+		sendMsg:              sendMsg,
 		deterministicSpinner: false,
 		listCache:            make(map[string]listCacheEntry),
 		contentCache:         make(map[string]contentCacheEntry),
@@ -184,47 +191,57 @@ func (m *Model) SetClipboard(c ClipboardWriter) {
 	m.clipboard = c
 }
 
+// SetSendMsg sets the message sender for testing or async updates.
+func (m *Model) SetSendMsg(s func(tea.Msg)) {
+	m.sendMsg = s
+}
+
 // Cursor returns the current cursor position.
-func (m Model) Cursor() int {
+func (m *Model) Cursor() int {
 	return m.cursor
 }
 
 // Objects returns the current list of objects.
-func (m Model) Objects() []gcs.ObjectMetadata {
+func (m *Model) Objects() []gcs.ObjectMetadata {
 	return m.objects
 }
 
 // Prefixes returns the current list of prefixes.
-func (m Model) Prefixes() []gcs.PrefixMetadata {
+func (m *Model) Prefixes() []gcs.PrefixMetadata {
 	return m.prefixes
 }
 
 // Messages returns the current list of log messages.
-func (m Model) Messages() []LogMessage {
+func (m *Model) Messages() []LogMessage {
 	return m.msgQueue.Messages()
 }
 
 // ErrorCount returns the number of log messages with LevelError.
-func (m Model) ErrorCount() int {
+func (m *Model) ErrorCount() int {
 	return m.msgQueue.ErrorCount
 }
 
 // HideStatusPill returns whether the status pill is currently hidden.
-func (m Model) HideStatusPill() bool {
+func (m *Model) HideStatusPill() bool {
 	return m.msgQueue.HideStatusPill
 }
 
 // ShowMessages returns whether the messages view is currently shown.
-func (m Model) ShowMessages() bool {
+func (m *Model) ShowMessages() bool {
 	return m.showMessages
 }
 
-// AddMessage appends a new message and returns a command to clear it from the status bar after a delay.
-func (m Model) AddMessage(level MsgLevel, text string) tea.Cmd {
-	return m.msgQueue.AddMessage(level, text)
+// ActiveTasks returns the current active background tasks.
+func (m *Model) ActiveTasks() map[string]Task {
+	return m.activeTasks
 }
 
-func (m Model) resetObjectsState() Model {
+// AddMessage appends a new message and returns a command to clear it from the status bar after a delay.
+func (m *Model) AddMessage(level MsgLevel, text string, jobNum int, taskID string) tea.Cmd {
+	return m.msgQueue.AddMessage(level, text, jobNum, taskID)
+}
+
+func (m *Model) resetObjectsState() *Model {
 	m.objects = nil
 	m.prefixes = nil
 	m.cursor = 0
@@ -235,7 +252,7 @@ func (m Model) resetObjectsState() Model {
 	return m
 }
 
-func (m Model) withCurrentSearchQuery(q string) Model {
+func (m *Model) withCurrentSearchQuery(q string) *Model {
 	if m.state == viewBuckets {
 		m.bucketSearchQuery = q
 	} else {
@@ -244,14 +261,14 @@ func (m Model) withCurrentSearchQuery(q string) Model {
 	return m
 }
 
-func (m Model) currentSearchQuery() string {
+func (m *Model) currentSearchQuery() string {
 	if m.state == viewBuckets {
 		return m.bucketSearchQuery
 	}
 	return m.objectSearchQuery
 }
 
-func (m Model) filteredBuckets() []BucketListItem {
+func (m *Model) filteredBuckets() []BucketListItem {
 	var items []BucketListItem
 
 	lowerQuery := strings.ToLower(m.bucketSearchQuery)
@@ -319,7 +336,7 @@ func (m Model) filteredBuckets() []BucketListItem {
 	return items
 }
 
-func (m Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []int) {
+func (m *Model) filteredObjects() ([]gcs.PrefixMetadata, []gcs.ObjectMetadata, []int) {
 	if m.objectSearchQuery == "" || m.state != viewObjects {
 		// When no search query or not in objects view, original indices are a straight mapping
 		indices := make([]int, len(m.prefixes))

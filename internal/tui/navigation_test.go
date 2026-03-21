@@ -85,7 +85,8 @@ func TestModel_Navigation_JumpToRoot(t *testing.T) {
 
 func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
 	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}})
 
 	assert.Assert(t, strings.Contains(m.View(), " p1"))
@@ -102,7 +103,8 @@ func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
 
 func TestModel_Update_CursorNavigation(t *testing.T) {
 	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}})
 
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
@@ -122,7 +124,8 @@ func TestModel_Update_HalfPageNavigation(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 30})
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: buckets})
 
@@ -149,7 +152,8 @@ func TestModel_Update_HalfPageNavigation(t *testing.T) {
 
 func TestModel_Update_CursorCycle(t *testing.T) {
 	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}})
 
 	assert.Assert(t, strings.Contains(m.View(), " b1"))
@@ -174,7 +178,8 @@ func TestModel_CursorBug_SingleItem(t *testing.T) {
 			}},
 		},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
@@ -192,7 +197,8 @@ func TestModel_HeaderClearedOnBack(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Enter bucket
@@ -212,7 +218,8 @@ func TestModel_CursorPersistsOnBack(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// 1. Initial state: Buckets loaded, cursor at 0 (b1)
@@ -242,7 +249,8 @@ func TestModel_CursorPersistsOnBack_WithFilter(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"apple", "banana", "apricot", "blueberry"}}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// 1. Initial state: Buckets loaded
@@ -313,7 +321,8 @@ func TestModel_CollapseProjectOnLeft(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Load buckets

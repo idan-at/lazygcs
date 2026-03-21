@@ -24,11 +24,11 @@ type GCSClient interface {
 	// GetObjectContent returns the first 1KB of content for a specific object.
 	GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error)
 	// DownloadObject downloads the content of a GCS object to a local file.
-	DownloadObject(ctx context.Context, bucketName, objectName, destPath string) error
+	DownloadObject(ctx context.Context, bucketName, objectName, destPath string, onProg gcs.ProgressFunc) error
 	// UploadObject uploads a local file to GCS.
 	UploadObject(ctx context.Context, bucketName, objectName, srcPath string) error
 	// DownloadPrefixAsZip downloads all objects under a prefix into a local zip file.
-	DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string) error
+	DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, destZipPath string, onProg gcs.ProgressFunc) error
 	// NewReader returns a sequential reader for an object.
 	NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error)
 	// NewReaderAt returns an io.ReaderAt for an object.
@@ -79,6 +79,13 @@ type ContentMsg struct {
 	ObjectName string
 	Content    string
 	Err        error
+}
+
+// DownloadProgressMsg is sent to update the progress of an active download.
+type DownloadProgressMsg struct {
+	TaskID  string
+	Current int64
+	Total   int64
 }
 
 // DownloadMsg is sent when a download operation completes.
@@ -137,6 +144,8 @@ type LogMessage struct {
 	Level     MsgLevel
 	Text      string
 	ID        string // Unique identifier for the message/transaction
+	JobNum    int    // Associated job number, if any
+	TaskID    string // Associated task ID, if any
 }
 
 // JobProgress tracks the progress of a batch download operation.
@@ -150,11 +159,13 @@ type JobProgress struct {
 
 // Task represents a tracked background operation.
 type Task struct {
-	ID       string // Unique ID (e.g., destination path or UUID)
-	Name     string // Display name (e.g., "Downloading file.txt")
-	JobNum   int    // Job number for matching messages
-	Started  time.Time
-	Progress int // 0-100 (for future progress bar support)
+	ID         string // Unique ID (e.g., destination path or UUID)
+	Name       string // Display name (e.g., "Downloading file.txt")
+	JobNum     int    // Job number for matching messages
+	Started    time.Time
+	Progress   int   // 0-100
+	Current    int64 // Current bytes downloaded
+	TotalBytes int64 // Total bytes to download
 }
 
 // DebouncePreviewMsg is sent after a delay to trigger a preview fetch.

@@ -40,7 +40,7 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 	_, client := setupTestServer(t, objects)
 
 	dest := filepath.Join(t.TempDir(), "folder1.zip")
-	err := client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest)
+	err := client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest, nil)
 	assert.NilError(t, err)
 
 	// Verify zip contents
@@ -134,7 +134,7 @@ func TestClient_DownloadObject(t *testing.T) {
 
 	dest := filepath.Join(t.TempDir(), "downloaded.txt")
 
-	err := client.DownloadObject(context.Background(), "b1", "file1.txt", dest)
+	err := client.DownloadObject(context.Background(), "b1", "file1.txt", dest, nil)
 	assert.NilError(t, err)
 
 	// #nosec G304

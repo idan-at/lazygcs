@@ -54,8 +54,45 @@ func NewClient(storageClient *storage.Client) *Client {
 	}
 }
 
+// ProgressFunc is a callback for tracking download progress.
+type ProgressFunc func(current, total int64)
+
+// progressWriter wraps an io.Writer to track progress.
+type progressWriter struct {
+	w       io.Writer
+	total   int64
+	current int64
+	onProg  ProgressFunc
+}
+
+func (pw *progressWriter) Write(p []byte) (int, error) {
+	n, err := pw.w.Write(p)
+	pw.current += int64(n)
+	if pw.onProg != nil {
+		pw.onProg(pw.current, pw.total)
+	}
+	return n, err
+}
+
+// progressReader wraps an io.Reader to track progress.
+type progressReader struct {
+	r       io.Reader
+	total   int64
+	current *int64 // Pointer to share progress across multiple readers for zip
+	onProg  ProgressFunc
+}
+
+func (pr *progressReader) Read(p []byte) (int, error) {
+	n, err := pr.r.Read(p)
+	*pr.current += int64(n)
+	if pr.onProg != nil {
+		pr.onProg(*pr.current, pr.total)
+	}
+	return n, err
+}
+
 // DownloadObject downloads a GCS object to the local file system.
-func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, dest string) error {
+func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, dest string, onProg ProgressFunc) error {
 	rc, err := c.storageClient.Bucket(bucketName).Object(objectName).NewReader(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create reader for %q in %q: %w", objectName, bucketName, err)
@@ -73,7 +110,13 @@ func (c *Client) DownloadObject(ctx context.Context, bucketName, objectName, des
 	}
 	defer func() { _ = f.Close() }()
 
-	if _, err := io.Copy(f, rc); err != nil {
+	pw := &progressWriter{
+		w:      f,
+		total:  rc.Attrs.Size,
+		onProg: onProg,
+	}
+
+	if _, err := io.Copy(pw, rc); err != nil {
 		return fmt.Errorf("failed to copy content to destination: %w", err)
 	}
 
@@ -103,7 +146,7 @@ func (c *Client) UploadObject(ctx context.Context, bucketName, objectName, src s
 }
 
 // DownloadPrefixAsZip downloads all objects under a prefix and packages them into a ZIP file.
-func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, dest string) error {
+func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, dest string, onProg ProgressFunc) error {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
 
 	if err := os.MkdirAll(filepath.Dir(dest), 0750); err != nil {
@@ -116,6 +159,25 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer func() { _ = f.Close() }()
+
+	// Calculate total size for progress tracking if onProg is provided
+	var totalSize int64
+	var currentSize int64
+	if onProg != nil {
+		sizeIt := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
+		for {
+			attrs, err := sizeIt.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("failed to calculate total size for prefix %q: %w", prefix, err)
+			}
+			if attrs.Name != prefix && filepath.Base(attrs.Name) != "" {
+				totalSize += attrs.Size
+			}
+		}
+	}
 
 	zw := zip.NewWriter(f)
 	defer func() { _ = zw.Close() }()
@@ -147,7 +209,14 @@ func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, de
 			return fmt.Errorf("failed to create zip entry for %q: %w", attrs.Name, err)
 		}
 
-		if _, err := io.Copy(w, rc); err != nil {
+		pr := &progressReader{
+			r:       rc,
+			total:   totalSize,
+			current: &currentSize,
+			onProg:  onProg,
+		}
+
+		if _, err := io.Copy(w, pr); err != nil {
 			_ = rc.Close()
 			return fmt.Errorf("failed to copy %q to zip: %w", attrs.Name, err)
 		}

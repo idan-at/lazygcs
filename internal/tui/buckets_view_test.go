@@ -14,7 +14,8 @@ import (
 func TestModel_ProjectSpecificLoading(t *testing.T) {
 	client := &mockGCSClient{}
 	// Two projects: p1 will load immediately, p2 will stay loading
-	m := tui.NewModel([]string{"p1", "p2"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1", "p2"}, client, "/tmp", false, false)
+	m := &mModel
 
 	// Initially both should have spinners and be visible
 	view := m.View()
@@ -31,7 +32,8 @@ func TestModel_ProjectSpecificLoading(t *testing.T) {
 
 func TestModel_AsyncLoading(t *testing.T) {
 	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"async-b1"}}}}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	assert.Assert(t, strings.Contains(m.View(), "p1"))
 
@@ -62,7 +64,8 @@ func TestModel_Pagination_Buckets(t *testing.T) {
 	client := &mockGCSClient{
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 10})
 
@@ -84,7 +87,8 @@ func TestModel_LongBucketList_EnterBucket_ObjectsVisible(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: buckets}},
 		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20}) // maxVisible = 10
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: client.projects[0].ProjectID, Buckets: client.projects[0].Buckets})
 
@@ -114,7 +118,8 @@ func TestModel_EnterBucket(t *testing.T) {
 		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
 		objects:  simpleObjectList([]string{"obj1", "obj2"}, nil),
 	}
-	m := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
 
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
 
@@ -138,7 +143,8 @@ func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
 			{ProjectID: "apple-project", Buckets: []string{"banana"}},
 		},
 	}
-	m := tui.NewModel([]string{"apple-project"}, client, "/tmp", false, false)
+	mModel := tui.NewModel([]string{"apple-project"}, client, "/tmp", false, false)
+	m := &mModel
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 
 	// Load buckets

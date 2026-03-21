@@ -469,7 +469,7 @@ func TestRefresh(t *testing.T) {
 
 	m := tui.NewModel(cfg.Projects, client, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 	m.SetDeterministicSpinner(true)
-	tm := teatest.NewTestModel(t, m)
+	tm := teatest.NewTestModel(t, &m)
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))

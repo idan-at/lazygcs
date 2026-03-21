@@ -19,7 +19,7 @@ import (
 var ExecCommand = exec.Command
 
 // Init initializes the application by triggering the first bucket fetch and the spinner.
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	var cmds []tea.Cmd
 	cmds = append(cmds, m.spinner.Tick)
 	for _, pID := range m.projectIDs {
@@ -28,14 +28,14 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m Model) fetchBucketsPage(projectID string, pageToken string) tea.Cmd {
+func (m *Model) fetchBucketsPage(projectID string, pageToken string) tea.Cmd {
 	return func() tea.Msg {
 		buckets, nextToken, err := m.client.ListBucketsPage(context.Background(), projectID, pageToken, 500)
 		return BucketsPageMsg{ProjectID: projectID, Buckets: buckets, NextToken: nextToken, Err: err}
 	}
 }
 
-func (m Model) fetchObjects() tea.Cmd {
+func (m *Model) fetchObjects() tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
 
@@ -49,14 +49,14 @@ func (m Model) fetchObjects() tea.Cmd {
 	return m.fetchObjectsPage(bucket, prefix, "")
 }
 
-func (m Model) fetchObjectsPage(bucket, prefix, pageToken string) tea.Cmd {
+func (m *Model) fetchObjectsPage(bucket, prefix, pageToken string) tea.Cmd {
 	return func() tea.Msg {
 		list, nextToken, err := m.client.ListObjectsPage(context.Background(), bucket, prefix, pageToken, 500)
 		return ObjectsPageMsg{Bucket: bucket, Prefix: prefix, List: list, NextToken: nextToken, Err: err}
 	}
 }
 
-func (m Model) fetchContent(obj gcs.ObjectMetadata) tea.Cmd {
+func (m *Model) fetchContent(obj gcs.ObjectMetadata) tea.Cmd {
 	bucketName := m.currentBucket
 	objectName := obj.Name
 	cacheKey := bucketName + "::" + objectName
@@ -78,7 +78,7 @@ func (m Model) fetchContent(obj gcs.ObjectMetadata) tea.Cmd {
 	}
 }
 
-func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
+func (m *Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix
 
@@ -95,22 +95,34 @@ func (m Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	}
 }
 
-func (m Model) fetchDownload(bucketName, objectName, dest, taskID string, jobNum int, isPrefix bool) tea.Cmd {
+func (m *Model) fetchDownload(bucketName, objectName, dest, taskID string, jobNum int, isPrefix bool) tea.Cmd {
 	return func() tea.Msg {
+		var lastUpdate time.Time
+		onProg := func(current, total int64) {
+			if m.sendMsg != nil && (time.Since(lastUpdate) > 100*time.Millisecond || current == total) {
+				lastUpdate = time.Now()
+				m.sendMsg(DownloadProgressMsg{
+					TaskID:  taskID,
+					Current: current,
+					Total:   total,
+				})
+			}
+		}
+
 		if isPrefix {
-			err := m.client.DownloadPrefixAsZip(context.Background(), bucketName, objectName, dest)
+			err := m.client.DownloadPrefixAsZip(context.Background(), bucketName, objectName, dest, onProg)
 			return DownloadMsg{Path: dest, TaskID: taskID, JobNum: jobNum, Err: err}
 		}
-		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
+		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest, onProg)
 		return DownloadMsg{Path: dest, TaskID: taskID, JobNum: jobNum, Err: err}
 	}
 }
 
-func (m Model) openFile(bucketName, objectName string) tea.Cmd {
+func (m *Model) openFile(bucketName, objectName string) tea.Cmd {
 	return func() tea.Msg {
 		tmpDir := os.TempDir()
 		dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
-		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
+		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
 		if err != nil {
 			return FileOpenedMsg{Err: err}
 		}
@@ -130,12 +142,12 @@ func (m Model) openFile(bucketName, objectName string) tea.Cmd {
 	}
 }
 
-func (m Model) editFile(bucketName, objectName string) tea.Cmd {
+func (m *Model) editFile(bucketName, objectName string) tea.Cmd {
 	tmpDir := os.TempDir()
 	dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
 
 	return func() tea.Msg {
-		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest)
+		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
 		if err != nil {
 			return EditorFinishedMsg{Err: err}
 		}
@@ -162,14 +174,14 @@ func (m Model) editFile(bucketName, objectName string) tea.Cmd {
 	}
 }
 
-func (m Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
+func (m *Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.client.UploadObject(context.Background(), bucketName, objectName, srcPath)
 		return UploadMsg{ObjectName: objectName, Err: err}
 	}
 }
 
-func (m Model) startDownloadTaskDirectly(task downloadTask) (Model, tea.Cmd) {
+func (m *Model) startDownloadTaskDirectly(task downloadTask) (*Model, tea.Cmd) {
 	jobNum := task.jobNum
 	m.activeDownloads++
 
@@ -191,11 +203,11 @@ func (m Model) startDownloadTaskDirectly(task downloadTask) (Model, tea.Cmd) {
 	}
 
 	m.activeDestinations[task.dest] = true
-	cmd := m.AddMessage(LevelInfo, msgText)
+	cmd := m.AddMessage(LevelInfo, msgText, jobNum, taskID)
 	return m, tea.Batch(cmd, m.fetchDownload(task.bucket, task.object, task.dest, taskID, jobNum, task.isPrefix))
 }
 
-func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
+func (m *Model) startDownloadTask(dest string) (*Model, tea.Cmd) {
 	task := downloadTask{
 		bucket:   m.pendingDownloadBucket,
 		object:   m.pendingDownloadObject,
@@ -206,7 +218,7 @@ func (m Model) startDownloadTask(dest string) (Model, tea.Cmd) {
 	return m.startDownloadTaskDirectly(task)
 }
 
-func (m Model) processDownloadQueue() (Model, tea.Cmd) {
+func (m *Model) processDownloadQueue() (*Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	for len(m.downloadQueue) > 0 && m.activeDownloads < maxConcurrentDownloads {
@@ -226,7 +238,7 @@ func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 			m.pendingDownloadIsPrefix = task.isPrefix
 			m.pendingDownloadJobNum = task.jobNum
 			// Persistent prompt: ignore the auto-clear command
-			_ = m.AddMessage(LevelWarn, fmt.Sprintf("File is actively downloading: %s - (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)))
+			_ = m.AddMessage(LevelWarn, fmt.Sprintf("File is actively downloading: %s - (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)), task.jobNum, "")
 			m.downloadQueue = m.downloadQueue[1:]
 			break
 		} else if fileExists == nil {
@@ -237,7 +249,7 @@ func (m Model) processDownloadQueue() (Model, tea.Cmd) {
 			m.pendingDownloadIsPrefix = task.isPrefix
 			m.pendingDownloadJobNum = task.jobNum
 			// Persistent prompt: ignore the auto-clear command
-			_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)))
+			_ = m.AddMessage(LevelWarn, fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(task.dest)), task.jobNum, "")
 			m.downloadQueue = m.downloadQueue[1:]
 			break
 		}
@@ -270,7 +282,7 @@ func clearStatusCmd(id string) tea.Cmd {
 	})
 }
 
-func (m Model) triggerDebounces(previewCmd tea.Cmd, hoverBucket, hoverPrefix string) (Model, tea.Cmd) {
+func (m *Model) triggerDebounces(previewCmd tea.Cmd, hoverBucket, hoverPrefix string) (*Model, tea.Cmd) {
 	m.cursorVersion++
 	cv := m.cursorVersion
 
