@@ -655,7 +655,7 @@ func (m Model) messagesView() string {
 		}
 
 		icon := getLevelIcon(msg.Level, m.showNerdIcons)
-		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(icon), textStyle.Render(msg.Text))
+		fmt.Fprintf(&s, "%s %s %s\n", textStyle.Render(timeStr), style.Render(icon), style.Render(msg.Text))
 	}
 
 	keyStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)
