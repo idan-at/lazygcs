@@ -447,3 +447,84 @@ func TestClient_ListObjectsPage(t *testing.T) {
 	assert.Equal(t, len(list3.Objects), 1)
 	assert.Equal(t, token3, "")
 }
+
+func TestClient_NetworkInterruption(t *testing.T) {
+	t.Run("Download Interruption", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// If it's a metadata request (JSON API style)
+			if strings.Contains(r.URL.Path, "/o/") && !strings.Contains(r.URL.RawQuery, "alt=media") {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"name":"o","size":"1000"}`))
+				return
+			}
+
+			// For media download (either JSON alt=media or XML API GET)
+			w.Header().Set("Content-Length", "1000")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(make([]byte, 100))
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}))
+		defer server.Close()
+
+		ctx := context.Background()
+		sc, err := storage.NewClient(ctx,
+			option.WithHTTPClient(server.Client()),
+			option.WithEndpoint(server.URL),
+			option.WithoutAuthentication(),
+		)
+		assert.NilError(t, err)
+		client := gcs.NewClient(sc)
+
+		dest := filepath.Join(t.TempDir(), "interrupted.txt")
+		err = client.DownloadObject(ctx, "b", "o", dest, nil)
+		assert.Assert(t, err != nil, "expected error due to network interruption")
+		// The error message might vary depending on where exactly it fails
+		assert.Assert(t, strings.Contains(err.Error(), "failed to copy content") ||
+			strings.Contains(err.Error(), "unexpected EOF") ||
+			strings.Contains(err.Error(), "connection reset by peer") ||
+			strings.Contains(err.Error(), "EOF"), "unexpected error message: %v", err)
+	})
+
+	t.Run("Upload Interruption", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// For uploads, we can hijack during the POST/PUT request
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}))
+		defer server.Close()
+
+		ctx := context.Background()
+		sc, err := storage.NewClient(ctx,
+			option.WithHTTPClient(server.Client()),
+			option.WithEndpoint(server.URL),
+			option.WithoutAuthentication(),
+		)
+		assert.NilError(t, err)
+		client := gcs.NewClient(sc)
+
+		src := filepath.Join(t.TempDir(), "upload.txt")
+		_ = os.WriteFile(src, make([]byte, 1000), 0600)
+
+		err = client.UploadObject(ctx, "b", "o", src)
+		assert.Assert(t, err != nil, "expected error due to network interruption")
+	})
+}
