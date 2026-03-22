@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -73,8 +74,13 @@ download_dir = "/tmp"
 
 	// It should fail with GCS client error because we provided a non-existent credentials path
 	assert.Assert(t, err != nil, "should fail due to missing credentials")
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		assert.Equal(t, exitError.ExitCode(), 1)
+	}
 	assert.Check(t, strings.Contains(output, "failed to create GCS client"))
 	assert.Check(t, !strings.Contains(output, "failed to load config"))
+	assert.Check(t, !strings.Contains(output, "panic:")) // No raw stack trace
 }
 
 func TestMain_NoConfig(t *testing.T) {

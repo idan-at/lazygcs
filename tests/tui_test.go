@@ -532,3 +532,56 @@ func TestPaging(t *testing.T) {
 		return strings.Contains(string(bts), "file001.txt")
 	}, teatest.WithDuration(2*time.Second))
 }
+
+func TestResizePreview(t *testing.T) {
+	longText := strings.Repeat("A", 100)
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file.txt"}, Content: []byte(longText)},
+	}
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file.txt") }, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 350, Height: 40})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), strings.Repeat("A", 100))
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 50, Height: 20})
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return !strings.Contains(s, strings.Repeat("A", 100)) && strings.Contains(s, "A")
+	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestEditorFinishedMsg(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file.txt"}, Content: []byte("content")},
+	}
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
+	tm.Type("j")
+	tm.Type("l")
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file.txt") }, teatest.WithDuration(3*time.Second))
+
+	originalExec := tui.ExecCommand
+	defer func() { tui.ExecCommand = originalExec }()
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "content") }, teatest.WithDuration(3*time.Second))
+
+	tm.Type("e")
+	time.Sleep(500 * time.Millisecond)
+
+	tm.Send(tui.EditorFinishedMsg{Err: fmt.Errorf("editor failed")})
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "editor failed")
+	}, teatest.WithDuration(3*time.Second))
+}

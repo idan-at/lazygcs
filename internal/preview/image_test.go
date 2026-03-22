@@ -141,3 +141,26 @@ func TestImagePreviewer_Preview_GIF(t *testing.T) {
 		t.Error("Preview does not contain escape sequences")
 	}
 }
+
+func TestImagePreviewer_RenderASCII(t *testing.T) {
+	// Create a simple 2x2 red PNG
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for x := 0; x < 2; x++ {
+		for y := 0; y < 2; y++ {
+			img.Set(x, y, color.RGBA{255, 0, 0, 255})
+		}
+	}
+
+	res, err := renderASCII(img, 10)
+	if err != nil {
+		t.Fatalf("renderASCII failed: %v", err)
+	}
+
+	if res == "" {
+		t.Error("renderASCII returned empty string")
+	}
+
+	if !strings.Contains(res, "\x1b") {
+		t.Error("renderASCII does not contain escape sequences")
+	}
+}

@@ -35,6 +35,11 @@ func TestLoad(t *testing.T) {
 			wantErr:     true,
 		},
 		{
+			name:    "MalformedTOML",
+			content: `projects = ["p1"`,
+			wantErr: true,
+		},
+		{
 			name:    "BasicProjects",
 			content: `projects = ["p1", "p2"]`,
 			expected: &config.Config{
@@ -113,4 +118,51 @@ nerd_icons = true
 			assert.Equal(t, cfg.NerdIcons, tt.expected.NerdIcons)
 		})
 	}
+}
+
+func TestLoad_PermissionError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	err := os.WriteFile(path, []byte(`projects = ["p1"]`), 0200)
+	assert.NilError(t, err)
+
+	_, err = config.Load(path)
+	assert.Assert(t, err != nil)
+	assert.Assert(t, os.IsPermission(err))
+}
+
+func TestInitConfig(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	t.Setenv("LAZYGCS_CONFIG", "")
+
+	t.Run("CustomPath", func(t *testing.T) {
+		path := filepath.Join(homeDir, "custom", "config.toml")
+		err := config.InitConfig(path, []string{"proj1"})
+		assert.NilError(t, err)
+
+		_, err = os.Stat(path)
+		assert.NilError(t, err)
+
+		cfg, err := config.Load(path)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cfg.Projects, []string{"proj1"})
+
+		err = config.InitConfig(path, []string{"proj2"})
+		assert.Assert(t, err != nil)
+		assert.ErrorContains(t, err, "already exists")
+	})
+
+	t.Run("DefaultPath", func(t *testing.T) {
+		err := config.InitConfig("", []string{"proj2"})
+		assert.NilError(t, err)
+
+		defaultPath := filepath.Join(homeDir, ".config", "lazygcs", "config.toml")
+		_, err = os.Stat(defaultPath)
+		assert.NilError(t, err)
+
+		cfg, err := config.Load(defaultPath)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cfg.Projects, []string{"proj2"})
+	})
 }

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -35,38 +36,73 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("content1")},
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/sub/file2.txt"}, Content: []byte("content2")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/sub/sub2/file3.txt"}, Content: []byte("content3")},
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "other.txt"}, Content: []byte("other")},
 	}
 	_, client := setupTestServer(t, objects)
 
-	dest := filepath.Join(t.TempDir(), "folder1.zip")
-	err := client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest, nil)
-	assert.NilError(t, err)
-
-	// Verify zip contents
-	r, err := zip.OpenReader(dest)
-	assert.NilError(t, err)
-	defer func() { _ = r.Close() }()
-
-	expectedFiles := map[string]string{
-		"file1.txt":     "content1",
-		"sub/file2.txt": "content2",
-	}
-
-	assert.Equal(t, len(r.File), len(expectedFiles))
-
-	for _, f := range r.File {
-		expectedContent, ok := expectedFiles[f.Name]
-		assert.Assert(t, ok, "Unexpected file in zip: %s", f.Name)
-
-		rc, err := f.Open()
+	t.Run("Specific prefix", func(t *testing.T) {
+		dest := filepath.Join(t.TempDir(), "folder1.zip")
+		err := client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest, nil)
 		assert.NilError(t, err)
-		content, err := io.ReadAll(rc)
-		assert.NilError(t, err)
-		_ = rc.Close()
 
-		assert.Equal(t, string(content), expectedContent)
-	}
+		r, err := zip.OpenReader(dest)
+		assert.NilError(t, err)
+		defer func() { _ = r.Close() }()
+
+		expectedFiles := map[string]string{
+			"file1.txt":          "content1",
+			"sub/file2.txt":      "content2",
+			"sub/sub2/file3.txt": "content3",
+		}
+
+		assert.Equal(t, len(r.File), len(expectedFiles))
+
+		for _, f := range r.File {
+			expectedContent, ok := expectedFiles[f.Name]
+			assert.Assert(t, ok, "Unexpected file in zip: %s", f.Name)
+
+			rc, err := f.Open()
+			assert.NilError(t, err)
+			content, err := io.ReadAll(rc)
+			assert.NilError(t, err)
+			_ = rc.Close()
+
+			assert.Equal(t, string(content), expectedContent)
+		}
+	})
+
+	t.Run("Empty prefix (entire bucket)", func(t *testing.T) {
+		dest := filepath.Join(t.TempDir(), "all.zip")
+		err := client.DownloadPrefixAsZip(context.Background(), "b1", "", dest, nil)
+		assert.NilError(t, err)
+
+		r, err := zip.OpenReader(dest)
+		assert.NilError(t, err)
+		defer func() { _ = r.Close() }()
+
+		expectedFiles := map[string]string{
+			"folder1/file1.txt":          "content1",
+			"folder1/sub/file2.txt":      "content2",
+			"folder1/sub/sub2/file3.txt": "content3",
+			"other.txt":                  "other",
+		}
+
+		assert.Equal(t, len(r.File), len(expectedFiles))
+
+		for _, f := range r.File {
+			expectedContent, ok := expectedFiles[f.Name]
+			assert.Assert(t, ok, "Unexpected file in zip: %s", f.Name)
+
+			rc, err := f.Open()
+			assert.NilError(t, err)
+			content, err := io.ReadAll(rc)
+			assert.NilError(t, err)
+			_ = rc.Close()
+
+			assert.Equal(t, string(content), expectedContent)
+		}
+	})
 }
 
 func TestClient_ListBucketsPage(t *testing.T) {
@@ -254,4 +290,91 @@ func TestFakestorage_Behavior(t *testing.T) {
 		}
 		assert.Assert(t, foundObject)
 	})
+}
+
+func TestClient_UploadObject(t *testing.T) {
+	bucketName := "upload-test-bucket"
+	objectName := "new-file.txt"
+	content := []byte("test upload data")
+
+	server, client := setupTestServer(t, []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "dummy"}}, // to create the bucket
+	})
+
+	srcPath := filepath.Join(t.TempDir(), "upload_source.txt")
+	err := os.WriteFile(srcPath, content, 0600)
+	assert.NilError(t, err)
+
+	err = client.UploadObject(context.Background(), bucketName, objectName, srcPath)
+	assert.NilError(t, err)
+
+	obj, err := server.GetObject(bucketName, objectName)
+	assert.NilError(t, err)
+	assert.Equal(t, string(obj.Content), string(content))
+}
+
+func TestClient_GetObjectMetadata(t *testing.T) {
+	bucketName := "test-bucket"
+	objectName := "test-obj.txt"
+	updatedTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
+	createdTime := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName:  bucketName,
+				Name:        objectName,
+				ContentType: "application/json",
+				Size:        123,
+				Updated:     updatedTime,
+				Created:     createdTime,
+			},
+		},
+	}
+	_, client := setupTestServer(t, objects)
+
+	t.Run("Existing object", func(t *testing.T) {
+		metadata, err := client.GetObjectMetadata(context.Background(), bucketName, objectName)
+		assert.NilError(t, err)
+		assert.Equal(t, metadata.Name, objectName)
+		assert.Equal(t, metadata.ContentType, "application/json")
+		assert.Equal(t, metadata.Size, int64(123))
+		assert.Equal(t, metadata.Updated.Unix(), updatedTime.Unix())
+		assert.Equal(t, metadata.Created.Unix(), createdTime.Unix())
+	})
+
+	t.Run("Non-existent object", func(t *testing.T) {
+		_, err := client.GetObjectMetadata(context.Background(), bucketName, "non-existent.txt")
+		assert.ErrorIs(t, err, storage.ErrObjectNotExist)
+	})
+}
+
+func TestClient_ListObjectsPage(t *testing.T) {
+	bucketName := "page-bucket"
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "obj1"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "obj2"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "obj3"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "obj4"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "obj5"}},
+	}
+	_, client := setupTestServer(t, objects)
+
+	// Page 1
+	list1, token1, err := client.ListObjectsPage(context.Background(), bucketName, "", "", 2)
+	assert.NilError(t, err)
+	assert.Equal(t, len(list1.Objects), 2)
+	assert.Assert(t, token1 != "")
+
+	// Page 2
+	list2, token2, err := client.ListObjectsPage(context.Background(), bucketName, "", token1, 2)
+	assert.NilError(t, err)
+	assert.Equal(t, len(list2.Objects), 2)
+	assert.Assert(t, token2 != "")
+
+	// Page 3
+	list3, token3, err := client.ListObjectsPage(context.Background(), bucketName, "", token2, 2)
+	assert.NilError(t, err)
+	assert.Equal(t, len(list3.Objects), 1)
+	assert.Equal(t, token3, "")
 }
