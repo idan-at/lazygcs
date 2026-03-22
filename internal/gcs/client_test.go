@@ -6,9 +6,12 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,8 +19,40 @@ import (
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"github.com/idan-at/lazygcs/internal/gcs"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 	"gotest.tools/v3/assert"
 )
+
+func TestClient_PermissionDenied(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":403,"message":"Permission denied."}}`))
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	// Create a storage client that points to our forbidden server
+	sc, err := storage.NewClient(ctx,
+		option.WithHTTPClient(server.Client()),
+		option.WithEndpoint(server.URL),
+		option.WithoutAuthentication(),
+	)
+	assert.NilError(t, err)
+
+	client := gcs.NewClient(sc)
+
+	t.Run("ListBuckets Forbidden", func(t *testing.T) {
+		_, _, err := client.ListBucketsPage(ctx, "project", "", 10)
+		assert.Assert(t, err != nil)
+		assert.Assert(t, strings.Contains(err.Error(), "403"))
+	})
+
+	t.Run("GetObjectContent Forbidden", func(t *testing.T) {
+		_, err := client.GetObjectContent(ctx, "b", "o")
+		assert.Assert(t, err != nil)
+		assert.Assert(t, strings.Contains(err.Error(), "403"))
+	})
+}
 
 func setupTestServer(t *testing.T, objects []fakestorage.Object) (*fakestorage.Server, *gcs.Client) {
 	t.Helper()
@@ -311,6 +346,40 @@ func TestClient_UploadObject(t *testing.T) {
 	obj, err := server.GetObject(bucketName, objectName)
 	assert.NilError(t, err)
 	assert.Equal(t, string(obj.Content), string(content))
+}
+
+func TestClient_DownloadObject_Errors(t *testing.T) {
+	bucketName := "err-bucket"
+	_, client := setupTestServer(t, []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "exists.txt"}, Content: []byte("hi")},
+	})
+
+	t.Run("Object Not Found (404)", func(t *testing.T) {
+		dest := filepath.Join(t.TempDir(), "notfound.txt")
+		err := client.DownloadObject(context.Background(), bucketName, "non-existent.txt", dest, nil)
+		assert.ErrorIs(t, err, storage.ErrObjectNotExist)
+	})
+
+	t.Run("Bucket Not Found", func(t *testing.T) {
+		dest := filepath.Join(t.TempDir(), "nobucket.txt")
+		err := client.DownloadObject(context.Background(), "no-such-bucket", "file.txt", dest, nil)
+		assert.Assert(t, err != nil)
+		// fakestorage might return ErrObjectNotExist even if bucket is missing
+		assert.Assert(t, strings.Contains(err.Error(), "storage:"))
+	})
+}
+
+func TestClient_UploadObject_Errors(t *testing.T) {
+	bucketName := "upload-err-bucket"
+	_, client := setupTestServer(t, []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "dummy"}},
+	})
+
+	t.Run("Source File Not Found", func(t *testing.T) {
+		err := client.UploadObject(context.Background(), bucketName, "remote.txt", "/non/existent/path/to/file")
+		assert.Assert(t, err != nil)
+		assert.Assert(t, strings.Contains(err.Error(), "failed to open source file"))
+	})
 }
 
 func TestClient_GetObjectMetadata(t *testing.T) {
