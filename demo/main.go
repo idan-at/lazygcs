@@ -70,25 +70,42 @@ func main() {
 	}
 
 	// Generate mock binary content
-	pngContent := bytes.Repeat([]byte("a"), 1024)
-	bannerContent := bytes.Repeat([]byte("b"), 2048)
 	jarContent := createFakeJar()
 	dump1Content := createFakeTarGz("db_backup_2023.sql", 50000)
 	dump2Content := createFakeTarGz("db_backup_2024.sql", 60000)
+
+	sqlPreviewContent := []byte(`-- Database Backup
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO users (id, username, email) VALUES
+(1, 'admin', 'admin@example.com'),
+(2, 'johndoe', 'john@example.com'),
+(3, 'janedoe', 'jane@example.com');
+
+CREATE INDEX idx_users_email ON users(email);
+`)
 
 	// 2. Start mock server
 	fmt.Println("Starting mock GCS server...")
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
 			// demo-project buckets
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "production-assets", Name: "config/settings.json"}, Content: []byte(`{"theme": "dark", "version": "1.0.0"}`)},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "production-assets", Name: "css/styles.css"}, Content: []byte("body { background: #000; }")},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "production-assets", Name: "images/logo.png"}, Content: pngContent},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "production-assets", Name: "images/banner.png"}, Content: bannerContent},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "production-assets", Name: "index.html"}, Content: []byte("<html><body>Hello World</body></html>")},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "production-assets", Name: "lib/app.jar"}, Content: jarContent},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "staging-backups", Name: "db_backup_2023.sql.gz"}, Content: dump1Content},
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "staging-backups", Name: "db_backup_2024.sql.gz"}, Content: dump2Content},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "folder/script.py"}, Content: []byte("def hello_world():\n    print(\"Hello from lazygcs!\")\n\nif __name__ == '__main__':\n    hello_world()\n")},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "folder/schema.sql"}, Content: sqlPreviewContent},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "config/settings.json"}, Content: []byte(`{"theme": "dark", "version": "1.0.0"}`)},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "css/styles.css"}, Content: []byte("body { background: #000; }")},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "index.html"}, Content: []byte("<html><body>Hello World</body></html>")},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "lib/app.jar"}, Content: jarContent},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "data-lake-raw-events", Name: "2026/03/22/events.json"}, Content: []byte(`{"event": "click", "user_id": 123}`)},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "data-lake-raw-events", Name: "2026/03/22/events2.json"}, Content: []byte(`{"event": "view", "user_id": 456}`)},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "db-backups-staging", Name: "db_backup_2023.sql.gz"}, Content: dump1Content},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "db-backups-staging", Name: "db_backup_2024.sql.gz"}, Content: dump2Content},
+			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "db-backups-staging", Name: "db_backup_2025.sql.gz"}, Content: dump1Content},
 		},
 		Scheme:     "http",
 		Host:       "127.0.0.1",
@@ -123,17 +140,24 @@ nerd_icons = false
 	vhsCmd := exec.Command("vhs", filepath.Join("demo", "demo.tape"))
 
 	// Ensure vhs uses our local lazygcs binary and our config
-	env := os.Environ()
+	var cleanEnv []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "KITTY_WINDOW_ID=") || strings.HasPrefix(e, "WEZTERM_PANE=") || strings.HasPrefix(e, "TERM=") {
+			continue
+		}
+		cleanEnv = append(cleanEnv, e)
+	}
+
 	// Add our tmp directory to PATH so vhs finds our local "lazygcs" binary
-	env = append(env, "PATH="+tmpDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	env = append(env, "LAZYGCS_CONFIG="+configFile)
+	cleanEnv = append(cleanEnv, "PATH="+tmpDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	cleanEnv = append(cleanEnv, "LAZYGCS_CONFIG="+configFile)
 
 	// Set the emulator host, omitting the "http://" prefix
 	hostURL := server.URL()
 	hostURL = strings.TrimPrefix(hostURL, "http://")
-	env = append(env, "STORAGE_EMULATOR_HOST="+hostURL)
+	cleanEnv = append(cleanEnv, "STORAGE_EMULATOR_HOST="+hostURL)
 
-	vhsCmd.Env = env
+	vhsCmd.Env = cleanEnv
 	vhsCmd.Stdout = os.Stdout
 	vhsCmd.Stderr = os.Stderr
 

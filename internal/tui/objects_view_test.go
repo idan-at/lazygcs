@@ -463,3 +463,69 @@ func TestModel_MultiSelect(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "✓ 📄 obj1"), "obj1 should still be selected")
 	assert.Assert(t, !strings.Contains(view, "✓ 📄 obj2"), "obj2 should be deselected")
 }
+
+func TestModel_UnknownContentTypeFallback(t *testing.T) {
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects: &gcs.ObjectList{
+			Objects: []gcs.ObjectMetadata{{
+				Name:        "backup.sql.gz",
+				Size:        1024,
+				ContentType: "", // Empty to trigger fallback
+			}},
+		},
+	}
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// Enter bucket
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	view := m.View()
+	// Should show inferred type instead of 'unknown'
+	assert.Assert(t, strings.Contains(view, "application/gzip"), "View should infer application/gzip type for .gz extensions")
+}
+
+func TestModel_CommonExtensionContentTypeFallback(t *testing.T) {
+	testCases := []struct {
+		filename     string
+		expectedType string
+	}{
+		{"script.py", "text/x-python"},
+		{"main.go", "text/x-go"},
+		{"query.sql", "application/x-sql"},
+		{"readme.md", "text/markdown"},
+		{"setup.sh", "application/x-sh"},
+		{"config.yaml", "application/x-yaml"},
+		{"config.yml", "application/x-yaml"},
+		{"unknown.xyz", "unknown"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.filename, func(t *testing.T) {
+			client := &mockGCSClient{
+				projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+				objects: &gcs.ObjectList{
+					Objects: []gcs.ObjectMetadata{{
+						Name:        tc.filename,
+						Size:        1024,
+						ContentType: "", // Empty to trigger fallback
+					}},
+				},
+			}
+			mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+			m := &mModel
+			m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
+
+			// Enter bucket
+			m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+			view := m.View()
+			if !strings.Contains(view, tc.expectedType) {
+				t.Logf("Failed: Expected %s but view is:\n%s", tc.expectedType, view)
+			}
+			assert.Assert(t, strings.Contains(view, tc.expectedType), "View should infer %s type for %s", tc.expectedType, tc.filename)
+		})
+	}
+}

@@ -14,76 +14,114 @@ Type "lazygcs"
 Enter
 
 # Give it some time to load buckets
-Sleep 3s
+Sleep 1s
 
-# Move down to the first bucket
+# j/k to navigate between the buckets.
 Type "j"
+Sleep 1s
+Type "j"
+Sleep 1s
+Type "j"
+Sleep 1s
+Type "k"
 Sleep 500ms
+Type "k"
+Sleep 1s
 
-# 1. Enter the first bucket (production-assets)
+# Navigate to the bucket and explore folders.
 Type "l"
 Sleep 1s
 
-# Cursor is now on "config/". Enter it to see the JSON file.
+# Cursor is on "config/". Enter it to see JSON.
 Type "l"
-Sleep 2s # Pause to show the syntax-highlighted JSON preview
-
-# Go back to the production-assets directory
-Type "h"
-Sleep 500ms
-
-# Move down to the "lib/" directory (past css and images)
-Type "j"
-Sleep 300ms
-Type "j"
-Sleep 300ms
-Type "j"
-Sleep 500ms
-
-# Enter "lib/" to see the JAR file preview
-Type "l"
-Sleep 2s # Pause to show the binary/archive preview of the JAR
-
-# Go back up to the bucket list
-Type "h"
-Sleep 500ms
-Type "h"
-Sleep 1s
-
-# 2. Move down to the second bucket (staging-backups)
-Type "j"
-Sleep 500ms
-
-# Enter the staging-backups bucket
-Type "l"
-Sleep 1s
-
-# Preview the tar.gz file before downloading
-Sleep 2s # Pause to show the tar.gz preview
-
-# 3. Multi-select and download the database backups
-# Select the first backup
-Type " "
-Sleep 500ms
-
-# Move down to the second backup
-Type "j"
-Sleep 500ms
-
-# Select the second backup
-Type " "
-Sleep 1s
-
-# Press 'd' to download the selected files
-Type "d"
-Sleep 3s # Pause to show the downloading status in the UI footer
-
-# 4. Show the Help Menu quickly before quitting
-Type "?"
 Sleep 2s
-Type "?"
+# Go back
+Type "h"
 Sleep 500ms
+
+# Move to "css/"
+Type "j"
+Sleep 500ms
+# Enter to see styles.css
+Type "l"
+Sleep 2s
+# Go back
+Type "h"
+Sleep 500ms
+
+# Move to "folder/"
+Type "j"
+Sleep 500ms
+# Enter it
+Type "l"
+Sleep 1s
+
+# Stand on a py file and show syntax highlight (script.py)
+Sleep 2s
+
+# Press j and stand on an sql, show syntax highlighting (schema.sql)
+Type "j"
+Sleep 2s
+
+# Go back
+Type "h"
+Sleep 500ms
+
+# Move to "lib/"
+Type "j"
+Sleep 500ms
+# Enter it
+Type "l"
+Sleep 2s
+
+# Go back
+Type "h"
+Sleep 500ms
+
+# Move to "index.html"
+Type "j"
+Sleep 500ms
+# Stand on it to show HTML preview
+Sleep 2s
+
+# Press H to go back to buckets list, next bucket
+Type "H"
+Sleep 1s
+
+# Navigate to db-backups-staging bucket
+Type "j"
+Sleep 500ms
+Type "j"
+Sleep 500ms
+
+# Enter db-backups-staging bucket
+Type "l"
+Sleep 1s
+
+# Press / and show filter
+Type "/"
+Sleep 1s
+Type "2024"
+Sleep 2s
+
+# Clear filter
+Escape
+Sleep 1s
+
+# select 2-3 files, download them
+Type " "
+Sleep 500ms
+Type "j"
+Sleep 500ms
+Type " "
+Sleep 500ms
+Type "j"
+Sleep 500ms
+Type " "
+Sleep 500ms
+Type "d"
+Sleep 2s
 
 # Quit the application
 Type "q"
-Sleep 1s
+Sleep 500ms

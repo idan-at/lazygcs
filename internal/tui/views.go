@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"mime"
 	"path/filepath"
 	"strings"
 	"time"
@@ -97,7 +98,26 @@ func (m *Model) previewView(width int) string {
 
 				contentType := obj.ContentType
 				if contentType == "" {
-					contentType = "unknown"
+					contentType = mime.TypeByExtension(filepath.Ext(obj.Name))
+				}
+				if contentType == "" {
+					ext := strings.ToLower(filepath.Ext(obj.Name))
+					switch ext {
+					case ".py":
+						contentType = "text/x-python"
+					case ".go":
+						contentType = "text/x-go"
+					case ".sql":
+						contentType = "application/sql"
+					case ".md":
+						contentType = "text/markdown"
+					case ".sh":
+						contentType = "application/x-sh"
+					case ".yaml", ".yml":
+						contentType = "application/x-yaml"
+					default:
+						contentType = "unknown"
+					}
 				}
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(truncate(contentType, width-10)))
 
