@@ -18,6 +18,17 @@ import (
 
 var version = "dev"
 
+type stringSlice []string
+
+func (s *stringSlice) String() string {
+	return fmt.Sprintf("%v", *s)
+}
+
+func (s *stringSlice) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
 func main() {
 	if err := run(os.Args[1:], nil); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -28,6 +39,27 @@ func main() {
 // run executes the main application logic.
 // client is an optional dependency injection for testing. If nil, it initializes the real GCS client.
 func run(args []string, client tui.GCSClient) error {
+	if len(args) > 0 && args[0] == "init" {
+		initCmd := flag.NewFlagSet("init", flag.ContinueOnError)
+
+		// We use a custom string slice flag since the standard library doesn't have it built-in.
+		var projects stringSlice
+		initCmd.Var(&projects, "project", "GCP Project ID to add to config (can be specified multiple times)")
+
+		if err := initCmd.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return nil
+			}
+			return err
+		}
+
+		if len(projects) == 0 {
+			return fmt.Errorf("at least one --project is required")
+		}
+
+		return config.InitConfig("", projects)
+	}
+
 	fs := flag.NewFlagSet("lazygcs", flag.ContinueOnError)
 	versionFlag := fs.Bool("version", false, "Print version and exit")
 
@@ -36,6 +68,10 @@ func run(args []string, client tui.GCSClient) error {
 
 Usage:
   lazygcs [flags]
+  lazygcs init --project <project_id> [--project <project_id> ...]
+
+Commands:
+  init        Initialize configuration file with provided project IDs
 
 Flags:
   -version    Print version and exit

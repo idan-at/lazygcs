@@ -99,3 +99,44 @@ func trimProjects(raw []string) []string {
 	}
 	return clean
 }
+
+// InitConfig creates a new configuration file with the given projects.
+func InitConfig(configPath string, projects []string) error {
+	var err error
+	if configPath == "" {
+		configPath, err = DefaultPath()
+		if err != nil {
+			return err
+		}
+	}
+
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	cfg := Config{
+		Projects:    projects,
+		DownloadDir: defaultDownloadDir(),
+		FuzzySearch: true,
+		NerdIcons:   false,
+	}
+
+	// Use O_EXCL to ensure atomic creation and fail if the file already exists.
+	// #nosec G304
+	f, err := os.OpenFile(configPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("config file already exists at %s", configPath)
+		}
+		return fmt.Errorf("failed to create config file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
+		return fmt.Errorf("failed to encode config: %w", err)
+	}
+
+	fmt.Printf("Config initialized at %s\n", configPath)
+	return nil
+}

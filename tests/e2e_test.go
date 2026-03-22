@@ -114,3 +114,41 @@ func TestHelpFlag(t *testing.T) {
 	assert.Assert(t, strings.Contains(string(output), "Flags:"))
 	assert.Assert(t, strings.Contains(string(output), "Controls:"))
 }
+
+func TestInitCommand(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.toml")
+
+	// Ensure config doesn't exist yet
+	_, err := os.Stat(configPath)
+	assert.Assert(t, os.IsNotExist(err))
+
+	// Set LAZYGCS_CONFIG to the temp path
+	t.Setenv("LAZYGCS_CONFIG", configPath)
+
+	cmd := exec.Command(binaryPath, "init", "--project", "p1", "--project", "p2")
+	output, err := cmd.CombinedOutput()
+
+	// Should succeed
+	assert.NilError(t, err, "output: "+string(output))
+
+	// Output should confirm creation
+	assert.Check(t, strings.Contains(string(output), "Config initialized"))
+
+	// Verify the config file was created
+	// #nosec G304
+	content, err := os.ReadFile(configPath)
+	assert.NilError(t, err)
+
+	configStr := string(content)
+	assert.Check(t, strings.Contains(configStr, `projects = ["p1", "p2"]`))
+}
+
+func TestInitCommand_NoProjects(t *testing.T) {
+	cmd := exec.Command(binaryPath, "init")
+	output, err := cmd.CombinedOutput()
+
+	// Should fail
+	assert.Assert(t, err != nil, "init should fail without projects")
+	assert.Check(t, strings.Contains(string(output), "at least one --project is required"))
+}

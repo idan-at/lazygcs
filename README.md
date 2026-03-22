@@ -46,6 +46,12 @@ sudo mv lazygcs /usr/local/bin/
 
 ### Usage
 Run `lazygcs` to start the application.
+
+You can initialize a configuration file with the `init` command:
+```bash
+lazygcs init --project p1 --project p2
+```
+
 You can use the `--version` flag to print the current version:
 ```bash
 lazygcs --version
@@ -55,7 +61,12 @@ lazygcs --version
 
 `lazygcs` is configured entirely via a TOML file. 
 
-Create a file at `~/.config/lazygcs/config.toml` (or define the `LAZYGCS_CONFIG` environment variable to point to a custom path).
+The easiest way to generate a config file is using the `init` command:
+```bash
+lazygcs init --project my-production-project --project my-staging-project
+```
+
+Alternatively, you can manually create a file at `~/.config/lazygcs/config.toml` (or define the `LAZYGCS_CONFIG` environment variable to point to a custom path).
 
 ### Example `config.toml`
 
