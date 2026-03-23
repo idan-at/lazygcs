@@ -162,14 +162,20 @@ func (m *Model) previewView(width int) string {
 
 						isKitty := strings.HasPrefix(m.previewContent, "\x1b_G")
 
-						for i, line := range displayLines {
-							if isKitty {
-								s.WriteString(line)
-							} else {
-								s.WriteString(truncate(line, width-2))
-							}
-							if i < len(displayLines)-1 {
-								s.WriteString("\n")
+						if isKitty && (m.showHelp || m.showMessages) {
+							// Embed the clear command here so BubbleTea's diff renderer sends it when toggling views.
+							s.WriteString("\x1b_Ga=d,d=A\x1b\\")
+							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(image preview hidden)"))
+						} else {
+							for i, line := range displayLines {
+								if isKitty {
+									s.WriteString(line)
+								} else {
+									s.WriteString(truncate(line, width-2))
+								}
+								if i < len(displayLines)-1 {
+									s.WriteString("\n")
+								}
 							}
 						}
 
@@ -334,8 +340,8 @@ func (m *Model) footerView() string {
 
 func (m *Model) maxItemsVisible() int {
 	v := m.height - 10
-	if m.showHelp {
-		v -= 12 // Space for the shorter, wider help box
+	if m.showMessages || m.showHelp {
+		v -= 19 // Space for either help or messages view
 	}
 	if v < 1 {
 		v = 1
@@ -591,33 +597,18 @@ func (m *Model) View() string {
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, midCol, rightCol)
 
 	var view string
-	if m.showHelp {
+	if m.showMessages {
+		view = m.headerView() + "\n\n" + mainContent + "\n" + lipgloss.PlaceHorizontal(m.width, lipgloss.Center, m.messagesView())
+	} else if m.showHelp {
 		view = m.headerView() + "\n\n" + mainContent + "\n" + lipgloss.PlaceHorizontal(m.width, lipgloss.Center, m.helpView())
 	} else {
 		view = m.headerView() + "\n\n" + mainContent + m.footerView()
 	}
 
 	result := view
-	if m.showMessages {
-		// Use lipgloss.Place to center the errors modal.
-		result = lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			m.messagesView(),
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.Color("236")),
-		)
-		// We add the kitty image clear code here to clear out any rendered images
-		// since they are drawn over the text otherwise
-		if strings.HasPrefix(m.previewContent, "\x1b_G") {
-			return "\x1b_Ga=d,d=A\x1b\\" + result
-		}
-		return result
-	}
-
-	if strings.HasPrefix(m.previewContent, "\x1b_Ga=d,d=A\x1b\\") {
+	// We add the kitty image clear code here to clear out any rendered images
+	// since they are drawn over the text otherwise
+	if strings.HasPrefix(m.previewContent, "\x1b_G") {
 		return "\x1b_Ga=d,d=A\x1b\\" + result
 	}
 	return result
@@ -681,7 +672,7 @@ func (m *Model) messagesView() string {
 	s.WriteString(title + "\n\n")
 
 	start := m.msgQueue.MessagesScroll
-	end := start + 15
+	end := start + 9
 	if end > len(m.msgQueue.Messages()) {
 		end = len(m.msgQueue.Messages())
 	}
@@ -761,6 +752,7 @@ func (m *Model) messagesView() string {
 		BorderForeground(lipgloss.Color("69")).
 		Padding(1, 2).
 		Width(boxWidth).
+		Height(15).
 		Render(s.String())
 
 	return box

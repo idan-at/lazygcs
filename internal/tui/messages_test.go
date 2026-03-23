@@ -135,7 +135,42 @@ func TestMessagesView_ClearsKittyImages(t *testing.T) {
 	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
 
 	view := m.View()
-	assert.Assert(t, strings.HasPrefix(view, "\x1b_Ga=d,d=A\x1b\\"), "View should clear kitty images when messages are shown")
+	// CLEAR code: \x1b_Ga=d,d=A\x1b\\
+	assert.Assert(t, strings.HasPrefix(view, "\x1b_Ga=d,d=A\x1b\\"), "View should start with CLEAR code when messages are shown")
+
+	// Verify that DRAW code is absent in the rest of the view
+	contentAfterClear := view[len("\x1b_Ga=d,d=A\x1b\\"):]
+	assert.Assert(t, !strings.Contains(contentAfterClear, "\x1b_Ga=T"), "View should NOT contain DRAW code after the initial CLEAR code")
+	assert.Assert(t, strings.Contains(view, "(image preview hidden)"), "Placeholder text should be present when messages are visible")
+}
+
+func TestHelpView_ClearsKittyImages(t *testing.T) {
+	m, client := setupTestModel(
+		[]gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		simpleObjectList([]string{"obj1"}, nil),
+		"/tmp",
+	)
+
+	// Navigate to object to set preview content
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Simulate receiving a kitty image for the object preview
+	m, _ = updateModel(m, tui.ContentMsg{
+		ObjectName: "obj1",
+		Content:    "\x1b_Ga=T,f=100;AAAA\x1b\\",
+	})
+
+	// Show help
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+
+	view := m.View()
+	// CLEAR code: \x1b_Ga=d,d=A\x1b\\
+	assert.Assert(t, strings.HasPrefix(view, "\x1b_Ga=d,d=A\x1b\\"), "View should start with CLEAR code when help is shown")
+
+	// Verify that DRAW code is absent in the rest of the view
+	contentAfterClear := view[len("\x1b_Ga=d,d=A\x1b\\"):]
+	assert.Assert(t, !strings.Contains(contentAfterClear, "\x1b_Ga=T"), "View should NOT contain DRAW code after the initial CLEAR code")
+	assert.Assert(t, strings.Contains(view, "(image preview hidden)"), "Placeholder text should be present when help is visible")
 }
 
 func TestFooterView_HideHelpOnMessage(t *testing.T) {
