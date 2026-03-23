@@ -25,6 +25,26 @@ brew tap idan-at/tap
 brew install lazygcs
 ```
 
+### Linux (APT/DNF/APK)
+
+#### Debian/Ubuntu (APT)
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/idan-at/lazygcs/setup.deb.sh' | sudo -E bash
+sudo apt install lazygcs
+```
+
+#### Fedora/RedHat (DNF)
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/idan-at/lazygcs/setup.rpm.sh' | sudo -E bash
+sudo dnf install lazygcs
+```
+
+#### Alpine (APK)
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/idan-at/lazygcs/setup.alpine.sh' | sudo -E bash
+sudo apk add lazygcs
+```
+
 ### Using Go
 
 Ensure you have [Go](https://golang.org/doc/install) (v1.24+) installed, then run:

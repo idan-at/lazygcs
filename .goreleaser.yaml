@@ -36,6 +36,19 @@ changelog:
       - '^docs:'
       - '^test:'
 
+nfpms:
+  - id: lazygcs
+    vendor: idan-at
+    homepage: https://github.com/idan-at/lazygcs
+    maintainer: "Idan Attias <some@thing.com>"
+    description: "A fast, keyboard-driven Terminal User Interface (TUI) for exploring and managing Google Cloud Storage (GCS)."
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+
 brews:
   - repository:
       owner: idan-at

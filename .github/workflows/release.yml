@@ -32,3 +32,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Install Cloudsmith CLI
+        run: pipx install cloudsmith-cli
+
+      - name: Push Packages to Cloudsmith
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          # Push DEB packages (for Debian/Ubuntu)
+          for file in dist/*.deb; do
+            [ -f "$file" ] && cloudsmith push deb idan-at/lazygcs/any-distro/any-version "$file"
+          done
+          
+          # Push RPM packages (for Fedora/RedHat)
+          for file in dist/*.rpm; do
+            [ -f "$file" ] && cloudsmith push rpm idan-at/lazygcs/any-distro/any-version "$file"
+          done
+          
+          # Push APK packages (for Alpine)
+          for file in dist/*.apk; do
+            [ -f "$file" ] && cloudsmith push alpine idan-at/lazygcs/alpine/any-version "$file"
+          done
