@@ -45,6 +45,17 @@ curl -1sLf 'https://dl.cloudsmith.io/public/idan-at/lazygcs/setup.alpine.sh' | s
 sudo apk add lazygcs
 ```
 
+### Manual Installation
+
+You can download the pre-compiled binaries (including `.deb`, `.rpm`, and `.apk` packages) directly from the [Releases page](https://github.com/idan-at/lazygcs/releases).
+
+For example, to install the `.deb` package on Debian/Ubuntu:
+
+```bash
+wget https://github.com/idan-at/lazygcs/releases/download/v0.8.0/lazygcs_0.8.0_linux_amd64.deb
+sudo apt install ./lazygcs_0.8.0_linux_amd64.deb
+```
+
 ### Using Go
 
 Ensure you have [Go](https://golang.org/doc/install) (v1.24+) installed, then run:
