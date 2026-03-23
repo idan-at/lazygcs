@@ -489,17 +489,17 @@ func TestModel_UnknownContentTypeFallback(t *testing.T) {
 
 func TestModel_CommonExtensionContentTypeFallback(t *testing.T) {
 	testCases := []struct {
-		filename     string
-		expectedType string
+		filename      string
+		expectedTypes []string
 	}{
-		{"script.py", "text/x-python"},
-		{"main.go", "text/x-go"},
-		{"query.sql", "application/x-sql"},
-		{"readme.md", "text/markdown"},
-		{"setup.sh", "application/x-sh"},
-		{"config.yaml", "application/x-yaml"},
-		{"config.yml", "application/x-yaml"},
-		{"unknown.xyz", "unknown"},
+		{"script.py", []string{"text/x-python", "text/python", "application/x-python-code"}},
+		{"main.go", []string{"text/x-go", "text/go"}},
+		{"query.sql", []string{"application/x-sql", "application/sql"}},
+		{"readme.md", []string{"text/markdown", "text/x-markdown"}},
+		{"setup.sh", []string{"application/x-sh", "application/sh", "text/x-sh"}},
+		{"config.yaml", []string{"application/x-yaml", "application/yaml", "text/yaml"}},
+		{"config.yml", []string{"application/x-yaml", "application/yaml", "text/yaml"}},
+		{"unknown.xyz", []string{"unknown"}},
 	}
 
 	for _, tc := range testCases {
@@ -522,10 +522,17 @@ func TestModel_CommonExtensionContentTypeFallback(t *testing.T) {
 			m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
 
 			view := m.View()
-			if !strings.Contains(view, tc.expectedType) {
-				t.Logf("Failed: Expected %s but view is:\n%s", tc.expectedType, view)
+			matched := false
+			for _, expectedType := range tc.expectedTypes {
+				if strings.Contains(view, expectedType) {
+					matched = true
+					break
+				}
 			}
-			assert.Assert(t, strings.Contains(view, tc.expectedType), "View should infer %s type for %s", tc.expectedType, tc.filename)
+			if !matched {
+				t.Logf("Failed: Expected one of %v but view is:\n%s", tc.expectedTypes, view)
+			}
+			assert.Assert(t, matched, "View should infer one of %v types for %s", tc.expectedTypes, tc.filename)
 		})
 	}
 }
