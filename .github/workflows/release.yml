@@ -33,6 +33,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
+      - name: Update README with new version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout main || git checkout -b main origin/main
+          git pull origin main
+          sed -i -E "s/download\/v[0-9a-zA-Z.-]+\/lazygcs_[0-9a-zA-Z.-]+_linux_amd64\.deb/download\/v${VERSION}\/lazygcs_${VERSION}_linux_amd64.deb/g" README.md
+          sed -i -E "s/apt install \.\/lazygcs_[0-9a-zA-Z.-]+_linux_amd64\.deb/apt install \.\/lazygcs_${VERSION}_linux_amd64.deb/g" README.md
+          git add README.md
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "docs: update manual installation version to v${VERSION}"
+            git push origin main
+          fi
+
       - name: Install Cloudsmith CLI
         run: pipx install cloudsmith-cli
 
