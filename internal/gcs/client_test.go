@@ -528,3 +528,67 @@ func TestClient_NetworkInterruption(t *testing.T) {
 		assert.Assert(t, err != nil, "expected error due to network interruption")
 	})
 }
+
+func TestClient_NewReader(t *testing.T) {
+	content := []byte("sequential read content")
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file.txt"}, Content: content},
+	}
+	_, client := setupTestServer(t, objects)
+
+	t.Run("Success", func(t *testing.T) {
+		rc, err := client.NewReader(context.Background(), "b1", "file.txt")
+		assert.NilError(t, err)
+		defer func() { _ = rc.Close() }()
+
+		data, err := io.ReadAll(rc)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, data, content)
+	})
+}
+
+func TestClient_DownloadPrefixAsZip_ErrorsAndProgress(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt", Size: 8}, Content: []byte("content1")},
+	}
+	_, client := setupTestServer(t, objects)
+
+	t.Run("Destination Dir Error", func(t *testing.T) {
+		conflictFile := filepath.Join(t.TempDir(), "conflict")
+		err := os.WriteFile(conflictFile, []byte("data"), 0600)
+		assert.NilError(t, err)
+
+		badDest := filepath.Join(conflictFile, "file.zip")
+		err = client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", badDest, nil)
+		assert.Assert(t, err != nil)
+		assert.Assert(t, strings.Contains(err.Error(), "failed to create destination directory"))
+	})
+
+	t.Run("Destination File Error", func(t *testing.T) {
+		destDir := t.TempDir()
+		// Create a directory where the file should be, causing os.Create to fail
+		err := os.Mkdir(filepath.Join(destDir, "folder1.zip"), 0750)
+		assert.NilError(t, err)
+
+		err = client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", filepath.Join(destDir, "folder1.zip"), nil)
+		assert.Assert(t, err != nil)
+		assert.Assert(t, strings.Contains(err.Error(), "failed to create destination file"))
+	})
+
+	t.Run("With Progress Tracker", func(t *testing.T) {
+		dest := filepath.Join(t.TempDir(), "folder1.zip")
+		var totalProgress int64
+		var currentProgress int64
+
+		onProg := func(current, total int64) {
+			currentProgress = current
+			totalProgress = total
+		}
+
+		err := client.DownloadPrefixAsZip(context.Background(), "b1", "folder1/", dest, onProg)
+		assert.NilError(t, err)
+
+		assert.Equal(t, totalProgress, int64(8)) // size of content1
+		assert.Equal(t, currentProgress, totalProgress)
+	})
+}
