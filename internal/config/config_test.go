@@ -138,7 +138,11 @@ func TestInitConfig(t *testing.T) {
 
 	t.Run("CustomPath", func(t *testing.T) {
 		path := filepath.Join(homeDir, "custom", "config.toml")
-		err := config.InitConfig(path, []string{"proj1"})
+		err := config.InitConfig(path, config.Config{
+			Projects:    []string{"proj1"},
+			DownloadDir: "/tmp/download",
+			NerdIcons:   true,
+		})
 		assert.NilError(t, err)
 
 		_, err = os.Stat(path)
@@ -147,14 +151,16 @@ func TestInitConfig(t *testing.T) {
 		cfg, err := config.Load(path)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, cfg.Projects, []string{"proj1"})
+		assert.Equal(t, cfg.DownloadDir, "/tmp/download")
+		assert.Equal(t, cfg.NerdIcons, true)
 
-		err = config.InitConfig(path, []string{"proj2"})
+		err = config.InitConfig(path, config.Config{Projects: []string{"proj2"}})
 		assert.Assert(t, err != nil)
 		assert.ErrorContains(t, err, "already exists")
 	})
 
 	t.Run("DefaultPath", func(t *testing.T) {
-		err := config.InitConfig("", []string{"proj2"})
+		err := config.InitConfig("", config.Config{Projects: []string{"proj2"}})
 		assert.NilError(t, err)
 
 		defaultPath := filepath.Join(homeDir, ".config", "lazygcs", "config.toml")
@@ -164,5 +170,7 @@ func TestInitConfig(t *testing.T) {
 		cfg, err := config.Load(defaultPath)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, cfg.Projects, []string{"proj2"})
+		assert.Equal(t, cfg.DownloadDir, filepath.Join(homeDir, "Downloads")) // Default
+		assert.Equal(t, cfg.NerdIcons, false)                                 // Default
 	})
 }

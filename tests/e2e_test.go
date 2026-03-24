@@ -124,6 +124,7 @@ func TestHelpFlag(t *testing.T) {
 func TestInitCommand(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.toml")
+	customDownloadDir := filepath.Join(tmpDir, "custom_downloads")
 
 	// Ensure config doesn't exist yet
 	_, err := os.Stat(configPath)
@@ -132,7 +133,8 @@ func TestInitCommand(t *testing.T) {
 	// Set LAZYGCS_CONFIG to the temp path
 	t.Setenv("LAZYGCS_CONFIG", configPath)
 
-	cmd := exec.Command(binaryPath, "init", "--project", "p1", "--project", "p2")
+	// #nosec G204
+	cmd := exec.Command(binaryPath, "init", "--project", "p1", "--project", "p2", "--download-dir", customDownloadDir, "--nerd-icons")
 	output, err := cmd.CombinedOutput()
 
 	// Should succeed
@@ -148,6 +150,8 @@ func TestInitCommand(t *testing.T) {
 
 	configStr := string(content)
 	assert.Check(t, strings.Contains(configStr, `projects = ["p1", "p2"]`))
+	assert.Check(t, strings.Contains(configStr, fmt.Sprintf(`download_dir = "%s"`, customDownloadDir)))
+	assert.Check(t, strings.Contains(configStr, `nerd_icons = true`))
 }
 
 func TestInitCommand_NoProjects(t *testing.T) {

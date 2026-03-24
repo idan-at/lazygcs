@@ -46,6 +46,9 @@ func run(args []string, client tui.GCSClient) error {
 		var projects stringSlice
 		initCmd.Var(&projects, "project", "GCP Project ID to add to config (can be specified multiple times)")
 
+		downloadDir := initCmd.String("download-dir", "", "Directory where files will be downloaded (default is ~/Downloads)")
+		nerdIcons := initCmd.Bool("nerd-icons", false, "Enable Nerd Font icons")
+
 		if err := initCmd.Parse(args[1:]); err != nil {
 			if errors.Is(err, flag.ErrHelp) {
 				return nil
@@ -57,7 +60,13 @@ func run(args []string, client tui.GCSClient) error {
 			return fmt.Errorf("at least one --project is required")
 		}
 
-		return config.InitConfig("", projects)
+		cfg := config.Config{
+			Projects:    projects,
+			DownloadDir: *downloadDir,
+			NerdIcons:   *nerdIcons,
+		}
+
+		return config.InitConfig("", cfg)
 	}
 
 	fs := flag.NewFlagSet("lazygcs", flag.ContinueOnError)
@@ -68,7 +77,7 @@ func run(args []string, client tui.GCSClient) error {
 
 Usage:
   lazygcs [flags]
-  lazygcs init --project <project_id> [--project <project_id> ...]
+  lazygcs init --project <project_id> [--project <project_id> ...] [--download-dir <dir>] [--nerd-icons]
 
 Commands:
   init        Initialize configuration file with provided project IDs

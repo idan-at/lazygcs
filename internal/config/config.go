@@ -100,8 +100,8 @@ func trimProjects(raw []string) []string {
 	return clean
 }
 
-// InitConfig creates a new configuration file with the given projects.
-func InitConfig(configPath string, projects []string) error {
+// InitConfig creates a new configuration file with the given config settings.
+func InitConfig(configPath string, cfg Config) error {
 	var err error
 	if configPath == "" {
 		configPath, err = DefaultPath()
@@ -115,12 +115,12 @@ func InitConfig(configPath string, projects []string) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	cfg := Config{
-		Projects:    projects,
-		DownloadDir: defaultDownloadDir(),
-		FuzzySearch: true,
-		NerdIcons:   false,
+	if cfg.DownloadDir == "" {
+		cfg.DownloadDir = defaultDownloadDir()
 	}
+
+	// Default to enabling fuzzy search on initialization.
+	cfg.FuzzySearch = true
 
 	// Use O_EXCL to ensure atomic creation and fail if the file already exists.
 	// #nosec G304
