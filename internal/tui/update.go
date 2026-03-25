@@ -512,6 +512,12 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = true
 		return m, nil
 
+	case key.Matches(msg, keys.Info):
+		if m.state == viewObjects || m.state == viewDownloadConfirm {
+			m.showMetadata = !m.showMetadata
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Messages):
 		m.showMessages = true
 		m.msgQueue.MessagesScroll = len(m.msgQueue.Messages()) - 15

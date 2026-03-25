@@ -50,6 +50,7 @@ type Model struct {
 	state          viewState
 	previewContent string
 	showHelp       bool
+	showMetadata   bool
 
 	// Search State
 	searchMode        bool

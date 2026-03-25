@@ -82,6 +82,50 @@ func TestModel_Navigation_JumpToRoot(t *testing.T) {
 	assert.Equal(t, m.FullPath(), "gs://b1/")
 }
 
+func TestModel_ToggleMetadata(t *testing.T) {
+	client := &mockGCSClient{
+		projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		objects:  simpleObjectList([]string{"file1.txt"}, nil),
+	}
+	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
+	m := &mModel
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 50})
+
+	// 1. Navigate to objects view
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
+	m, _ = pressKey(m, 'j') // Focus b1
+	m, _ = pressKey(m, 'l') // Enter b1
+
+	// Simulate objects loading
+	m, _ = updateModel(m, tui.ObjectsMsg{
+		Bucket: "b1",
+		Prefix: "",
+		List: &gcs.ObjectList{
+			Objects: []gcs.ObjectMetadata{{Name: "file1.txt", Bucket: "b1"}},
+		},
+	})
+
+	// Initial state: metadata should be off
+	assert.Assert(t, strings.Contains(stripAnsi(m.View()), "Preview"))
+
+	// 2. Press 'i' to toggle metadata ON
+	m, _ = pressKey(m, 'i')
+	view := stripAnsi(m.View())
+	if !strings.Contains(view, "Metadata") {
+		t.Errorf("Metadata not found in view. Full view:\n%s", view)
+	}
+	assert.Assert(t, strings.Contains(view, "Metadata"))
+
+	// 3. Press 'i' again to toggle metadata OFF
+	m, _ = pressKey(m, 'i')
+	assert.Assert(t, strings.Contains(stripAnsi(m.View()), "Preview"))
+
+	// 4. Ensure it doesn't toggle in buckets view
+	m, _ = pressKey(m, 'h') // Back to buckets
+	m, _ = pressKey(m, 'i')
+	assert.Assert(t, !strings.Contains(m.View(), "Metadata"), "Metadata should not toggle in buckets view")
+}
+
 func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
 	client := &mockGCSClient{projects: []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2", "b3"}}}}
 	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)

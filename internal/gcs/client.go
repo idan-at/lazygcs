@@ -23,12 +23,22 @@ type Client struct {
 
 // ObjectMetadata holds metadata for a GCS object.
 type ObjectMetadata struct {
-	Name        string
-	Size        int64
-	ContentType string
-	Updated     time.Time
-	Created     time.Time
-	Owner       string
+	Name            string
+	Bucket          string
+	Size            int64
+	ContentType     string
+	ContentEncoding string
+	CacheControl    string
+	StorageClass    string
+	Generation      int64
+	Metageneration  int64
+	ETag            string
+	MD5             []byte
+	CRC32C          uint32
+	Updated         time.Time
+	Created         time.Time
+	Owner           string
+	Metadata        map[string]string
 }
 
 // PrefixMetadata holds metadata for a GCS common prefix (virtual folder).
@@ -296,12 +306,22 @@ func (c *Client) GetObjectMetadata(ctx context.Context, bucketName, objectName s
 	}
 
 	return &ObjectMetadata{
-		Name:        attrs.Name,
-		Size:        attrs.Size,
-		ContentType: attrs.ContentType,
-		Updated:     attrs.Updated,
-		Created:     attrs.Created,
-		Owner:       attrs.Owner,
+		Name:            attrs.Name,
+		Bucket:          attrs.Bucket,
+		Size:            attrs.Size,
+		ContentType:     attrs.ContentType,
+		ContentEncoding: attrs.ContentEncoding,
+		CacheControl:    attrs.CacheControl,
+		StorageClass:    attrs.StorageClass,
+		Generation:      attrs.Generation,
+		Metageneration:  attrs.Metageneration,
+		ETag:            attrs.Etag,
+		MD5:             attrs.MD5,
+		CRC32C:          attrs.CRC32C,
+		Updated:         attrs.Updated,
+		Created:         attrs.Created,
+		Owner:           attrs.Owner,
+		Metadata:        attrs.Metadata,
 	}, nil
 }
 
@@ -360,12 +380,22 @@ func (c *Client) ListObjectsPage(ctx context.Context, bucketName, prefix, pageTo
 		} else {
 			if attr.Name != prefix {
 				list.Objects = append(list.Objects, ObjectMetadata{
-					Name:        attr.Name,
-					Size:        attr.Size,
-					ContentType: attr.ContentType,
-					Updated:     attr.Updated,
-					Created:     attr.Created,
-					Owner:       attr.Owner,
+					Name:            attr.Name,
+					Bucket:          attr.Bucket,
+					Size:            attr.Size,
+					ContentType:     attr.ContentType,
+					ContentEncoding: attr.ContentEncoding,
+					CacheControl:    attr.CacheControl,
+					StorageClass:    attr.StorageClass,
+					Generation:      attr.Generation,
+					Metageneration:  attr.Metageneration,
+					ETag:            attr.Etag,
+					MD5:             attr.MD5,
+					CRC32C:          attr.CRC32C,
+					Updated:         attr.Updated,
+					Created:         attr.Created,
+					Owner:           attr.Owner,
+					Metadata:        attr.Metadata,
 				})
 			}
 		}
@@ -407,12 +437,22 @@ func (c *Client) ListObjects(ctx context.Context, bucketName, prefix string) (*O
 		} else {
 			if attrs.Name != prefix {
 				list.Objects = append(list.Objects, ObjectMetadata{
-					Name:        attrs.Name,
-					Size:        attrs.Size,
-					ContentType: attrs.ContentType,
-					Updated:     attrs.Updated,
-					Created:     attrs.Created,
-					Owner:       attrs.Owner,
+					Name:            attrs.Name,
+					Bucket:          attrs.Bucket,
+					Size:            attrs.Size,
+					ContentType:     attrs.ContentType,
+					ContentEncoding: attrs.ContentEncoding,
+					CacheControl:    attrs.CacheControl,
+					StorageClass:    attrs.StorageClass,
+					Generation:      attrs.Generation,
+					Metageneration:  attrs.Metageneration,
+					ETag:            attrs.Etag,
+					MD5:             attrs.MD5,
+					CRC32C:          attrs.CRC32C,
+					Updated:         attrs.Updated,
+					Created:         attrs.Created,
+					Owner:           attrs.Owner,
+					Metadata:        attrs.Metadata,
 				})
 			}
 		}

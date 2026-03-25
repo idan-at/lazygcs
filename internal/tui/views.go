@@ -91,7 +91,11 @@ func (m *Model) renderScrollbar(totalItems, activeIdx int) string {
 func (m *Model) previewView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
-		s.WriteString(lipgloss.NewStyle().Bold(true).Render("Preview") + "\n\n")
+		title := "Preview"
+		if m.showMetadata {
+			title = "Metadata"
+		}
+		s.WriteString(lipgloss.NewStyle().Bold(true).Render(title) + "\n\n")
 
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
@@ -132,95 +136,150 @@ func (m *Model) previewView(width int) string {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				displayName := getDisplayName(obj.Name, m.currentPrefix)
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
 
-				contentType := obj.ContentType
-				if contentType == "" {
-					contentType = mime.TypeByExtension(filepath.Ext(obj.Name))
-				}
-				if contentType == "" {
-					ext := strings.ToLower(filepath.Ext(obj.Name))
-					switch ext {
-					case ".py":
-						contentType = "text/x-python"
-					case ".go":
-						contentType = "text/x-go"
-					case ".sql":
-						contentType = "application/sql"
-					case ".md":
-						contentType = "text/markdown"
-					case ".sh":
-						contentType = "application/x-sh"
-					case ".yaml", ".yml":
-						contentType = "application/x-yaml"
-					default:
-						contentType = "unknown"
-					}
-				}
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(truncate(contentType, width-10)))
-
-				if !obj.Created.IsZero() {
-					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05")))
-				}
-				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05")))
-
-				if obj.Owner != "" {
-					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(obj.Owner, width-10)))
-				}
-
-				if m.previewContent != "" && m.previewContent != "\x1b_Ga=d,d=A\x1b\\" {
-					separator := lipgloss.NewStyle().
-						Border(lipgloss.NormalBorder(), true, false, false, false).
-						BorderForeground(lipgloss.Color("#414559")).
-						Width(width).
-						MarginTop(1).
-						Render("")
-
-					s.WriteString(separator)
+				if m.showMetadata {
+					// Detailed Metadata View
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-10)))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Bucket:"), valStyle.Render(truncate(obj.Bucket, width-12)))
 					s.WriteString("\n")
 
-					if m.previewContent == "Loading..." || m.previewContent == "\x1b_Ga=d,d=A\x1b\\Loading..." {
-						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.renderSpinner())
-					} else if isBinary(m.previewContent) {
-						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(binary content)"))
-					} else {
-						// Calculate how many lines we can actually show
-						// We want the ENTIRE previewView content to fit in m.maxItemsVisible() + 2
-						// Preview Title (2) + Metadata (~6) + Separator (2) = ~10 lines
-						maxLines := m.maxItemsVisible() - 8
-						if maxLines < 1 {
-							maxLines = 1
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
+
+					storageClass := obj.StorageClass
+					if storageClass == "" {
+						storageClass = "STANDARD" // Default fallback if missing
+					}
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Storage Class:"), valStyle.Render(storageClass))
+					s.WriteString("\n")
+
+					if !obj.Created.IsZero() {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format(time.RFC3339)))
+					}
+					if !obj.Updated.IsZero() {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format(time.RFC3339)))
+					}
+					s.WriteString("\n")
+
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Content-Type:"), valStyle.Render(truncate(obj.ContentType, width-18)))
+					if obj.ContentEncoding != "" {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Content-Encoding:"), valStyle.Render(truncate(obj.ContentEncoding, width-22)))
+					}
+					if obj.CacheControl != "" {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Cache-Control:"), valStyle.Render(truncate(obj.CacheControl, width-19)))
+					}
+					s.WriteString("\n")
+
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Generation:"), valStyle.Render(fmt.Sprintf("%d", obj.Generation)))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Metageneration:"), valStyle.Render(fmt.Sprintf("%d", obj.Metageneration)))
+					if obj.ETag != "" {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("ETag:"), valStyle.Render(truncate(obj.ETag, width-10)))
+					}
+					if len(obj.MD5) > 0 {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("MD5:"), valStyle.Render(fmt.Sprintf("%x", obj.MD5)))
+					}
+					if obj.CRC32C != 0 {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("CRC32C:"), valStyle.Render(fmt.Sprintf("%x", obj.CRC32C)))
+					}
+
+					if len(obj.Metadata) > 0 {
+						s.WriteString("\n")
+						s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5C2E7")).Render("Custom Metadata:") + "\n")
+						for k, v := range obj.Metadata {
+							fmt.Fprintf(&s, "  %s %s\n", keyStyle.Render(k+":"), valStyle.Render(truncate(v, width-len(k)-6)))
 						}
+					}
+				} else {
+					// Standard Preview
+					displayName := getDisplayName(obj.Name, m.currentPrefix)
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
 
-						allLines := strings.Split(m.previewContent, "\n")
-						displayLines := allLines
-						if len(displayLines) > maxLines {
-							displayLines = displayLines[:maxLines]
+					contentType := obj.ContentType
+					if contentType == "" {
+						contentType = mime.TypeByExtension(filepath.Ext(obj.Name))
+					}
+					if contentType == "" {
+						ext := strings.ToLower(filepath.Ext(obj.Name))
+						switch ext {
+						case ".py":
+							contentType = "text/x-python"
+						case ".go":
+							contentType = "text/x-go"
+						case ".sql":
+							contentType = "application/sql"
+						case ".md":
+							contentType = "text/markdown"
+						case ".sh":
+							contentType = "application/x-sh"
+						case ".yaml", ".yml":
+							contentType = "application/x-yaml"
+						default:
+							contentType = "unknown"
 						}
+					}
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render(truncate(contentType, width-10)))
 
-						isKitty := strings.HasPrefix(m.previewContent, "\x1b_G")
+					if !obj.Created.IsZero() {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Created:"), valStyle.Render(obj.Created.Format("2006-01-02 15:04:05")))
+					}
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Updated:"), valStyle.Render(obj.Updated.Format("2006-01-02 15:04:05")))
 
-						if isKitty && (m.showHelp || m.showMessages) {
-							// Embed the clear command here so BubbleTea's diff renderer sends it when toggling views.
-							s.WriteString("\x1b_Ga=d,d=A\x1b\\")
-							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(image preview hidden)"))
+					if obj.Owner != "" {
+						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(obj.Owner, width-10)))
+					}
+
+					if m.previewContent != "" && m.previewContent != "\x1b_Ga=d,d=A\x1b\\" {
+						separator := lipgloss.NewStyle().
+							Border(lipgloss.NormalBorder(), true, false, false, false).
+							BorderForeground(lipgloss.Color("#414559")).
+							Width(width).
+							MarginTop(1).
+							Render("")
+
+						s.WriteString(separator)
+						s.WriteString("\n")
+
+						if m.previewContent == "Loading..." || m.previewContent == "\x1b_Ga=d,d=A\x1b\\Loading..." {
+							fmt.Fprintf(&s, "\n%s Loading preview...\n", m.renderSpinner())
+						} else if isBinary(m.previewContent) {
+							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(binary content)"))
 						} else {
-							for i, line := range displayLines {
-								if isKitty {
-									s.WriteString(line)
-								} else {
-									s.WriteString(truncate(line, width-2))
-								}
-								if i < len(displayLines)-1 {
-									s.WriteString("\n")
+							// Calculate how many lines we can actually show
+							// We want the ENTIRE previewView content to fit in m.maxItemsVisible() + 2
+							// Preview Title (2) + Metadata (~6) + Separator (2) = ~10 lines
+							maxLines := m.maxItemsVisible() - 8
+							if maxLines < 1 {
+								maxLines = 1
+							}
+
+							allLines := strings.Split(m.previewContent, "\n")
+							displayLines := allLines
+							if len(displayLines) > maxLines {
+								displayLines = displayLines[:maxLines]
+							}
+
+							isKitty := strings.HasPrefix(m.previewContent, "\x1b_G")
+
+							if isKitty && (m.showHelp || m.showMessages) {
+								// Embed the clear command here so BubbleTea's diff renderer sends it when toggling views.
+								s.WriteString("\x1b_Ga=d,d=A\x1b\\")
+								s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(image preview hidden)"))
+							} else {
+								for i, line := range displayLines {
+									if isKitty {
+										s.WriteString(line)
+									} else {
+										s.WriteString(truncate(line, width-2))
+									}
+									if i < len(displayLines)-1 {
+										s.WriteString("\n")
+									}
 								}
 							}
-						}
 
-						if len(allLines) > maxLines {
-							s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Render("..."))
+							if len(allLines) > maxLines {
+								s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Render("..."))
+							}
 						}
 					}
 				}
