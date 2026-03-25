@@ -108,6 +108,22 @@ func humanizeSize(bytes int64) string {
 }
 
 var (
+	fallbackExactIcons = map[string]string{
+		"dockerfile":          "🐳 ",
+		"makefile":            "🛠️ ",
+		".gitignore":          "👁️ ",
+		"docker-compose.yml":  "🐳 ",
+		"docker-compose.yaml": "🐳 ",
+	}
+
+	nerdExactIcons = map[string]string{
+		"dockerfile":          " ",
+		"makefile":            " ",
+		".gitignore":          " ",
+		"docker-compose.yml":  " ",
+		"docker-compose.yaml": " ",
+	}
+
 	fallbackIcons = map[string]string{
 		".go":   "🐹 ",
 		".md":   "📝 ",
@@ -147,6 +163,10 @@ var (
 		".hpp":  "🧪 ",
 		".rs":   "🦀 ",
 		".sql":  "💾 ",
+		".env":  "🔐 ",
+		".lock": "🔒 ",
+		".rb":   "💎 ",
+		".php":  "🐘 ",
 	}
 
 	nerdIcons = map[string]string{
@@ -165,10 +185,10 @@ var (
 		".svg":  "󰋩 ",
 		".webp": "󰋩 ",
 		".pdf":  "󰈦 ",
-		".zip":  "󰏗 ",
-		".tar":  "󰏗 ",
-		".gz":   "󰏗 ",
-		".tgz":  "󰏗 ",
+		".zip":  " ",
+		".tar":  " ",
+		".gz":   " ",
+		".tgz":  " ",
 		".sh":   " ",
 		".bash": " ",
 		".zsh":  " ",
@@ -188,36 +208,107 @@ var (
 		".hpp":  " ",
 		".rs":   " ",
 		".sql":  " ",
+		".env":  "󰒓 ",
+		".lock": "󰌾 ",
+		".rb":   " ",
+		".php":  "󰌽 ",
 	}
 )
 
 func getIcon(name string, isFolder bool, isBucket bool, useNerdFont bool) string {
 	if isBucket {
 		if useNerdFont {
-			return "🪣 "
+			return " " // Database icon for buckets
 		}
 		return "📦 "
 	}
 	if isFolder {
 		if useNerdFont {
-			return " "
+			return "󰉋 "
 		}
 		return "📁 "
 	}
 
+	baseName := strings.ToLower(filepath.Base(name))
 	ext := strings.ToLower(filepath.Ext(name))
 
 	if useNerdFont {
+		if icon, ok := nerdExactIcons[baseName]; ok {
+			return icon
+		}
 		if icon, ok := nerdIcons[ext]; ok {
 			return icon
 		}
 		return "󰈔 " // Default file Nerd Font icon
 	}
 
+	if icon, ok := fallbackExactIcons[baseName]; ok {
+		return icon
+	}
 	if icon, ok := fallbackIcons[ext]; ok {
 		return icon
 	}
 	return "📄 "
+}
+
+func getIconColor(name string, isFolder bool, isBucket bool) string {
+	if isBucket {
+		return "#CBA6F7" // Mauve
+	}
+	if isFolder {
+		return "#8CAAEE" // Blue
+	}
+
+	baseName := strings.ToLower(filepath.Base(name))
+	ext := strings.ToLower(filepath.Ext(name))
+
+	// Exact matches
+	switch baseName {
+	case "dockerfile", "docker-compose.yml", "docker-compose.yaml":
+		return "#8CAAEE" // Blue
+	case "makefile":
+		return "#A6ADC8" // Subtext0
+	case ".gitignore":
+		return "#F38BA8" // Red
+	}
+
+	// Extensions
+	switch ext {
+	case ".go":
+		return "#89DCEB" // Sky
+	case ".md", ".txt":
+		return "#BAC2DE" // Subtext1
+	case ".json", ".yaml", ".yml", ".toml":
+		return "#FAB387" // Peach
+	case ".csv":
+		return "#A6E3A1" // Green
+	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp":
+		return "#F5C2E7" // Pink
+	case ".pdf":
+		return "#F38BA8" // Red
+	case ".zip", ".tar", ".gz", ".tgz":
+		return "#F38BA8" // Red
+	case ".sh", ".bash", ".zsh":
+		return "#A6E3A1" // Green
+	case ".py":
+		return "#F9E2AF" // Yellow
+	case ".js", ".ts", ".jsx", ".tsx":
+		return "#F9E2AF" // Yellow
+	case ".html", ".htm", ".css":
+		return "#8CAAEE" // Blue
+	case ".xml":
+		return "#FAB387" // Peach
+	case ".java", ".c", ".cpp", ".h", ".hpp", ".rs":
+		return "#F9E2AF" // Yellow
+	case ".sql":
+		return "#FAB387" // Peach
+	case ".env", ".lock":
+		return "#F38BA8" // Red
+	case ".rb", ".php":
+		return "#F38BA8" // Red
+	}
+
+	return "#A6ADC8" // Default (Subtext0)
 }
 
 func getDisplayName(name, currentPrefix string) string {

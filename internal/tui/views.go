@@ -477,6 +477,7 @@ func (m *Model) objectsView(width int) string {
 				displayItem := getDisplayName(originalName, targetPrefix)
 
 				icon := getIcon(displayItem, isFolder, false, m.showNerdIcons)
+				iconColor := getIconColor(displayItem, isFolder, false)
 
 				textStyle := lipgloss.NewStyle()
 				isFocused := (m.state != viewBuckets) && (objCursor == i)
@@ -488,12 +489,15 @@ func (m *Model) objectsView(width int) string {
 					textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
 				}
 
+				iconStyle := textStyle.Foreground(lipgloss.Color(iconColor))
+				styledIcon := iconStyle.Render(icon)
+
 				// Truncate to fit column (account for selection indicator, optional icon, and padding)
 				// Offset: 1 (indicator) + 1 (space) + icon width
 				truncateLen := width - 2 - lipgloss.Width(icon)
 				truncatedItem := truncate(displayItem, truncateLen)
 
-				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, icon, truncatedItem)
+				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, styledIcon, truncatedItem)
 				content := textStyle.Width(width).Render(itemContent)
 
 				s.WriteString(content + "\n")
@@ -576,13 +580,17 @@ func (m *Model) bucketsView(width int) string {
 		} else {
 			// Bucket Item
 			icon := getIcon(item.BucketName, false, true, m.showNerdIcons)
+			iconColor := getIconColor(item.BucketName, false, true)
+
+			iconStyle := textStyle.Foreground(lipgloss.Color(iconColor))
+			styledIcon := iconStyle.Render(icon)
 
 			// Truncate to fit column, account for indentation
 			// Offset: 1 (indicator) + 1 (space) + icon width
 			truncateLen := width - 2 - lipgloss.Width(icon)
 			truncatedBucket := truncate(item.BucketName, truncateLen)
 
-			itemContent := fmt.Sprintf("%s %s%s", indicator, icon, truncatedBucket)
+			itemContent := fmt.Sprintf("%s %s%s", indicator, styledIcon, truncatedBucket)
 			content := textStyle.Width(width).Render(itemContent)
 			s.WriteString(content + "\n")
 		}
