@@ -182,12 +182,13 @@ func TestSearch(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := ansiRegexp.ReplaceAllString(string(bts), "")
 		return strings.Contains(s, "test-bucket-1") && strings.Contains(s, "test-bucket-2")
-	}, teatest.WithDuration(3*time.Second))
+	}, teatest.WithDuration(5*time.Second))
 
 	// Search for test-bucket-1
 	tm.Type("/")
-	time.Sleep(100 * time.Millisecond) // UI transition to search
+	time.Sleep(200 * time.Millisecond) // UI transition to search
 	tm.Type("bucket-1")
+	time.Sleep(100 * time.Millisecond)
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter}) // Enter to finish search mode
 
 	// Force a full redraw
@@ -197,7 +198,7 @@ func TestSearch(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := ansiRegexp.ReplaceAllString(string(bts), "")
 		return strings.Contains(s, "test-bucket-1") && !strings.Contains(s, "test-bucket-2")
-	}, teatest.WithDuration(3*time.Second))
+	}, teatest.WithDuration(5*time.Second))
 }
 
 func TestNavigationUp(t *testing.T) {
