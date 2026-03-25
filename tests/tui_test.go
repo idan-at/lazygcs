@@ -197,7 +197,12 @@ func TestSearch(t *testing.T) {
 	// Verify only test-bucket-1 is visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := ansiRegexp.ReplaceAllString(string(bts), "")
-		return strings.Contains(s, "test-bucket-1") && !strings.Contains(s, "test-bucket-2")
+		parts := strings.Split(s, "Buckets")
+		if len(parts) == 0 {
+			return false
+		}
+		lastFrame := parts[len(parts)-1]
+		return strings.Contains(lastFrame, "FILTER: bucket-1") && strings.Contains(lastFrame, "test-bucket-1") && !strings.Contains(lastFrame, "test-bucket-2")
 	}, teatest.WithDuration(5*time.Second))
 }
 
