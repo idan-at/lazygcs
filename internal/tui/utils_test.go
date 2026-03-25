@@ -206,3 +206,31 @@ func TestHighlightMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestModel_RenderScrollbar(t *testing.T) {
+	m := NewModel([]string{"p1"}, nil, "/tmp", false, false)
+	m.height = 14 // maxItemsVisible = 14 - 10 = 4
+
+	// 1. No scrollbar needed
+	s := m.renderScrollbar(3, 0)
+	assert.Equal(t, s, "")
+
+	// 2. Scrollbar at top
+	// total=10, visible=4, cursor=0 -> start=0
+	// thumbHeight = 4/10 * 4 = 1.6 -> 1
+	// thumbStart = 0/10 * 4 = 0
+	s = m.renderScrollbar(10, 0)
+	lines := strings.Split(s, "\n")
+	assert.Equal(t, len(lines), 4)
+	assert.Assert(t, strings.Contains(lines[0], "┃"))
+	assert.Assert(t, strings.Contains(lines[1], "│"))
+
+	// 3. Scrollbar at bottom
+	// total=10, visible=4, cursor=9 -> start=6
+	// thumbHeight = 4/10 * 4 = 1.6 -> 1
+	// thumbStart = 6/10 * 4 = 2.4 -> 2
+	s = m.renderScrollbar(10, 9)
+	lines = strings.Split(s, "\n")
+	assert.Assert(t, strings.Contains(lines[2], "┃"))
+	assert.Assert(t, strings.Contains(lines[3], "│"))
+}

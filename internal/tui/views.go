@@ -49,6 +49,45 @@ func (m *Model) FullPath() string {
 	return path
 }
 
+func (m *Model) renderScrollbar(totalItems, activeIdx int) string {
+	maxVisible := m.maxItemsVisible()
+	if totalItems <= maxVisible || maxVisible <= 0 {
+		return ""
+	}
+
+	start, _ := visibleRange(activeIdx, totalItems, maxVisible)
+
+	// Calculate thumb size and position
+	// Ensure thumb is at least 1 cell high
+	thumbHeight := int(float64(maxVisible) / float64(totalItems) * float64(maxVisible))
+	if thumbHeight < 1 {
+		thumbHeight = 1
+	}
+
+	// Calculate thumb start position
+	thumbStart := int(float64(start) / float64(totalItems) * float64(maxVisible))
+	// Adjust if it goes out of bounds
+	if thumbStart+thumbHeight > maxVisible {
+		thumbStart = maxVisible - thumbHeight
+	}
+
+	var s strings.Builder
+	trackStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#414559")) // Dimmed slate
+	thumbStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")) // Mauve
+
+	for i := 0; i < maxVisible; i++ {
+		if i >= thumbStart && i < thumbStart+thumbHeight {
+			s.WriteString(thumbStyle.Render("┃"))
+		} else {
+			s.WriteString(trackStyle.Render("│"))
+		}
+		if i < maxVisible-1 {
+			s.WriteString("\n")
+		}
+	}
+	return s.String()
+}
+
 func (m *Model) previewView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
@@ -392,8 +431,6 @@ func (m *Model) maxItemsVisible() int {
 }
 
 func (m *Model) objectsView(width int) string {
-	var s strings.Builder
-
 	var targetBucket string
 	var targetPrefix string
 	var currentPrefixes []gcs.PrefixMetadata
@@ -421,101 +458,114 @@ func (m *Model) objectsView(width int) string {
 					currentObjects = cached.List.Objects
 					showObjects = true
 				} else {
-					s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(fmt.Sprintf("Objects in %s", targetBucket), width)) + "\n\n")
-					fmt.Fprintf(&s, "%s Loading...", m.renderSpinner())
-					return s.String()
+					return lipgloss.NewStyle().Bold(true).Render(truncate(fmt.Sprintf("Objects in %s", targetBucket), width)) + "\n\n" +
+						fmt.Sprintf("%s Loading...", m.renderSpinner())
 				}
 			}
 		}
 	}
 
-	if showObjects {
-		title := fmt.Sprintf("Objects in %s", targetBucket)
-		s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate(title, width)) + "\n\n")
+	if !showObjects {
+		return ""
+	}
 
-		totalItems := len(currentPrefixes) + len(currentObjects)
+	title := lipgloss.NewStyle().Bold(true).Render(truncate(fmt.Sprintf("Objects in %s", targetBucket), width))
+	totalItems := len(currentPrefixes) + len(currentObjects)
 
-		if m.loading && m.state != viewBuckets && totalItems == 0 {
-			fmt.Fprintf(&s, "%s Loading...", m.renderSpinner())
+	if m.loading && m.state != viewBuckets && totalItems == 0 {
+		return title + "\n\n" + fmt.Sprintf("%s Loading...", m.renderSpinner())
+	}
+
+	maxVisible := m.maxItemsVisible()
+	displayMaxVisible := maxVisible
+	if m.loading && m.state != viewBuckets {
+		displayMaxVisible--
+		if displayMaxVisible < 1 {
+			displayMaxVisible = 1
+		}
+	}
+
+	startIdx := objCursor
+	if startIdx < 0 {
+		startIdx = 0
+	}
+
+	scrollbar := m.renderScrollbar(totalItems, startIdx)
+	listWidth := width
+	if scrollbar != "" {
+		listWidth -= 2
+	}
+
+	start, end := visibleRange(startIdx, totalItems, displayMaxVisible)
+	var listBuilder strings.Builder
+
+	for i := start; i < end; i++ {
+		var originalName string
+		var isFolder bool
+		if i < len(currentPrefixes) {
+			originalName = currentPrefixes[i].Name
+			isFolder = true
 		} else {
-			maxVisible := m.maxItemsVisible()
-			if m.loading && m.state != viewBuckets {
-				maxVisible--
-				if maxVisible < 1 {
-					maxVisible = 1
-				}
-			}
-
-			startIdx := objCursor
-			if startIdx < 0 {
-				startIdx = 0
-			}
-			start, end := visibleRange(startIdx, totalItems, maxVisible)
-
-			for i := start; i < end; i++ {
-				var originalName string
-				var isFolder bool
-				if i < len(currentPrefixes) {
-					originalName = currentPrefixes[i].Name
-					isFolder = true
-				} else {
-					originalName = currentObjects[i-len(currentPrefixes)].Name
-					isFolder = false
-				}
-
-				// Check if selected
-				var isSelected bool
-				if m.selected != nil {
-					_, isSelected = m.selected[originalName]
-				}
-
-				selectionIndicator := " "
-				if isSelected {
-					selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5C2E7")).Render("✓")
-				}
-
-				displayItem := getDisplayName(originalName, targetPrefix)
-
-				icon := getIcon(displayItem, isFolder, false, m.showNerdIcons)
-				iconColor := getIconColor(displayItem, isFolder, false)
-
-				textStyle := lipgloss.NewStyle()
-				isFocused := (m.state != viewBuckets) && (objCursor == i)
-				if isFocused {
-					textStyle = textStyle.Background(lipgloss.Color("#313244")).Foreground(lipgloss.Color("#CDD6F4")).Bold(true)
-				} else if isSelected {
-					textStyle = textStyle.Foreground(lipgloss.Color("#F5C2E7")).Bold(true)
-				} else {
-					textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
-				}
-
-				iconStyle := textStyle.Foreground(lipgloss.Color(iconColor))
-				styledIcon := iconStyle.Render(icon)
-
-				// Truncate to fit column (account for selection indicator, optional icon, and padding)
-				// Offset: 1 (indicator) + 1 (space) + icon width
-				truncateLen := width - 2 - lipgloss.Width(icon)
-				truncatedItem := truncate(displayItem, truncateLen)
-				highlightedItem := highlightMatch(truncatedItem, m.objectSearchQuery, m.fuzzySearch)
-
-				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, styledIcon, highlightedItem)
-				content := textStyle.Width(width).Render(itemContent)
-
-				s.WriteString(content + "\n")
-			}
-			if totalItems == 0 {
-				s.WriteString("(empty)")
-			} else if m.loading && m.state != viewBuckets {
-				fmt.Fprintf(&s, "%s Loading...", m.renderSpinner())
-			}
+			originalName = currentObjects[i-len(currentPrefixes)].Name
+			isFolder = false
 		}
+
+		// Check if selected
+		var isSelected bool
+		if m.selected != nil {
+			_, isSelected = m.selected[originalName]
+		}
+
+		selectionIndicator := " "
+		if isSelected {
+			selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5C2E7")).Render("✓")
+		}
+
+		displayItem := getDisplayName(originalName, targetPrefix)
+		icon := getIcon(displayItem, isFolder, false, m.showNerdIcons)
+		iconColor := getIconColor(displayItem, isFolder, false)
+
+		textStyle := lipgloss.NewStyle()
+		isFocused := (m.state != viewBuckets) && (objCursor == i)
+		if isFocused {
+			textStyle = textStyle.Background(lipgloss.Color("#313244")).Foreground(lipgloss.Color("#CDD6F4")).Bold(true)
+		} else if isSelected {
+			textStyle = textStyle.Foreground(lipgloss.Color("#F5C2E7")).Bold(true)
+		} else {
+			textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
+		}
+
+		iconStyle := textStyle.Foreground(lipgloss.Color(iconColor))
+		styledIcon := iconStyle.Render(icon)
+
+		truncateLen := listWidth - 2 - lipgloss.Width(icon)
+		truncatedItem := truncate(displayItem, truncateLen)
+		highlightedItem := highlightMatch(truncatedItem, m.objectSearchQuery, m.fuzzySearch)
+
+		itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, styledIcon, highlightedItem)
+		content := textStyle.Width(listWidth).Render(itemContent)
+		listBuilder.WriteString(content + "\n")
 	}
-	return s.String()
+
+	if m.loading && m.state != viewBuckets {
+		fmt.Fprintf(&listBuilder, "%s Loading...", m.renderSpinner())
+	} else if totalItems == 0 {
+		listBuilder.WriteString("(empty)")
+	}
+
+	list := listBuilder.String()
+	var content string
+	if scrollbar != "" {
+		content = lipgloss.JoinHorizontal(lipgloss.Top, list, " ", scrollbar)
+	} else {
+		content = list
+	}
+
+	return title + "\n\n" + content
 }
 
 func (m *Model) bucketsView(width int) string {
-	var s strings.Builder
-	s.WriteString(lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width)) + "\n\n")
+	title := lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width))
 
 	filtered := m.filteredBuckets()
 
@@ -532,7 +582,15 @@ func (m *Model) bucketsView(width int) string {
 		}
 	}
 
-	start, end := visibleRange(activeIdx, len(filtered), m.maxItemsVisible())
+	maxVisible := m.maxItemsVisible()
+	scrollbar := m.renderScrollbar(len(filtered), activeIdx)
+	listWidth := width
+	if scrollbar != "" {
+		listWidth -= 2
+	}
+
+	start, end := visibleRange(activeIdx, len(filtered), maxVisible)
+	var listBuilder strings.Builder
 	for i := start; i < end; i++ {
 		item := filtered[i]
 
@@ -566,7 +624,7 @@ func (m *Model) bucketsView(width int) string {
 				projectStyle = projectStyle.Foreground(lipgloss.Color("#BAC2DE")).Bold(true)
 			}
 
-			truncateLen := width - 2 // ▼ + space = 2
+			truncateLen := listWidth - 2 // ▼ + space = 2
 			if m.loadingProjects[item.ProjectID] {
 				truncateLen -= 2 // space + spinner
 			}
@@ -576,8 +634,8 @@ func (m *Model) bucketsView(width int) string {
 			if m.loadingProjects[item.ProjectID] {
 				itemContent += " " + m.renderSpinner()
 			}
-			content := projectStyle.Width(width).Render(itemContent)
-			s.WriteString(content + "\n")
+			content := projectStyle.Width(listWidth).Render(itemContent)
+			listBuilder.WriteString(content + "\n")
 		} else {
 			// Bucket Item
 			icon := getIcon(item.BucketName, false, true, m.showNerdIcons)
@@ -588,17 +646,25 @@ func (m *Model) bucketsView(width int) string {
 
 			// Truncate to fit column, account for indentation
 			// Offset: 1 (indicator) + 1 (space) + icon width
-			truncateLen := width - 2 - lipgloss.Width(icon)
+			truncateLen := listWidth - 2 - lipgloss.Width(icon)
 			truncatedBucket := truncate(item.BucketName, truncateLen)
 			highlightedBucket := highlightMatch(truncatedBucket, m.bucketSearchQuery, m.fuzzySearch)
 
 			itemContent := fmt.Sprintf("%s %s%s", indicator, styledIcon, highlightedBucket)
-			content := textStyle.Width(width).Render(itemContent)
-			s.WriteString(content + "\n")
+			content := textStyle.Width(listWidth).Render(itemContent)
+			listBuilder.WriteString(content + "\n")
 		}
 	}
 
-	return s.String()
+	list := listBuilder.String()
+	var content string
+	if scrollbar != "" {
+		content = lipgloss.JoinHorizontal(lipgloss.Top, list, " ", scrollbar)
+	} else {
+		content = list
+	}
+
+	return title + "\n\n" + content
 }
 
 // View renders the current state of the application as a string.
