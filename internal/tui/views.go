@@ -206,7 +206,7 @@ func (m *Model) footerView() string {
 		Bold(true).
 		Padding(0, 1).
 		Background(lipgloss.Color("#414559")).
-		Foreground(lipgloss.Color("#A6ADC8"))
+		Foreground(lipgloss.Color("#CDD6F4"))
 
 	q := m.bucketSearchQuery
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
@@ -214,57 +214,60 @@ func (m *Model) footerView() string {
 	}
 
 	if m.searchMode {
-		statusText = fmt.Sprintf(" SEARCH: %s█ ", q)
-		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#CDD6F4"))
+		statusText = fmt.Sprintf(" SEARCH: %s_ ", q)
+		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#1E1E2E"))
 	} else if q != "" {
 		statusText = fmt.Sprintf(" FILTER: %s ", q)
-		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#CDD6F4"))
+		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#1E1E2E"))
 	} else if m.bgJobs > len(m.loadingProjects) {
-		statusText = m.renderSpinner()
-		statusStyle = lipgloss.NewStyle().Padding(0, 1)
+		statusText = " LOADING "
+		statusStyle = statusStyle.Background(lipgloss.Color("#8CAAEE")).Foreground(lipgloss.Color("#1E1E2E"))
 	}
 
 	pill := statusStyle.Render(statusText)
 
+	// Task Pill
 	var tasksPill string
 	if len(m.activeTasks) > 0 {
-		tasksPill = " " + lipgloss.NewStyle().
+		tasksPill = lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
 			Background(lipgloss.Color("#F9E2AF")).
-			Foreground(lipgloss.Color("#CDD6F4")).
-			Render(fmt.Sprintf("⟳ %d Tasks", len(m.activeTasks)))
+			Foreground(lipgloss.Color("#1E1E2E")).
+			Render(fmt.Sprintf(" ⟳ %d Tasks ", len(m.activeTasks)))
 	}
 
+	// Error Pill
 	var errorsPill string
 	if m.msgQueue.ErrorCount > 0 {
-		errorsPill = " " + lipgloss.NewStyle().
+		errorsPill = lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
-			Background(lipgloss.Color("#F38BA8")). // Red background
-			Foreground(lipgloss.Color("#CDD6F4")).
-			Render(fmt.Sprintf("%d ERRORS", m.msgQueue.ErrorCount))
+			Background(lipgloss.Color("#F38BA8")).
+			Foreground(lipgloss.Color("#1E1E2E")).
+			Render(fmt.Sprintf(" %d ERRORS ", m.msgQueue.ErrorCount))
 	}
 
 	hasMessage := m.state == viewDownloadConfirm || (len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill)
 
-	// Right side: Help hints (omitted if message is shown to allow longer messages)
+	// Right side: Help hints
 	var helpView string
 	if !hasMessage {
 		m.help.ShowAll = false
 		m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("#BAC2DE"))
 		m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))
+		m.help.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#414559"))
 		helpView = m.help.View(keys)
 	}
 
 	// Calculate available width for msgPill
-	rightPadding := 1
-	leftBase := pill + tasksPill + errorsPill
-	availableWidth := m.width - lipgloss.Width(leftBase) - lipgloss.Width(helpView) - rightPadding - 2
+	leftBaseWidth := lipgloss.Width(pill + tasksPill + errorsPill)
+	helpWidth := lipgloss.Width(helpView)
+	availableWidth := m.width - leftBaseWidth - helpWidth - 4
 
 	var msgPill string
 	if m.state == viewDownloadConfirm {
-		style := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#F9E2AF")).Faint(true)
+		style := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#F9E2AF"))
 		icon := getLevelIcon(LevelWarn, m.showNerdIcons)
 		var text string
 		if m.activeDestinations != nil && m.activeDestinations[m.pendingDownloadDest] {
@@ -272,12 +275,9 @@ func (m *Model) footerView() string {
 		} else {
 			text = fmt.Sprintf("File exists: %s - (o)verwrite, (a)bort, (r)ename, (esc) cancel batch?", filepath.Base(m.pendingDownloadDest))
 		}
-		if lipgloss.Width(icon+text) > availableWidth {
-			text = truncate(text, availableWidth-lipgloss.Width(icon))
-		}
-		msgPill = " " + style.Render(icon+text)
+		msgPill = style.Render(truncate(icon+text, availableWidth))
 	} else {
-		// Calculate aggregate progress for active downloads
+		// Calculate aggregate progress
 		var totalProgress int
 		var activeDlCount int
 		var totalBytes int64
@@ -301,7 +301,7 @@ func (m *Model) footerView() string {
 
 		if len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill {
 			latest := m.msgQueue.Messages()[len(m.msgQueue.Messages())-1]
-			style := lipgloss.NewStyle().Padding(0, 1).Faint(true)
+			style := lipgloss.NewStyle().Padding(0, 1)
 			switch latest.Level {
 			case LevelError:
 				style = style.Foreground(lipgloss.Color("#F38BA8"))
@@ -313,29 +313,25 @@ func (m *Model) footerView() string {
 			icon := getLevelIcon(latest.Level, m.showNerdIcons)
 			text := latest.Text
 
-			// If it's a download message and we should show progress, append the bar
 			if showProgressBar && strings.Contains(text, "Downloading") {
-				barWidth := 12
-				bar := renderProgressBar(barWidth, totalProgress)
+				bar := renderProgressBar(10, totalProgress)
 				text = fmt.Sprintf("%s %s %d%%", text, bar, totalProgress)
 			}
-
-			if lipgloss.Width(icon+text) > availableWidth {
-				text = truncate(text, availableWidth-lipgloss.Width(icon))
-			}
-			msgPill = " " + style.Render(icon+text)
+			msgPill = style.Render(truncate(icon+text, availableWidth))
 		}
 	}
 
-	// Build the ribbon
-	leftContent := pill + tasksPill + msgPill + errorsPill
-	gapWidth := m.width - lipgloss.Width(leftContent) - lipgloss.Width(helpView) - rightPadding
+	// Build the final footer bar
+	leftSide := lipgloss.JoinHorizontal(lipgloss.Top, pill, tasksPill, errorsPill, msgPill)
+
+	// Fill the gap between left and right
+	gapWidth := m.width - lipgloss.Width(leftSide) - lipgloss.Width(helpView)
 	if gapWidth < 0 {
 		gapWidth = 0
 	}
 	gap := strings.Repeat(" ", gapWidth)
 
-	return "\n" + leftContent + gap + helpView + strings.Repeat(" ", rightPadding)
+	return "\n" + lipgloss.JoinHorizontal(lipgloss.Top, leftSide, gap, helpView)
 }
 
 func (m *Model) maxItemsVisible() int {
