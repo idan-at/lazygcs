@@ -72,15 +72,14 @@ func TestModel_Navigation_JumpToRoot(t *testing.T) {
 
 	// Verify we are deep (header shows object path)
 	m, _ = pressKey(m, 'j') // hover obj1
-	assert.Assert(t, strings.Contains(m.View(), "gs://b1/obj1"), "Should show full object path in header")
+	assert.Equal(t, m.FullPath(), "gs://b1/obj1")
 
 	// 2. Press 'H' to jump to root
 	m, _ = pressKey(m, 'H')
 
 	// Assertions:
 	// - Header should be back to bucket level
-	assert.Assert(t, !strings.Contains(m.View(), "gs://b1/obj1"), "Header should no longer show object path")
-	assert.Assert(t, strings.Contains(m.View(), "gs://b1/"), "Header should show bucket root")
+	assert.Equal(t, m.FullPath(), "gs://b1/")
 }
 
 func TestModel_Update_ArrowKeyNavigation(t *testing.T) {
@@ -205,13 +204,13 @@ func TestModel_HeaderClearedOnBack(t *testing.T) {
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1"}})
 	m, _ = pressKey(m, 'j')
 	m, _ = pressKeyType(m, tea.KeyEnter)
-	assert.Assert(t, strings.Contains(m.View(), "gs://b1/"))
+	assert.Equal(t, m.FullPath(), "gs://b1/")
 
 	// Go back to bucket list
 	m, _ = pressKey(m, 'h')
 
 	// Header should update to reflect the currently focused bucket
-	assert.Assert(t, strings.Contains(m.View(), "gs://b1/"))
+	assert.Equal(t, m.FullPath(), "gs://b1/")
 }
 
 func TestModel_CursorPersistsOnBack(t *testing.T) {

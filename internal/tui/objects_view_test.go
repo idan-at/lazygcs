@@ -207,8 +207,8 @@ func TestModel_EnterPrefix(t *testing.T) {
 	m, _ = pressKeyType(m, tea.KeyEnter)
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "", List: client.objects})
 
-	// Verify we are at root
-	assert.Assert(t, strings.Contains(m.View(), "gs://b1/"))
+	// Verify we are at root (focusing folder1/)
+	assert.Equal(t, m.FullPath(), "gs://b1/folder1/")
 
 	// Enter folder1/
 	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
@@ -220,8 +220,8 @@ func TestModel_EnterPrefix(t *testing.T) {
 	m, _ = updateModel(m, tui.ObjectsMsg{Bucket: "b1", Prefix: "folder1/", List: nestedObjects})
 
 	view := m.View()
-	// Should show path header
-	assert.Assert(t, strings.Contains(view, "gs://b1/folder1/"))
+	// Should show path header (focusing folder1/sub/)
+	assert.Equal(t, m.FullPath(), "gs://b1/folder1/sub/")
 
 	// Verify that RELATIVE names are present.
 	assert.Assert(t, strings.Contains(view, " file2.txt"))

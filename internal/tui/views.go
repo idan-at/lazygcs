@@ -18,7 +18,8 @@ func (m *Model) renderSpinner() string {
 	return m.spinner.View()
 }
 
-func (m *Model) fullPath() string {
+// FullPath returns the absolute GCS path of the currently selected or focused item.
+func (m *Model) FullPath() string {
 	if m.state == viewBuckets {
 		filtered := m.filteredBuckets()
 		if m.cursor < len(filtered) && !filtered[m.cursor].IsProject {
@@ -191,12 +192,57 @@ func (m *Model) previewView(width int) string {
 }
 
 func (m *Model) headerView() string {
-	return lipgloss.NewStyle().
+	path := m.FullPath()
+	path = strings.TrimPrefix(path, "gs://")
+
+	var parts []string
+	if path != "" {
+		parts = strings.Split(strings.TrimSuffix(path, "/"), "/")
+	}
+
+	rootPill := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#1E1E2E")).
 		Background(lipgloss.Color("#8CAAEE")).
 		Padding(0, 1).
-		Render(truncate(" "+m.fullPath()+" ", m.width-2))
+		Render("gs://")
+
+	breadcrumbs := []string{rootPill}
+
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		var pill string
+		if i == len(parts)-1 {
+			// Last item is active
+			pill = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#1E1E2E")).
+				Background(lipgloss.Color("#CBA6F7")).
+				Padding(0, 1).
+				Render(part)
+		} else {
+			// Intermediate items
+			pill = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#CDD6F4")).
+				Background(lipgloss.Color("#414559")).
+				Padding(0, 1).
+				Render(part)
+		}
+		breadcrumbs = append(breadcrumbs, pill)
+	}
+
+	separator := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6C7086")).
+		Margin(0, 1).
+		Render("❯")
+
+	renderedPath := truncate(strings.Join(breadcrumbs, separator), m.width-2)
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Render(renderedPath)
 }
 
 func (m *Model) footerView() string {
