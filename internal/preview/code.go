@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // CodePreviewer ...
@@ -87,7 +89,7 @@ func Highlight(filename, content string) (string, error) {
 	}
 	lexer = chroma.Coalesce(lexer)
 
-	style := styles.Get("monokai")
+	style := styles.Get("catppuccin-mocha")
 	if style == nil {
 		style = styles.Fallback
 	}
@@ -108,5 +110,32 @@ func Highlight(filename, content string) (string, error) {
 		return content, nil //nolint:nilerr
 	}
 
-	return buf.String(), nil
+	// Split chroma output and add styled line numbers
+	lines := strings.Split(buf.String(), "\n")
+
+	// If the last line is completely empty (often due to trailing newline), drop it from numbering
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	// Dynamic padding for line numbers
+	maxLen := len(fmt.Sprintf("%d", len(lines)))
+	if maxLen < 3 {
+		maxLen = 3
+	}
+
+	numberStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#A6ADC8")). // Dimmed text
+		Faint(true)
+
+	separatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#414559")) // Dimmed border
+
+	var result strings.Builder
+	for i, line := range lines {
+		lineNum := fmt.Sprintf("%*d", maxLen, i+1)
+		result.WriteString(numberStyle.Render(lineNum) + " " + separatorStyle.Render("│") + " " + line + "\n")
+	}
+
+	return result.String(), nil
 }
