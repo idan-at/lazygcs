@@ -47,7 +47,7 @@ func (mq *MessageQueue) AddMessage(level MsgLevel, text string, jobNum int, task
 
 	if mq.count == maxMessages {
 		removed := mq.messages[mq.head]
-		if removed.Level == LevelError {
+		if removed.Level == LevelError && mq.ErrorCount == maxMessages {
 			mq.ErrorCount--
 		}
 
@@ -66,6 +66,8 @@ func (mq *MessageQueue) AddMessage(level MsgLevel, text string, jobNum int, task
 
 	if level == LevelError {
 		mq.ErrorCount++
+	} else {
+		mq.ErrorCount = 0
 	}
 
 	mq.HideStatusPill = false

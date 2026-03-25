@@ -33,13 +33,15 @@ func TestModel_ErrorCount_Tracking(t *testing.T) {
 	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m := &mModel
 
-	_ = m.AddMessage(tui.LevelInfo, "info 1", 0, "")
 	_ = m.AddMessage(tui.LevelError, "error 1", 0, "")
-	_ = m.AddMessage(tui.LevelWarn, "warn 1", 0, "")
 	_ = m.AddMessage(tui.LevelError, "error 2", 0, "")
-
-	// This method ErrorCount doesn't exist yet
 	assert.Equal(t, m.ErrorCount(), 2, "ErrorCount should be 2")
+
+	_ = m.AddMessage(tui.LevelInfo, "info 1", 0, "")
+	assert.Equal(t, m.ErrorCount(), 0, "ErrorCount should reset to 0 after an info message")
+
+	_ = m.AddMessage(tui.LevelError, "error 3", 0, "")
+	assert.Equal(t, m.ErrorCount(), 1, "ErrorCount should be 1 after new error")
 }
 
 func TestModel_ErrorCount_Bounding(t *testing.T) {
@@ -57,9 +59,9 @@ func TestModel_ErrorCount_Bounding(t *testing.T) {
 	_ = m.AddMessage(tui.LevelError, "one more error", 0, "")
 	assert.Equal(t, m.ErrorCount(), 500, "ErrorCount should stay at 500 after overflow")
 
-	// Add 1 info message, it should push out an error
+	// Add 1 info message, it should reset to 0
 	_ = m.AddMessage(tui.LevelInfo, "info message", 0, "")
-	assert.Equal(t, m.ErrorCount(), 499, "ErrorCount should decrease to 499 as error is pushed out by info")
+	assert.Equal(t, m.ErrorCount(), 0, "ErrorCount should reset to 0 on success")
 }
 
 func TestModel_ClearStatusMsg(t *testing.T) {
