@@ -391,12 +391,19 @@ func TestClient_GetObjectMetadata(t *testing.T) {
 	objects := []fakestorage.Object{
 		{
 			ObjectAttrs: fakestorage.ObjectAttrs{
-				BucketName:  bucketName,
-				Name:        objectName,
-				ContentType: "application/json",
-				Size:        123,
-				Updated:     updatedTime,
-				Created:     createdTime,
+				BucketName:      bucketName,
+				Name:            objectName,
+				ContentType:     "application/json",
+				ContentEncoding: "gzip",
+				CacheControl:    "public, max-age=3600",
+				StorageClass:    "STANDARD",
+				Generation:      12345,
+				Etag:            "etag-123",
+				Crc32c:          "9876",
+				Size:            123,
+				Updated:         updatedTime,
+				Created:         createdTime,
+				Metadata:        map[string]string{"custom": "value"},
 			},
 		},
 	}
@@ -406,10 +413,17 @@ func TestClient_GetObjectMetadata(t *testing.T) {
 		metadata, err := client.GetObjectMetadata(context.Background(), bucketName, objectName)
 		assert.NilError(t, err)
 		assert.Equal(t, metadata.Name, objectName)
+		assert.Equal(t, metadata.Bucket, bucketName)
 		assert.Equal(t, metadata.ContentType, "application/json")
+		assert.Equal(t, metadata.ContentEncoding, "gzip")
+		assert.Equal(t, metadata.CacheControl, "public, max-age=3600")
+		assert.Equal(t, metadata.StorageClass, "STANDARD")
+		assert.Equal(t, metadata.Generation, int64(12345))
+		assert.Equal(t, metadata.ETag, "etag-123")
 		assert.Equal(t, metadata.Size, int64(123))
 		assert.Equal(t, metadata.Updated.Unix(), updatedTime.Unix())
 		assert.Equal(t, metadata.Created.Unix(), createdTime.Unix())
+		assert.DeepEqual(t, metadata.Metadata, map[string]string{"custom": "value"})
 	})
 
 	t.Run("Non-existent object", func(t *testing.T) {
