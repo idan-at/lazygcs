@@ -401,7 +401,7 @@ func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
 	assert.Assert(t, len(lines) <= 20, "View height %d exceeded terminal height 20. Wrapping likely occurred!", len(lines))
 }
 
-var ansiRegexp = regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*((?:[a-zA-Z\\d\\s:;?=-]|\\x07)*[a-zA-Z\\d\\s:;?=-])")
+var ansiRegexp = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]")
 
 func stripAnsi(s string) string {
 	return ansiRegexp.ReplaceAllString(s, "")

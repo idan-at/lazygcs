@@ -496,8 +496,9 @@ func (m *Model) objectsView(width int) string {
 				// Offset: 1 (indicator) + 1 (space) + icon width
 				truncateLen := width - 2 - lipgloss.Width(icon)
 				truncatedItem := truncate(displayItem, truncateLen)
+				highlightedItem := highlightMatch(truncatedItem, m.objectSearchQuery, m.fuzzySearch)
 
-				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, styledIcon, truncatedItem)
+				itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, styledIcon, highlightedItem)
 				content := textStyle.Width(width).Render(itemContent)
 
 				s.WriteString(content + "\n")
@@ -589,8 +590,9 @@ func (m *Model) bucketsView(width int) string {
 			// Offset: 1 (indicator) + 1 (space) + icon width
 			truncateLen := width - 2 - lipgloss.Width(icon)
 			truncatedBucket := truncate(item.BucketName, truncateLen)
+			highlightedBucket := highlightMatch(truncatedBucket, m.bucketSearchQuery, m.fuzzySearch)
 
-			itemContent := fmt.Sprintf("%s %s%s", indicator, styledIcon, truncatedBucket)
+			itemContent := fmt.Sprintf("%s %s%s", indicator, styledIcon, highlightedBucket)
 			content := textStyle.Width(width).Render(itemContent)
 			s.WriteString(content + "\n")
 		}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	reflowTruncate "github.com/muesli/reflow/truncate"
 )
 
@@ -92,6 +93,45 @@ func truncate(s string, maxLen int) string {
 		return ""
 	}
 	return reflowTruncate.StringWithTail(s, uint(maxLen), "...")
+}
+
+func highlightMatch(s, query string, isFuzzy bool) string {
+	if query == "" {
+		return s
+	}
+
+	highlightStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E1E2E")).Background(lipgloss.Color("#F9E2AF")).Bold(true)
+
+	if !isFuzzy {
+		lowerS := strings.ToLower(s)
+		lowerQ := strings.ToLower(query)
+		idx := strings.Index(lowerS, lowerQ)
+		if idx == -1 {
+			return s
+		}
+
+		match := s[idx : idx+len(query)]
+		return s[:idx] + highlightStyle.Render(match) + s[idx+len(query):]
+	}
+
+	// Fuzzy highlight: highlight matching characters
+	queryRunes := []rune(strings.ToLower(query))
+	targetRunes := []rune(s)
+	targetLowerRunes := []rune(strings.ToLower(s))
+
+	var result strings.Builder
+	qIdx := 0
+
+	for i, r := range targetRunes {
+		if qIdx < len(queryRunes) && targetLowerRunes[i] == queryRunes[qIdx] {
+			result.WriteString(highlightStyle.Render(string(r)))
+			qIdx++
+		} else {
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
 }
 
 func humanizeSize(bytes int64) string {

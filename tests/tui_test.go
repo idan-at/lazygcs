@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -175,9 +176,12 @@ func TestSearch(t *testing.T) {
 	}
 	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
 
+	ansiRegexp := regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]")
+
 	// Wait for buckets
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		return strings.Contains(string(bts), "test-bucket-1") && strings.Contains(string(bts), "test-bucket-2")
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		return strings.Contains(s, "test-bucket-1") && strings.Contains(s, "test-bucket-2")
 	}, teatest.WithDuration(3*time.Second))
 
 	// Search for test-bucket-1
@@ -191,7 +195,7 @@ func TestSearch(t *testing.T) {
 
 	// Verify only test-bucket-1 is visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := string(bts)
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
 		return strings.Contains(s, "test-bucket-1") && !strings.Contains(s, "test-bucket-2")
 	}, teatest.WithDuration(3*time.Second))
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"gotest.tools/v3/assert"
 )
 
@@ -121,6 +122,86 @@ func TestGetDisplayName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getDisplayName(tt.objectName, tt.currentPrefix)
+			assert.Equal(t, got, tt.want)
+		})
+	}
+}
+
+func TestHighlightMatch(t *testing.T) {
+	// Force lipgloss to render colors for tests
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E1E2E")).Background(lipgloss.Color("#F9E2AF")).Bold(true)
+
+	tests := []struct {
+		name    string
+		str     string
+		query   string
+		isFuzzy bool
+		want    string
+	}{
+		{
+			name:    "Empty query",
+			str:     "hello.txt",
+			query:   "",
+			isFuzzy: false,
+			want:    "hello.txt",
+		},
+		{
+			name:    "No match (exact)",
+			str:     "hello.txt",
+			query:   "world",
+			isFuzzy: false,
+			want:    "hello.txt",
+		},
+		{
+			name:    "Exact match (mid)",
+			str:     "hello.txt",
+			query:   "lo.",
+			isFuzzy: false,
+			want:    "hel" + style.Render("lo.") + "txt",
+		},
+		{
+			name:    "Exact match (case insensitive)",
+			str:     "HeLLo.txt",
+			query:   "ell",
+			isFuzzy: false,
+			want:    "H" + style.Render("eLL") + "o.txt",
+		},
+		{
+			name:    "Fuzzy match (all chars present)",
+			str:     "hello.txt",
+			query:   "hlt",
+			isFuzzy: true,
+			want:    style.Render("h") + "e" + style.Render("l") + "lo." + style.Render("t") + "xt",
+		},
+		{
+			name:    "Fuzzy match (case insensitive)",
+			str:     "HeLLo.txt",
+			query:   "hlt",
+			isFuzzy: true,
+			want:    style.Render("H") + "e" + style.Render("L") + "Lo." + style.Render("t") + "xt",
+		},
+		{
+			name:    "Fuzzy match (no match)",
+			str:     "hello.txt",
+			query:   "xyz",
+			isFuzzy: true,
+			want:    "hello.txt",
+		},
+		{
+			name:    "Fuzzy match (partial match - fails as whole query not matched)",
+			str:     "hello.txt",
+			query:   "hlx",
+			isFuzzy: true,
+			// Since our highlightMatch doesn't validate if fuzzyMatch passed,
+			// it just highlights the matching characters it finds.
+			// The caller is responsible for only passing matching strings.
+			want: style.Render("h") + "e" + style.Render("l") + "lo.t" + style.Render("x") + "t",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := highlightMatch(tt.str, tt.query, tt.isFuzzy)
 			assert.Equal(t, got, tt.want)
 		})
 	}
