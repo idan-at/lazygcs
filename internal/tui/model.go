@@ -141,7 +141,7 @@ func NewModel(projectIDs []string, client GCSClient, downloadDir string, fuzzySe
 func NewModelWithSender(projectIDs []string, client GCSClient, downloadDir string, fuzzySearch bool, showNerdIcons bool, sendMsg func(tea.Msg)) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7"))
 
 	loadingProjects := make(map[string]bool)
 	for _, id := range projectIDs {

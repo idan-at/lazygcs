@@ -55,8 +55,8 @@ func (m *Model) previewView(width int) string {
 
 		currentPrefixes, currentObjects, _ := m.filteredObjects()
 
-		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))           // Dimmed text
-		valStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")) // Bright white
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8"))            // Dimmed text
+		valStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#CDD6F4")) // Bright white
 
 		if m.cursor < len(currentPrefixes) {
 			// Selected item is a prefix (folder)
@@ -84,7 +84,7 @@ func (m *Model) previewView(width int) string {
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(prefix.Owner, width-10)))
 				}
 				if prefix.Err != nil && !strings.Contains(prefix.Err.Error(), "object doesn't exist") && !strings.Contains(prefix.Err.Error(), "not found") {
-					fmt.Fprintf(&s, "\n%s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(truncate(fmt.Sprintf("Metadata Error: %v", prefix.Err), width-2)))
+					fmt.Fprintf(&s, "\n%s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("#F38BA8")).Render(truncate(fmt.Sprintf("Metadata Error: %v", prefix.Err), width-2)))
 				}
 			}
 		} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
@@ -133,7 +133,7 @@ func (m *Model) previewView(width int) string {
 				if m.previewContent != "" && m.previewContent != "\x1b_Ga=d,d=A\x1b\\" {
 					separator := lipgloss.NewStyle().
 						Border(lipgloss.NormalBorder(), true, false, false, false).
-						BorderForeground(lipgloss.Color("240")).
+						BorderForeground(lipgloss.Color("#414559")).
 						Width(width).
 						MarginTop(1).
 						Render("")
@@ -144,7 +144,7 @@ func (m *Model) previewView(width int) string {
 					if m.previewContent == "Loading..." || m.previewContent == "\x1b_Ga=d,d=A\x1b\\Loading..." {
 						fmt.Fprintf(&s, "\n%s Loading preview...\n", m.renderSpinner())
 					} else if isBinary(m.previewContent) {
-						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(binary content)"))
+						s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(binary content)"))
 					} else {
 						// Calculate how many lines we can actually show
 						// We want the ENTIRE previewView content to fit in m.maxItemsVisible() + 2
@@ -165,7 +165,7 @@ func (m *Model) previewView(width int) string {
 						if isKitty && (m.showHelp || m.showMessages) {
 							// Embed the clear command here so BubbleTea's diff renderer sends it when toggling views.
 							s.WriteString("\x1b_Ga=d,d=A\x1b\\")
-							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true).Render("(image preview hidden)"))
+							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(image preview hidden)"))
 						} else {
 							for i, line := range displayLines {
 								if isKitty {
@@ -180,7 +180,7 @@ func (m *Model) previewView(width int) string {
 						}
 
 						if len(allLines) > maxLines {
-							s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("..."))
+							s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Render("..."))
 						}
 					}
 				}
@@ -193,10 +193,10 @@ func (m *Model) previewView(width int) string {
 func (m *Model) headerView() string {
 	return lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
+		Foreground(lipgloss.Color("#1E1E2E")).
+		Background(lipgloss.Color("#8CAAEE")).
 		Padding(0, 1).
-		Render(truncate(m.fullPath(), m.width-2))
+		Render(truncate(" "+m.fullPath()+" ", m.width-2))
 }
 
 func (m *Model) footerView() string {
@@ -205,8 +205,8 @@ func (m *Model) footerView() string {
 	statusStyle := lipgloss.NewStyle().
 		Bold(true).
 		Padding(0, 1).
-		Background(lipgloss.Color("240")).
-		Foreground(lipgloss.Color("250"))
+		Background(lipgloss.Color("#414559")).
+		Foreground(lipgloss.Color("#A6ADC8"))
 
 	q := m.bucketSearchQuery
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
@@ -215,10 +215,10 @@ func (m *Model) footerView() string {
 
 	if m.searchMode {
 		statusText = fmt.Sprintf(" SEARCH: %s█ ", q)
-		statusStyle = statusStyle.Background(lipgloss.Color("69")).Foreground(lipgloss.Color("15"))
+		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#CDD6F4"))
 	} else if q != "" {
 		statusText = fmt.Sprintf(" FILTER: %s ", q)
-		statusStyle = statusStyle.Background(lipgloss.Color("61")).Foreground(lipgloss.Color("15"))
+		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#CDD6F4"))
 	} else if m.bgJobs > len(m.loadingProjects) {
 		statusText = m.renderSpinner()
 		statusStyle = lipgloss.NewStyle().Padding(0, 1)
@@ -231,8 +231,8 @@ func (m *Model) footerView() string {
 		tasksPill = " " + lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
-			Background(lipgloss.Color("130")).
-			Foreground(lipgloss.Color("15")).
+			Background(lipgloss.Color("#F9E2AF")).
+			Foreground(lipgloss.Color("#CDD6F4")).
 			Render(fmt.Sprintf("⟳ %d Tasks", len(m.activeTasks)))
 	}
 
@@ -241,8 +241,8 @@ func (m *Model) footerView() string {
 		errorsPill = " " + lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
-			Background(lipgloss.Color("196")). // Red background
-			Foreground(lipgloss.Color("15")).
+			Background(lipgloss.Color("#F38BA8")). // Red background
+			Foreground(lipgloss.Color("#CDD6F4")).
 			Render(fmt.Sprintf("%d ERRORS", m.msgQueue.ErrorCount))
 	}
 
@@ -252,8 +252,8 @@ func (m *Model) footerView() string {
 	var helpView string
 	if !hasMessage {
 		m.help.ShowAll = false
-		m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-		m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("#BAC2DE"))
+		m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))
 		helpView = m.help.View(keys)
 	}
 
@@ -264,7 +264,7 @@ func (m *Model) footerView() string {
 
 	var msgPill string
 	if m.state == viewDownloadConfirm {
-		style := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("214")).Faint(true)
+		style := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#F9E2AF")).Faint(true)
 		icon := getLevelIcon(LevelWarn, m.showNerdIcons)
 		var text string
 		if m.activeDestinations != nil && m.activeDestinations[m.pendingDownloadDest] {
@@ -304,11 +304,11 @@ func (m *Model) footerView() string {
 			style := lipgloss.NewStyle().Padding(0, 1).Faint(true)
 			switch latest.Level {
 			case LevelError:
-				style = style.Foreground(lipgloss.Color("196"))
+				style = style.Foreground(lipgloss.Color("#F38BA8"))
 			case LevelWarn:
-				style = style.Foreground(lipgloss.Color("214"))
+				style = style.Foreground(lipgloss.Color("#F9E2AF"))
 			default:
-				style = style.Foreground(lipgloss.Color("42"))
+				style = style.Foreground(lipgloss.Color("#A6E3A1"))
 			}
 			icon := getLevelIcon(latest.Level, m.showNerdIcons)
 			text := latest.Text
@@ -429,7 +429,7 @@ func (m *Model) objectsView(width int) string {
 
 				selectionIndicator := " "
 				if isSelected {
-					selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Render("✓")
+					selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5C2E7")).Render("✓")
 				}
 
 				displayItem := getDisplayName(originalName, targetPrefix)
@@ -439,11 +439,11 @@ func (m *Model) objectsView(width int) string {
 				textStyle := lipgloss.NewStyle()
 				isFocused := (m.state != viewBuckets) && (objCursor == i)
 				if isFocused {
-					textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
+					textStyle = textStyle.Background(lipgloss.Color("#313244")).Foreground(lipgloss.Color("#CDD6F4")).Bold(true)
 				} else if isSelected {
-					textStyle = textStyle.Foreground(lipgloss.Color("212")).Bold(true)
+					textStyle = textStyle.Foreground(lipgloss.Color("#F5C2E7")).Bold(true)
 				} else {
-					textStyle = textStyle.Foreground(lipgloss.Color("250"))
+					textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
 				}
 
 				// Truncate to fit column (account for selection indicator, optional icon, and padding)
@@ -491,7 +491,7 @@ func (m *Model) bucketsView(width int) string {
 
 		indicator := " "
 		if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
-			indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Render("●")
+			indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Render("●")
 		}
 
 		textStyle := lipgloss.NewStyle()
@@ -499,11 +499,11 @@ func (m *Model) bucketsView(width int) string {
 		isActiveBucket := m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket
 
 		if isFocused {
-			textStyle = textStyle.Background(lipgloss.Color("236")).Foreground(lipgloss.Color("15")).Bold(true)
+			textStyle = textStyle.Background(lipgloss.Color("#313244")).Foreground(lipgloss.Color("#CDD6F4")).Bold(true)
 		} else if isActiveBucket {
-			textStyle = textStyle.Foreground(lipgloss.Color("69"))
+			textStyle = textStyle.Foreground(lipgloss.Color("#CBA6F7"))
 		} else {
-			textStyle = textStyle.Foreground(lipgloss.Color("250"))
+			textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
 		}
 
 		if item.IsProject {
@@ -516,7 +516,7 @@ func (m *Model) bucketsView(width int) string {
 			// Make project titles bold and a different color
 			projectStyle := textStyle
 			if !isFocused {
-				projectStyle = projectStyle.Foreground(lipgloss.Color("246")).Bold(true)
+				projectStyle = projectStyle.Foreground(lipgloss.Color("#BAC2DE")).Bold(true)
 			}
 
 			truncateLen := width - 2 // ▼ + space = 2
@@ -559,15 +559,15 @@ func (m *Model) View() string {
 	columnHeight := m.maxItemsVisible() + 4 // Title + blank line + list items + borders
 
 	activeStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("69")). // Google Blue-ish
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#CBA6F7")). // Modern Mauve/Purple
 		Padding(0, 1).
 		Height(columnHeight)
 
 	inactiveStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")). // Dimmed gray
-		Foreground(lipgloss.Color("244")).       // Dimmed text
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#414559")). // Dimmed slate
+		Foreground(lipgloss.Color("#A6ADC8")).       // Dimmed text
 		Padding(0, 1).
 		Height(columnHeight)
 
@@ -618,9 +618,9 @@ func (m *Model) helpView() string {
 	groups := keys.FullHelp()
 	headers := []string{"Navigation", "Pagination", "Actions", "App"}
 
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true).Width(12)
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Width(20)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Bold(true).Underline(true).MarginBottom(1)
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Bold(true).Width(12)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Width(20)
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8CAAEE")).Bold(true).Underline(true).MarginBottom(1)
 
 	cols := make([]string, len(groups))
 	for i, group := range groups {
@@ -635,7 +635,7 @@ func (m *Model) helpView() string {
 
 	title := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("229")).
+		Foreground(lipgloss.Color("#8CAAEE")).
 		Render("HELP")
 
 	helpGrid := lipgloss.JoinHorizontal(lipgloss.Top,
@@ -646,7 +646,7 @@ func (m *Model) helpView() string {
 	)
 
 	footer := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
+		Foreground(lipgloss.Color("#6C7086")).
 		MarginTop(1).
 		Render("Press esc or q to close")
 
@@ -654,7 +654,7 @@ func (m *Model) helpView() string {
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("69")).
+		BorderForeground(lipgloss.Color("#CBA6F7")).
 		Padding(1, 2).
 		Render(content)
 
@@ -666,7 +666,7 @@ func (m *Model) messagesView() string {
 
 	title := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("69")).
+		Foreground(lipgloss.Color("#CBA6F7")).
 		Render(fmt.Sprintf("MESSAGES (%d)", len(m.msgQueue.Messages())))
 
 	s.WriteString(title + "\n\n")
@@ -677,10 +677,10 @@ func (m *Model) messagesView() string {
 		end = len(m.msgQueue.Messages())
 	}
 
-	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A6D189"))
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E5C890"))
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E78284"))
+	textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8"))
 
 	for i := start; i < end; i++ {
 		msg := m.msgQueue.Messages()[i]
@@ -726,8 +726,8 @@ func (m *Model) messagesView() string {
 		fmt.Fprintf(&s, "%s %s %s%s%s\n", textStyle.Render(timeStr), style.Render(icon), style.Render(statusIcon), style.Render(msg.Text), textStyle.Faint(true).Render(progressText))
 	}
 
-	keyStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)
-	descStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	keyStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Bold(true)
+	descStyleFooter := lipgloss.NewStyle().Foreground(lipgloss.Color("#585B70"))
 
 	line1 := descStyleFooter.Render("Use ") + keyStyleFooter.Render("j/k") + descStyleFooter.Render(" to scroll")
 	line2 := keyStyleFooter.Render("esc") + descStyleFooter.Render(" or ") + keyStyleFooter.Render("q") + descStyleFooter.Render(" to close")
@@ -749,7 +749,7 @@ func (m *Model) messagesView() string {
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("69")).
+		BorderForeground(lipgloss.Color("#CBA6F7")).
 		Padding(1, 2).
 		Width(boxWidth).
 		Height(15).
