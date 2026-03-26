@@ -52,8 +52,8 @@ You can download the pre-compiled binaries (including `.deb`, `.rpm`, and `.apk`
 For example, to install the `.deb` package on Debian/Ubuntu:
 
 ```bash
-wget https://github.com/idan-at/lazygcs/releases/download/v0.8.0/lazygcs_0.8.0_linux_amd64.deb
-sudo apt install ./lazygcs_0.8.0_linux_amd64.deb
+wget https://github.com/idan-at/lazygcs/releases/download/v0.9.0/lazygcs_0.9.0_linux_amd64.deb
+sudo apt install ./lazygcs_0.9.0_linux_amd64.deb
 ```
 
 ### Using Go
