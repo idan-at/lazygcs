@@ -14,7 +14,7 @@ Type "lazygcs"
 Enter
 
 # Give it some time to load buckets
-Sleep 1s
+Sleep 1.5s
 
 # j/k to navigate between the buckets.
 Type "j"
