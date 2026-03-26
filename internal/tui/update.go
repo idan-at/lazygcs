@@ -42,6 +42,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEditorFinishedMsg(msg)
 	case UploadMsg:
 		return m.handleUploadMsg(msg)
+	case CreateMsg:
+		return m.handleCreateMsg(msg)
 	case DebouncePreviewMsg:
 		if msg.CursorVersion == m.cursorVersion {
 			return m, msg.FetchCmd
@@ -503,6 +505,10 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchKey(msg)
 	}
 
+	if m.creationMode {
+		return m.handleCreationKey(msg)
+	}
+
 	if m.state == viewDownloadConfirm {
 		return m.handleDownloadConfirmKey(msg)
 	}
@@ -533,6 +539,9 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		}
 		return m, nil
+
+	case key.Matches(msg, keys.Create):
+		return m.handleCreateKey()
 
 	case key.Matches(msg, keys.Select):
 		return m.handleSelectKey()
@@ -1316,9 +1325,75 @@ func (m *Model) handleUploadMsg(msg UploadMsg) (tea.Model, tea.Cmd) {
 		delete(m.metadataCache, cacheKey)
 		// Refresh view to show updated metadata (size/time)
 		var refreshCmd tea.Cmd
-		var newModel tea.Model
-		newModel, refreshCmd = m.handleRefreshKey(true)
-		return newModel, tea.Batch(cmd, refreshCmd)
+		var nm tea.Model
+		nm, refreshCmd = m.handleRefreshKey(true)
+		return nm, tea.Batch(cmd, refreshCmd)
 	}
 	return m, cmd
+}
+
+func (m *Model) handleCreateKey() (tea.Model, tea.Cmd) {
+	m.creationMode = true
+	m.creationQuery = ""
+	return m, nil
+}
+
+func (m *Model) handleCreationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.creationMode = false
+		m.creationQuery = ""
+		return m, nil
+	case tea.KeyEnter:
+		m.creationMode = false
+		return m.submitCreation()
+	case tea.KeyBackspace, tea.KeyDelete:
+		q := m.creationQuery
+		if len(q) > 0 {
+			runes := []rune(q)
+			m.creationQuery = string(runes[:len(runes)-1])
+		}
+	case tea.KeyRunes, tea.KeySpace:
+		m.creationQuery += msg.String()
+	}
+	return m, nil
+}
+
+func (m *Model) submitCreation() (tea.Model, tea.Cmd) {
+	name := m.creationQuery
+	m.creationQuery = ""
+	if name == "" {
+		return m, nil
+	}
+
+	switch m.state {
+	case viewBuckets:
+		filtered := m.filteredBuckets()
+		if m.cursor < 0 || m.cursor >= len(filtered) {
+			return m, nil
+		}
+		item := filtered[m.cursor]
+		projectID := item.ProjectID
+
+		statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Creating bucket %s in %s...", name, projectID), 0, "")
+		return m, tea.Batch(statusCmd, m.createBucket(projectID, name))
+	case viewObjects:
+		bucket := m.currentBucket
+		objectName := m.currentPrefix + strings.TrimPrefix(name, "/")
+
+		statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Creating %s...", objectName), 0, "")
+		return m, tea.Batch(statusCmd, m.createObject(bucket, objectName))
+	}
+	return m, nil
+}
+
+func (m *Model) handleCreateMsg(msg CreateMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		statusCmd := m.AddMessage(LevelError, fmt.Sprintf("Creation failed: %v", msg.Err), 0, "")
+		return m, statusCmd
+	}
+
+	statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Created %s", msg.Name), 0, "")
+	nm, refreshCmd := m.handleRefreshKey(true)
+	return nm, tea.Batch(statusCmd, refreshCmd)
 }

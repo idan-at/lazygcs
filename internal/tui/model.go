@@ -58,6 +58,10 @@ type Model struct {
 	objectSearchQuery string
 	fuzzySearch       bool
 
+	// Creation State
+	creationMode  bool
+	creationQuery string
+
 	// Settings
 	showNerdIcons bool
 

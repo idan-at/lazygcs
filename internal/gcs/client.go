@@ -155,6 +155,23 @@ func (c *Client) UploadObject(ctx context.Context, bucketName, objectName, src s
 	return nil
 }
 
+// CreateBucket creates a new GCS bucket.
+func (c *Client) CreateBucket(ctx context.Context, projectID, bucketName string) error {
+	if err := c.storageClient.Bucket(bucketName).Create(ctx, projectID, nil); err != nil {
+		return fmt.Errorf("failed to create bucket %q in project %q: %w", bucketName, projectID, err)
+	}
+	return nil
+}
+
+// CreateEmptyObject creates a 0-byte object in the specified bucket.
+func (c *Client) CreateEmptyObject(ctx context.Context, bucketName, objectName string) error {
+	wc := c.storageClient.Bucket(bucketName).Object(objectName).NewWriter(ctx)
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("failed to create empty object %q in %q: %w", objectName, bucketName, err)
+	}
+	return nil
+}
+
 // DownloadPrefixAsZip downloads all objects under a prefix and packages them into a ZIP file.
 func (c *Client) DownloadPrefixAsZip(ctx context.Context, bucketName, prefix, dest string, onProg ProgressFunc) error {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})

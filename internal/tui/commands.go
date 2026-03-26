@@ -181,6 +181,20 @@ func (m *Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
 	}
 }
 
+func (m *Model) createBucket(projectID, bucketName string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.client.CreateBucket(context.Background(), projectID, bucketName)
+		return CreateMsg{Name: bucketName, Err: err}
+	}
+}
+
+func (m *Model) createObject(bucketName, objectName string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.client.CreateEmptyObject(context.Background(), bucketName, objectName)
+		return CreateMsg{Name: objectName, Err: err}
+	}
+}
+
 func (m *Model) startDownloadTaskDirectly(task downloadTask) (*Model, tea.Cmd) {
 	jobNum := task.jobNum
 	m.activeDownloads++

@@ -22,6 +22,7 @@ type keyMap struct {
 	Edit         key.Binding
 	Refresh      key.Binding
 	Search       key.Binding
+	Create       key.Binding
 	Esc          key.Binding
 	Help         key.Binding
 	Messages     key.Binding
@@ -46,6 +47,7 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.Copy,
 		k.Open,
 		k.Edit,
+		k.Create,
 		k.Search,
 		k.Refresh,
 		k.Esc,
@@ -66,10 +68,10 @@ func (k keyMap) OrderedHelp() []key.Binding {
 // FullHelp returns keybindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right, k.Home},                               // Navigation
-		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown}, // Pagination
-		{k.Select, k.Download, k.Copy, k.Open, k.Edit, k.Refresh, k.Search},   // Actions
-		{k.Esc, k.Info, k.Messages, k.Help, k.Quit},                           // App
+		{k.Up, k.Down, k.Left, k.Right, k.Home},                                       // Navigation
+		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown},         // Pagination
+		{k.Select, k.Download, k.Copy, k.Open, k.Edit, k.Create, k.Refresh, k.Search}, // Actions
+		{k.Esc, k.Info, k.Messages, k.Help, k.Quit},                                   // App
 	}
 }
 
@@ -141,6 +143,10 @@ var keys = keyMap{
 	Refresh: key.NewBinding(
 		key.WithKeys("R"),
 		key.WithHelp("R", "refresh"),
+	),
+	Create: key.NewBinding(
+		key.WithKeys("n"),
+		key.WithHelp("n", "new"),
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),

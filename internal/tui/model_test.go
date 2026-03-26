@@ -31,6 +31,16 @@ type mockGCSClient struct {
 		Object string
 		Src    string
 	}
+
+	lastCreate struct {
+		Bucket string
+		Object string
+	}
+
+	lastCreateBucket struct {
+		ProjectID string
+		Bucket    string
+	}
 }
 
 func (f *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
@@ -40,6 +50,12 @@ func (f *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, 
 		}
 	}
 	return nil, "", nil
+}
+
+func (f *mockGCSClient) CreateBucket(_ context.Context, projectID, bucketName string) error {
+	f.lastCreateBucket.ProjectID = projectID
+	f.lastCreateBucket.Bucket = bucketName
+	return nil
 }
 
 func (f *mockGCSClient) ListObjects(_ context.Context, _, _ string) (*gcs.ObjectList, error) {
@@ -86,6 +102,12 @@ func (f *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest s
 	f.lastDownload.Bucket = bucket
 	f.lastDownload.Object = object
 	f.lastDownload.Dest = dest
+	return nil
+}
+
+func (f *mockGCSClient) CreateEmptyObject(_ context.Context, bucket, object string) error {
+	f.lastCreate.Bucket = bucket
+	f.lastCreate.Object = object
 	return nil
 }
 

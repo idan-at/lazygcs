@@ -31,7 +31,7 @@ func TestModel_Actions_Refresh(t *testing.T) {
 
 	// Simulate receipt of refreshed objects (same object list)
 	msg := resolveFetchCmd(cmd)
-	m, _ = updateModel(m, msg)
+	_, _ = updateModel(m, msg)
 
 	// BUG: If duplicated, length will be 2. It should remain 1.
 	assert.Equal(t, len(m.Objects()), 1, "Objects should not be duplicated after refresh")
@@ -236,7 +236,7 @@ func TestModel_DownloadAction_MultiSelect(t *testing.T) {
 		if dl, ok := msg.(tui.DownloadMsg); ok {
 			dlMsgs = append(dlMsgs, dl)
 		} else {
-			m, _ = updateModel(m, msg)
+			_, _ = updateModel(m, msg)
 		}
 	}
 	assert.Assert(t, len(dlMsgs) == 2, "Expected 2 concurrent downloads")
@@ -419,7 +419,7 @@ func TestModel_DownloadStatusAutoClear(t *testing.T) {
 
 	// Execute the command (simulate timer firing)
 	msg := cmd()
-	m, _ = updateModel(m, msg)
+	_, _ = updateModel(m, msg)
 
 	// Status should be CLEARED
 	assert.Assert(t, !strings.Contains(m.View(), "Downloaded to /tmp/obj1"), "Status should be cleared after timer fires")
@@ -833,7 +833,7 @@ func TestModel_DownloadAction_MultipleConcurrentBatches(t *testing.T) {
 		if dl, ok := msg.(tui.DownloadMsg); ok {
 			dlMsgs = append(dlMsgs, dl)
 		} else {
-			m, _ = updateModel(m, msg)
+			_, _ = updateModel(m, msg)
 		}
 	}
 	assert.Assert(t, len(dlMsgs) == 5, "Expected 5 concurrent downloads, got %d", len(dlMsgs))
@@ -999,7 +999,7 @@ func TestModel_DownloadAction_QueueStallFix(t *testing.T) {
 		if dl, ok := msg.(tui.DownloadMsg); ok {
 			dlMsgs = append(dlMsgs, dl)
 		} else {
-			m, _ = updateModel(m, msg)
+			_, _ = updateModel(m, msg)
 		}
 	}
 
@@ -1062,4 +1062,136 @@ func TestModel_DownloadAction_ActivelyDownloadingPrompt(t *testing.T) {
 	} else {
 		t.Fatalf("Expected DownloadMsg, got %T", msgs[0])
 	}
+}
+
+func TestModel_Actions_CreateDirectory(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
+
+	// Enter bucket b1
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Press 'n' to trigger create mode
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+
+	// Input directory name: "new_dir/"
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("_")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+
+	// Press Enter to submit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Assert the view is now refreshing or shows creating
+	assert.Assert(t, cmd != nil)
+
+	// Resolve command which should be the Create operation
+	msg := resolveFetchCmd(cmd)
+	_, _ = updateModel(m, msg)
+
+	assert.Equal(t, client.lastCreate.Bucket, "b1")
+	assert.Equal(t, client.lastCreate.Object, "new_dir/")
+}
+
+func TestModel_Actions_CreateFile(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
+
+	// Enter bucket b1
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Press 'n' to trigger create mode
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+
+	// Input file name: "new_file.txt"
+	for _, ch := range "new_file.txt" {
+		m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(string(ch))})
+	}
+
+	// Press Enter to submit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Assert the view is now refreshing or shows creating
+	assert.Assert(t, cmd != nil)
+
+	// Resolve command
+	msg := resolveFetchCmd(cmd)
+	_, _ = updateModel(m, msg)
+
+	assert.Equal(t, client.lastCreate.Bucket, "b1")
+	assert.Equal(t, client.lastCreate.Object, "new_file.txt")
+}
+
+func TestModel_Actions_CreateFile_WithLeadingSlash(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"folder/"}, []string{"folder/"})
+	m, client := setupTestModel(projects, objects, "/tmp")
+	_ = client
+
+	// Enter bucket b1
+	m = enterBucket(m, projects, "b1", objects)
+
+	// Enter folder/
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Move to folder/
+
+	// At this point m.currentPrefix should be "folder/"
+	// Press 'n' to trigger create mode
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+
+	// Input file name: "/new_file.txt" (with a leading slash)
+	for _, ch := range "/new_file.txt" {
+		m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(string(ch))})
+	}
+
+	// Press Enter to submit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Assert the view is now refreshing or shows creating
+	assert.Assert(t, cmd != nil)
+
+	// Resolve command
+	msg := resolveFetchCmd(cmd)
+	_, _ = updateModel(m, msg)
+
+	assert.Equal(t, client.lastCreate.Bucket, "b1")
+	// The leading slash from the input should be stripped,
+	// so it doesn't become "folder//new_file.txt"
+	assert.Equal(t, client.lastCreate.Object, "folder/new_file.txt")
+}
+
+func TestModel_Actions_CreateBucket(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	m, client := setupTestModel(projects, nil, "/tmp")
+	_ = client
+
+	// We are at viewBuckets by default
+	// Press 'n' to trigger create mode
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+
+	// Input bucket name: "new-bucket"
+	for _, ch := range "new-bucket" {
+		m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(string(ch))})
+	}
+
+	// Press Enter to submit
+	m, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Assert the view is now refreshing or shows creating
+	assert.Assert(t, cmd != nil)
+
+	// Resolve command
+	msg := resolveFetchCmd(cmd)
+	_, _ = updateModel(m, msg)
+
+	assert.Equal(t, client.lastCreateBucket.ProjectID, "p1")
+	assert.Equal(t, client.lastCreateBucket.Bucket, "new-bucket")
 }

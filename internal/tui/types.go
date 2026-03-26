@@ -15,6 +15,8 @@ import (
 type GCSClient interface {
 	// ListBucketsPage retrieves a specific page of buckets for a given project.
 	ListBucketsPage(ctx context.Context, projectID, pageToken string, pageSize int) ([]string, string, error)
+	// CreateBucket creates a new GCS bucket.
+	CreateBucket(ctx context.Context, projectID, bucketName string) error
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
 	ListObjects(ctx context.Context, bucketName, prefix string) (*gcs.ObjectList, error)
 	// ListObjectsPage retrieves a specific page of object names and common prefixes (folders).
@@ -23,6 +25,8 @@ type GCSClient interface {
 	GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*gcs.ObjectMetadata, error)
 	// GetObjectContent returns the first 1KB of content for a specific object.
 	GetObjectContent(ctx context.Context, bucketName, objectName string) (string, error)
+	// CreateEmptyObject creates a 0-byte object in the specified bucket.
+	CreateEmptyObject(ctx context.Context, bucketName, objectName string) error
 	// DownloadObject downloads the content of a GCS object to a local file.
 	DownloadObject(ctx context.Context, bucketName, objectName, destPath string, onProg gcs.ProgressFunc) error
 	// UploadObject uploads a local file to GCS.
@@ -112,6 +116,12 @@ type EditorFinishedMsg struct {
 type UploadMsg struct {
 	ObjectName string
 	Err        error
+}
+
+// CreateMsg is sent when a creation operation (bucket/object) completes.
+type CreateMsg struct {
+	Name string
+	Err  error
 }
 
 // ClearStatusMsg is sent to clear the status bar.

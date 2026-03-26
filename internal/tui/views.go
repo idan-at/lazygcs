@@ -357,7 +357,16 @@ func (m *Model) footerView() string {
 		q = m.objectSearchQuery
 	}
 
-	if m.searchMode {
+	if m.creationMode {
+		prompt := " NEW FILE: "
+		if m.state == viewBuckets {
+			prompt = " NEW BUCKET: "
+		} else if strings.HasSuffix(m.creationQuery, "/") {
+			prompt = " NEW DIR: "
+		}
+		statusText = fmt.Sprintf("%s%s_ ", prompt, m.creationQuery)
+		statusStyle = statusStyle.Background(lipgloss.Color("#A6E3A1")).Foreground(lipgloss.Color("#1E1E2E"))
+	} else if m.searchMode {
 		statusText = fmt.Sprintf(" SEARCH: %s_ ", q)
 		statusStyle = statusStyle.Background(lipgloss.Color("#CBA6F7")).Foreground(lipgloss.Color("#1E1E2E"))
 	} else if q != "" {
