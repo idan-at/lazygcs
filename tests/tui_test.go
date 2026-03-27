@@ -44,6 +44,44 @@ func TestListBuckets(t *testing.T) {
 	)
 }
 
+func TestBucketMetadataPreview(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "metadata-bucket",
+				Name:       "init",
+			},
+		},
+	}
+	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
+
+	// Wait for the bucket to appear in the list
+	teatest.WaitFor(
+		t,
+		tm.Output(),
+		func(bts []byte) bool {
+			return strings.Contains(string(bts), "metadata-bucket")
+		},
+		teatest.WithDuration(3*time.Second),
+	)
+
+	// Move cursor down to the bucket (index 1, since index 0 is the project)
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+
+	teatest.WaitFor(
+		t,
+		tm.Output(),
+		func(bts []byte) bool {
+			return strings.Contains(string(bts), "Storage Class:")
+		},
+		teatest.WithDuration(3*time.Second),
+	)
+
+	tm.Send(tea.Quit())
+	finalView := tm.FinalModel(t).(*tui.Model).View()
+	assert.Assert(t, strings.Contains(finalView, "Storage Class:"), "Final view:\n%s", finalView)
+}
+
 func TestDownloadObject(t *testing.T) {
 	content := []byte("download test content")
 	objects := []fakestorage.Object{

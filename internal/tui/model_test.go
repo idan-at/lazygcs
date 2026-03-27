@@ -70,6 +70,10 @@ func (f *mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int
 	return f.objects, "", nil
 }
 
+func (f *mockGCSClient) GetBucketMetadata(_ context.Context, bucketName string) (*gcs.BucketMetadata, error) {
+	return &gcs.BucketMetadata{Name: bucketName, Location: "US", StorageClass: "STANDARD"}, nil
+}
+
 func (f *mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string) (*gcs.ObjectMetadata, error) {
 	// Simple mock: find in prefixes or objects
 	if f.objects != nil {

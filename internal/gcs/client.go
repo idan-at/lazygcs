@@ -51,6 +51,17 @@ type PrefixMetadata struct {
 	Err     error
 }
 
+// BucketMetadata holds key attributes for a GCS bucket.
+type BucketMetadata struct {
+	Name              string
+	Location          string
+	StorageClass      string
+	VersioningEnabled bool
+	Created           time.Time
+	Labels            map[string]string
+	OwnerEntity       string
+}
+
 // ObjectList holds the list of objects and prefixes (folders) returned by ListObjects.
 type ObjectList struct {
 	Objects  []ObjectMetadata
@@ -405,6 +416,24 @@ func (c *Client) IsVersioningEnabled(ctx context.Context, bucketName string) (bo
 type ProjectBuckets struct {
 	ProjectID string
 	Buckets   []string
+}
+
+// GetBucketMetadata retrieves full metadata for a specific bucket.
+func (c *Client) GetBucketMetadata(ctx context.Context, bucketName string) (*BucketMetadata, error) {
+	attrs, err := c.storageClient.Bucket(bucketName).Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metadata for bucket %q: %w", bucketName, err)
+	}
+
+	return &BucketMetadata{
+		Name:              attrs.Name,
+		Location:          attrs.Location,
+		StorageClass:      attrs.StorageClass,
+		VersioningEnabled: attrs.VersioningEnabled,
+		Created:           attrs.Created,
+		Labels:            attrs.Labels,
+		OwnerEntity:       attrs.OwnerEntity,
+	}, nil
 }
 
 // ListBucketsPage retrieves a specific page of buckets for a specific project.

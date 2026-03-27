@@ -173,3 +173,76 @@ func TestModel_SearchFilter_BucketsOnly(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "apple-project"), "Should show project header when a bucket matches")
 	assert.Assert(t, strings.Contains(view, "banana"), "Should show matching bucket")
 }
+
+func TestModel_BucketMetadataError(t *testing.T) {
+	client := &mockGCSClient{}
+	mModel := tui.NewModel([]string{"test-project-1"}, client, "/tmp", false, false)
+	m := &mModel
+
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "test-project-1", Buckets: []string{"error-bucket"}})
+
+	// Select the bucket
+	m, _ = pressKeyType(m, tea.KeyDown)
+
+	msg := tui.BucketMetadataMsg{
+		Bucket: "error-bucket",
+		Err:    fmt.Errorf("metadata access denied"),
+	}
+
+	m, cmd := updateModel(m, msg)
+	assert.Assert(t, cmd != nil, "Expected a command for the error message")
+
+	// Process the AddMessage command
+	if cmd != nil {
+		m, _ = updateModel(m, cmd())
+	}
+
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "Error: metadata access denied"), "Preview content should show the error")
+	assert.Equal(t, m.ErrorCount(), 1, "Should have 1 error in message queue")
+	assert.Assert(t, strings.Contains(m.Messages()[0].Text, "metadata access denied"), "Message text should complain about metadata")
+
+	// Verify that moving the cursor away and back retrieves the cached error and doesn't crash
+	m, _ = pressKeyType(m, tea.KeyUp)
+	m, _ = pressKeyType(m, tea.KeyDown)
+
+	viewAfterReturn := m.View()
+	assert.Assert(t, strings.Contains(viewAfterReturn, "Error: metadata access denied"), "Preview content should show the cached error after returning")
+}
+
+func TestModel_BucketMetadataDeterministicLabels(t *testing.T) {
+	client := &mockGCSClient{}
+	mModel := tui.NewModel([]string{"test-project-1"}, client, "/tmp", false, false)
+	m := &mModel
+
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "test-project-1", Buckets: []string{"test-bucket"}})
+
+	// Select the bucket
+	m, _ = pressKeyType(m, tea.KeyDown)
+
+	msg := tui.BucketMetadataMsg{
+		Bucket: "test-bucket",
+		Metadata: &gcs.BucketMetadata{
+			Name: "test-bucket",
+			Labels: map[string]string{
+				"z-label": "z-value",
+				"a-label": "a-value",
+				"m-label": "m-value",
+			},
+		},
+	}
+
+	m, _ = updateModel(m, msg)
+
+	view1 := m.View()
+
+	assert.Assert(t, strings.Contains(view1, "a-label:"), "Should show a-label")
+
+	idxA := strings.Index(view1, "a-label")
+	idxM := strings.Index(view1, "m-label")
+	idxZ := strings.Index(view1, "z-label")
+
+	assert.Assert(t, idxA != -1 && idxM != -1 && idxZ != -1, "All labels should be in view")
+	assert.Assert(t, idxA < idxM, "a-label should be before m-label")
+	assert.Assert(t, idxM < idxZ, "m-label should be before z-label")
+}

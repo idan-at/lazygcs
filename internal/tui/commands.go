@@ -78,6 +78,17 @@ func (m *Model) fetchContent(obj gcs.ObjectMetadata) tea.Cmd {
 	}
 }
 
+// fetchBucketMetadata gets bucket attributes like storage class and location.
+func (m *Model) fetchBucketMetadata(bucketName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		metadata, err := m.client.GetBucketMetadata(ctx, bucketName)
+		return BucketMetadataMsg{Bucket: bucketName, Metadata: metadata, Err: err}
+	}
+}
+
 func (m *Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix

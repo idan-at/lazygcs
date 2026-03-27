@@ -78,11 +78,12 @@ type Model struct {
 	jobProgress             map[int]*JobProgress
 
 	// Buckets View
-	projects          []gcs.ProjectBuckets
-	collapsedProjects map[string]struct{}
-	cursor            int // used for buckets or objects depending on state
-	bucketCursor      int // stores the cursor position in the bucket list
-	cursorVersion     int // used for debouncing preview requests
+	projects            []gcs.ProjectBuckets
+	collapsedProjects   map[string]struct{}
+	cursor              int // used for buckets or objects depending on state
+	bucketCursor        int // stores the cursor position in the bucket list
+	cursorVersion       int // used for debouncing preview requests
+	bucketMetadataCache *LRUCache[string, bucketMetadataCacheEntry]
 
 	// Objects View
 	currentBucket             string
@@ -134,6 +135,19 @@ type metadataCacheEntry struct {
 	ExpiresAt time.Time
 }
 
+type bucketMetadataCacheEntry struct {
+	Metadata     *gcs.BucketMetadata
+	SortedLabels []Label
+	Err          error
+	ExpiresAt    time.Time
+}
+
+// Label represents a key-value pair for metadata labels.
+type Label struct {
+	Key   string
+	Value string
+}
+
 // RealClipboard implements ClipboardWriter using the system clipboard.
 type RealClipboard struct{}
 
@@ -179,6 +193,7 @@ func NewModelWithSender(projectIDs []string, client GCSClient, downloadDir strin
 		activeDestinations:    make(map[string]bool),
 		selected:              make(map[string]struct{}),
 		collapsedProjects:     make(map[string]struct{}),
+		bucketMetadataCache:   NewLRUCache[string, bucketMetadataCacheEntry](256),
 		help:                  help.New(),
 		spinner:               s,
 		previewRegistry:       reg,

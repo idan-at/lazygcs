@@ -25,6 +25,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleObjectsPageMsg(msg)
 	case MetadataMsg:
 		return m.handleMetadataMsg(msg)
+	case BucketMetadataMsg:
+		return m.handleBucketMetadataMsg(msg)
 	case ContentMsg:
 		return m.handleContentMsg(msg)
 	case DownloadProgressMsg:
@@ -226,7 +228,7 @@ func (m *Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		// Fetch metadata for the current cursor (either 0 or restored)
 		m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 	} else if m.cursor-len(m.prefixes) < len(m.objects) {
-		m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
+		m.previewContent = clearImagesEsc + "Loading..."
 		m, cmd = m.triggerDebounces(m.fetchContent(m.objects[m.cursor-len(m.prefixes)]), "", "")
 	}
 	return m, cmd
@@ -280,7 +282,7 @@ func (m *Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 			// Fetch metadata for the current cursor (either 0 or restored)
 			m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 		} else if len(m.objects) > 0 {
-			m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
+			m.previewContent = clearImagesEsc + "Loading..."
 			m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
 		}
 	}
@@ -308,6 +310,52 @@ func (m *Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	}
 	m.listCache[cacheKey] = listCacheEntry{List: fullList, ExpiresAt: time.Now().Add(5 * time.Minute)}
 
+	return m, cmd
+}
+
+func (m *Model) handleBucketMetadataMsg(msg BucketMetadataMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	if msg.Err != nil {
+		cmd = m.AddMessage(LevelError, fmt.Sprintf("Failed to load metadata for %s: %v", msg.Bucket, msg.Err), 0, "")
+	}
+
+	var sortedLabels []Label
+	if msg.Metadata != nil && len(msg.Metadata.Labels) > 0 {
+		keys := make([]string, 0, len(msg.Metadata.Labels))
+		for k := range msg.Metadata.Labels {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			sortedLabels = append(sortedLabels, Label{Key: k, Value: msg.Metadata.Labels[k]})
+		}
+	}
+
+	duration := 1 * time.Hour
+	if msg.Err != nil {
+		duration = 1 * time.Minute // Shorter TTL for errors
+	}
+
+	m.bucketMetadataCache.Add(msg.Bucket, bucketMetadataCacheEntry{
+		Metadata:     msg.Metadata,
+		SortedLabels: sortedLabels,
+		Err:          msg.Err,
+		ExpiresAt:    time.Now().Add(duration),
+	})
+
+	// Note: We don't strictly need to force a re-render here if we just rely on the main loop,
+	// but since we updated the cache, the next view update will pick it up.
+	// We can clear the "Loading..." preview content so it renders the new state.
+	if m.state == viewBuckets {
+		filtered := m.filteredBuckets()
+		if m.cursor < len(filtered) && filtered[m.cursor].BucketName == msg.Bucket {
+			if msg.Err != nil {
+				m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
+			} else {
+				m.previewContent = clearImagesEsc // Clear loading state to trigger re-render of metadata
+			}
+		}
+	}
 	return m, cmd
 }
 
@@ -692,7 +740,7 @@ func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
+				m.previewContent = clearImagesEsc + "Loading..."
 				return m.triggerDebounces(m.fetchContent(obj), "", "")
 			}
 		}
@@ -814,8 +862,8 @@ func (m *Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.previewContent = "\x1b_Ga=d,d=A\x1b\\" // Reset preview on move
-	m.objectVersions = nil                   // Reset versions on move
+	m.previewContent = clearImagesEsc // Reset preview on move
+	m.objectVersions = nil            // Reset versions on move
 	m.versioningChecked = false
 
 	switch m.state {
@@ -831,7 +879,7 @@ func (m *Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 			idx := m.cursor - len(currentPrefixes)
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
-				m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
+				m.previewContent = clearImagesEsc + "Loading..."
 				if m.showVersions {
 					return m.triggerDebounces(m.fetchObjectVersions(m.currentBucket, obj.Name), "", "")
 				}
@@ -843,7 +891,16 @@ func (m *Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 		if m.cursor < len(filtered) {
 			item := filtered[m.cursor]
 			if !item.IsProject {
-				return m.triggerDebounces(nil, item.BucketName, "")
+				if cacheEntry, ok := m.bucketMetadataCache.Get(item.BucketName); ok && time.Now().Before(cacheEntry.ExpiresAt) {
+					if cacheEntry.Err != nil {
+						m.previewContent = fmt.Sprintf("Error: %v", cacheEntry.Err)
+					} else {
+						m.previewContent = clearImagesEsc
+					}
+					return m.triggerDebounces(nil, item.BucketName, "")
+				}
+				m.previewContent = clearImagesEsc + "Loading..."
+				return m.triggerDebounces(m.fetchBucketMetadata(item.BucketName), item.BucketName, "")
 			}
 		}
 	}
@@ -1029,6 +1086,7 @@ func (m *Model) handleRefreshKey(silent bool) (tea.Model, tea.Cmd) {
 		m.projects = nil
 		m.bgJobs = len(m.projectIDs)
 		m.loadingProjects = make(map[string]bool)
+		m.bucketMetadataCache = NewLRUCache[string, bucketMetadataCacheEntry](256)
 		for _, id := range m.projectIDs {
 			m.loadingProjects[id] = true
 		}
@@ -1164,7 +1222,7 @@ func (m *Model) handleRightKey() (tea.Model, tea.Cmd) {
 		currentPrefixes, _, _ := m.filteredObjects()
 		// Check if selected item is a prefix
 		if m.cursor < len(currentPrefixes) {
-			m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
+			m.previewContent = clearImagesEsc
 			m.currentPrefix = currentPrefixes[m.cursor].Name
 			m.searchMode = false
 			m.objectSearchQuery = ""
@@ -1198,7 +1256,7 @@ func (m *Model) handleLeftKey() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	} else if m.state == viewObjects {
-		m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
+		m.previewContent = clearImagesEsc
 		m.searchMode = false
 		m.objectSearchQuery = ""
 		m.showVersions = false

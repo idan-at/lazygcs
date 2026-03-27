@@ -11,6 +11,15 @@ import (
 	"github.com/idan-at/lazygcs/internal/gcs"
 )
 
+var (
+	bucketInfoTitleStyle   = lipgloss.NewStyle().Bold(true)
+	bucketInfoProjectStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8"))
+	bucketInfoKeyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8"))
+	bucketInfoValStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#CDD6F4"))
+	bucketInfoErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#F28FAD"))
+	bucketInfoLabelsStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5C2E7"))
+)
+
 func (m *Model) renderSpinner() string {
 	if m.deterministicSpinner {
 		return "*"
@@ -170,7 +179,8 @@ func (m *Model) renderVersionsView(width int) string {
 
 func (m *Model) previewView(width int) string {
 	var s strings.Builder
-	if m.state == viewObjects || m.state == viewDownloadConfirm {
+	switch m.state {
+	case viewObjects, viewDownloadConfirm:
 		if m.showVersions {
 			s.WriteString(m.renderVersionsView(width))
 			return s.String()
@@ -313,7 +323,7 @@ func (m *Model) previewView(width int) string {
 						fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Owner:"), valStyle.Render(truncate(obj.Owner, width-10)))
 					}
 
-					if m.previewContent != "" && m.previewContent != "\x1b_Ga=d,d=A\x1b\\" {
+					if m.previewContent != "" && m.previewContent != clearImagesEsc {
 						separator := lipgloss.NewStyle().
 							Border(lipgloss.NormalBorder(), true, false, false, false).
 							BorderForeground(lipgloss.Color("#414559")).
@@ -324,7 +334,7 @@ func (m *Model) previewView(width int) string {
 						s.WriteString(separator)
 						s.WriteString("\n")
 
-						if m.previewContent == "Loading..." || m.previewContent == "\x1b_Ga=d,d=A\x1b\\Loading..." {
+						if m.previewContent == "Loading..." || m.previewContent == clearImagesEsc+"Loading..." {
 							fmt.Fprintf(&s, "\n%s Loading preview...\n", m.renderSpinner())
 						} else if isBinary(m.previewContent) {
 							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(binary content)"))
@@ -347,7 +357,7 @@ func (m *Model) previewView(width int) string {
 
 							if isKitty && (m.showHelp || m.showMessages) {
 								// Embed the clear command here so BubbleTea's diff renderer sends it when toggling views.
-								s.WriteString("\x1b_Ga=d,d=A\x1b\\")
+								s.WriteString(clearImagesEsc)
 								s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(image preview hidden)"))
 							} else {
 								for i, line := range displayLines {
@@ -366,6 +376,61 @@ func (m *Model) previewView(width int) string {
 								s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Render("..."))
 							}
 						}
+					}
+				}
+			}
+		}
+	case viewBuckets:
+		title := "Bucket Information"
+		s.WriteString(bucketInfoTitleStyle.Render(title) + "\n\n")
+
+		filtered := m.filteredBuckets()
+		if m.cursor < len(filtered) {
+			item := filtered[m.cursor]
+			if item.IsProject {
+				s.WriteString(bucketInfoProjectStyle.Render("Project: ") + item.ProjectID + "\n")
+			} else {
+				fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Bucket:"), bucketInfoValStyle.Render(truncate(item.BucketName, width-10)))
+
+				if m.previewContent == "Loading..." || m.previewContent == clearImagesEsc+"Loading..." {
+					fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.renderSpinner())
+				} else if strings.HasPrefix(m.previewContent, "Error:") {
+					fmt.Fprintf(&s, "\n%s\n", bucketInfoErrorStyle.Render(m.previewContent))
+				} else if cacheEntry, ok := m.bucketMetadataCache.Peek(item.BucketName); ok && time.Now().Before(cacheEntry.ExpiresAt) {
+					meta := cacheEntry.Metadata
+					if meta != nil {
+						fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Location:"), bucketInfoValStyle.Render(meta.Location))
+
+						storageClass := meta.StorageClass
+						if storageClass == "" {
+							storageClass = "STANDARD"
+						}
+						fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Storage Class:"), bucketInfoValStyle.Render(storageClass))
+
+						versioning := "Disabled"
+						if meta.VersioningEnabled {
+							versioning = "Enabled"
+						}
+						fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Versioning:"), bucketInfoValStyle.Render(versioning))
+
+						if !meta.Created.IsZero() {
+							fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Created At:"), bucketInfoValStyle.Render(meta.Created.Format("2006-01-02 15:04:05")))
+						}
+
+						if meta.OwnerEntity != "" {
+							fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Owner:"), bucketInfoValStyle.Render(truncate(meta.OwnerEntity, width-10)))
+						}
+
+						if len(cacheEntry.SortedLabels) > 0 {
+							s.WriteString("\n" + bucketInfoLabelsStyle.Render("Labels:") + "\n")
+							for _, label := range cacheEntry.SortedLabels {
+								k, v := label.Key, label.Value
+								fmt.Fprintf(&s, "  %s %s\n", bucketInfoKeyStyle.Render(k+":"), bucketInfoValStyle.Render(truncate(v, width-len(k)-6)))
+							}
+						}
+					} else if cacheEntry.Err != nil {
+						// Fallback in case the previewContent wasn't set to "Error:" but the cache has an error
+						fmt.Fprintf(&s, "\n%s\n", bucketInfoErrorStyle.Render(fmt.Sprintf("Error: %v", cacheEntry.Err)))
 					}
 				}
 			}
@@ -880,7 +945,7 @@ func (m *Model) View() string {
 	// We add the kitty image clear code here to clear out any rendered images
 	// since they are drawn over the text otherwise
 	if strings.HasPrefix(m.previewContent, "\x1b_G") {
-		return "\x1b_Ga=d,d=A\x1b\\" + result
+		return clearImagesEsc + result
 	}
 	return result
 }

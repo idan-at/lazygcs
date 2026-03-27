@@ -140,6 +140,29 @@ func TestClient_DownloadPrefixAsZip(t *testing.T) {
 	})
 }
 
+func TestClient_GetBucketMetadata(t *testing.T) {
+	bucketName := "meta-bucket"
+
+	server, client := setupTestServer(t, []fakestorage.Object{})
+
+	server.CreateBucketWithOpts(fakestorage.CreateBucketOpts{
+		Name:              bucketName,
+		VersioningEnabled: true,
+	})
+
+	t.Run("Existing bucket", func(t *testing.T) {
+		metadata, err := client.GetBucketMetadata(context.Background(), bucketName)
+		assert.NilError(t, err)
+		assert.Equal(t, metadata.Name, bucketName)
+		assert.Equal(t, metadata.VersioningEnabled, true)
+	})
+
+	t.Run("Non-existent bucket", func(t *testing.T) {
+		_, err := client.GetBucketMetadata(context.Background(), "non-existent-bucket")
+		assert.ErrorIs(t, err, storage.ErrBucketNotExist)
+	})
+}
+
 func TestClient_ListBucketsPage(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "o1"}},

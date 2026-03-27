@@ -13,6 +13,8 @@ import (
 // GCSClient defines the contract for interacting with Google Cloud Storage.
 // This interface allows for easy mocking in TUI unit tests.
 type GCSClient interface {
+	// GetBucketMetadata gets metadata for a bucket.
+	GetBucketMetadata(ctx context.Context, bucketName string) (*gcs.BucketMetadata, error)
 	// ListBucketsPage retrieves a specific page of buckets for a given project.
 	ListBucketsPage(ctx context.Context, projectID, pageToken string, pageSize int) ([]string, string, error)
 	// CreateBucket creates a new GCS bucket.
@@ -80,6 +82,13 @@ type MetadataMsg struct {
 	PrefixIndex int
 	Metadata    *gcs.ObjectMetadata
 	Err         error
+}
+
+// BucketMetadataMsg is sent when bucket metadata fetching completes.
+type BucketMetadataMsg struct {
+	Bucket   string
+	Metadata *gcs.BucketMetadata
+	Err      error
 }
 
 // ObjectVersionsMsg is sent when object versions fetching completes.
@@ -182,6 +191,9 @@ type JobProgress struct {
 
 // ProgressVisibilityThreshold is the time a task must be active before it's shown in the footer.
 const ProgressVisibilityThreshold = 1 * time.Second
+
+// clearImagesEsc is the Kitty graphics protocol escape sequence used to clear images.
+const clearImagesEsc = "\x1b_Ga=d,d=A\x1b\\"
 
 // Task represents a tracked background operation.
 type Task struct {
