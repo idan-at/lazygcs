@@ -33,22 +33,26 @@ type mockGCSClient struct {
 		Src    string
 	}
 
-	lastCreate struct {
-		Bucket string
-		Object string
-	}
-
 	lastCreateBucket struct {
 		ProjectID string
 		Bucket    string
+	}
+
+	lastCreate struct {
+		Bucket string
+		Object string
 	}
 
 	versioningDisabled bool
 	mockVersions       []gcs.ObjectMetadata
 }
 
-func (f *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
-	for _, p := range f.projects {
+func (m *mockGCSClient) GetProjectMetadata(_ context.Context, projectID string) (*gcs.ProjectMetadata, error) {
+	return &gcs.ProjectMetadata{ProjectID: projectID}, nil
+}
+
+func (m *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
+	for _, p := range m.projects {
 		if p.ProjectID == projectID {
 			return p.Buckets, "", nil
 		}
@@ -56,33 +60,33 @@ func (f *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, 
 	return nil, "", nil
 }
 
-func (f *mockGCSClient) CreateBucket(_ context.Context, projectID, bucketName string) error {
-	f.lastCreateBucket.ProjectID = projectID
-	f.lastCreateBucket.Bucket = bucketName
+func (m *mockGCSClient) CreateBucket(_ context.Context, projectID, bucketName string) error {
+	m.lastCreateBucket.ProjectID = projectID
+	m.lastCreateBucket.Bucket = bucketName
 	return nil
 }
 
-func (f *mockGCSClient) ListObjects(_ context.Context, _, _ string) (*gcs.ObjectList, error) {
-	return f.objects, nil
+func (m *mockGCSClient) ListObjects(_ context.Context, _, _ string) (*gcs.ObjectList, error) {
+	return m.objects, nil
 }
 
-func (f *mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int) (*gcs.ObjectList, string, error) {
-	return f.objects, "", nil
+func (m *mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int) (*gcs.ObjectList, string, error) {
+	return m.objects, "", nil
 }
 
-func (f *mockGCSClient) GetBucketMetadata(_ context.Context, bucketName string) (*gcs.BucketMetadata, error) {
+func (m *mockGCSClient) GetBucketMetadata(_ context.Context, bucketName string) (*gcs.BucketMetadata, error) {
 	return &gcs.BucketMetadata{Name: bucketName, Location: "US", StorageClass: "STANDARD"}, nil
 }
 
-func (f *mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string) (*gcs.ObjectMetadata, error) {
+func (m *mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName string) (*gcs.ObjectMetadata, error) {
 	// Simple mock: find in prefixes or objects
-	if f.objects != nil {
-		for _, p := range f.objects.Prefixes {
+	if m.objects != nil {
+		for _, p := range m.objects.Prefixes {
 			if p.Name == objectName {
 				return &gcs.ObjectMetadata{Name: p.Name, Updated: p.Updated, Created: p.Created, Owner: p.Owner}, nil
 			}
 		}
-		for _, o := range f.objects.Objects {
+		for _, o := range m.objects.Objects {
 			if o.Name == objectName {
 				return &o, nil
 			}
@@ -91,12 +95,12 @@ func (f *mockGCSClient) GetObjectMetadata(_ context.Context, _, objectName strin
 	return nil, fmt.Errorf("not found")
 }
 
-func (f *mockGCSClient) GetObjectContent(_ context.Context, _, objectName string) (string, error) {
-	if f.contentError != nil {
-		return "", f.contentError
+func (m *mockGCSClient) GetObjectContent(_ context.Context, _, objectName string) (string, error) {
+	if m.contentError != nil {
+		return "", m.contentError
 	}
-	if f.objects != nil {
-		for _, o := range f.objects.Objects {
+	if m.objects != nil {
+		for _, o := range m.objects.Objects {
 			if o.Name == objectName {
 				// Fake content for testing
 				return fmt.Sprintf("content of %s", objectName), nil
@@ -106,41 +110,41 @@ func (f *mockGCSClient) GetObjectContent(_ context.Context, _, objectName string
 	return "", fmt.Errorf("not found")
 }
 
-func (f *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest string, _ gcs.ProgressFunc) error {
-	f.lastDownload.Bucket = bucket
-	f.lastDownload.Object = object
-	f.lastDownload.Dest = dest
+func (m *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest string, _ gcs.ProgressFunc) error {
+	m.lastDownload.Bucket = bucket
+	m.lastDownload.Object = object
+	m.lastDownload.Dest = dest
 	return nil
 }
 
-func (f *mockGCSClient) CreateEmptyObject(_ context.Context, bucket, object string) error {
-	f.lastCreate.Bucket = bucket
-	f.lastCreate.Object = object
+func (m *mockGCSClient) CreateEmptyObject(_ context.Context, bucket, object string) error {
+	m.lastCreate.Bucket = bucket
+	m.lastCreate.Object = object
 	return nil
 }
 
-func (f *mockGCSClient) UploadObject(_ context.Context, bucket, object, src string) error {
-	f.lastUpload.Bucket = bucket
-	f.lastUpload.Object = object
-	f.lastUpload.Src = src
+func (m *mockGCSClient) UploadObject(_ context.Context, bucket, object, src string) error {
+	m.lastUpload.Bucket = bucket
+	m.lastUpload.Object = object
+	m.lastUpload.Src = src
 	return nil
 }
 
-func (f *mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string, _ gcs.ProgressFunc) error {
+func (m *mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string, _ gcs.ProgressFunc) error {
 	return nil
 }
 
-func (f *mockGCSClient) NewReader(_ context.Context, _, objectName string) (io.ReadCloser, error) {
+func (m *mockGCSClient) NewReader(_ context.Context, _, objectName string) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader(fmt.Sprintf("content of %s", objectName))), nil
 }
 
-func (f *mockGCSClient) NewReaderAt(_ context.Context, _, objectName string) io.ReaderAt {
+func (m *mockGCSClient) NewReaderAt(_ context.Context, _, objectName string) io.ReaderAt {
 	return strings.NewReader(fmt.Sprintf("content of %s", objectName))
 }
 
-func (f *mockGCSClient) ListObjectVersions(_ context.Context, bucketName, objectName string) ([]gcs.ObjectMetadata, error) {
-	if f.mockVersions != nil {
-		return f.mockVersions, nil
+func (m *mockGCSClient) ListObjectVersions(_ context.Context, bucketName, objectName string) ([]gcs.ObjectMetadata, error) {
+	if m.mockVersions != nil {
+		return m.mockVersions, nil
 	}
 	return []gcs.ObjectMetadata{
 		{Name: objectName, Bucket: bucketName, Generation: 1, Size: 10, Updated: time.Now()},
@@ -148,8 +152,8 @@ func (f *mockGCSClient) ListObjectVersions(_ context.Context, bucketName, object
 	}, nil
 }
 
-func (f *mockGCSClient) IsVersioningEnabled(_ context.Context, _ string) (bool, error) {
-	return !f.versioningDisabled, nil
+func (m *mockGCSClient) IsVersioningEnabled(_ context.Context, _ string) (bool, error) {
+	return !m.versioningDisabled, nil
 }
 
 // Helper to create simple object list from names

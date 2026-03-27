@@ -23,6 +23,58 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func TestClient_GetProjectMetadata(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, r.URL.Path, "/v1/projects/my-test-project")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"projectId": "my-test-project",
+				"projectNumber": "1234567890",
+				"name": "My Test Project",
+				"createTime": "2023-10-01T12:00:00Z",
+				"labels": {"env": "test"},
+				"parent": {"type": "folder", "id": "98765"}
+			}`))
+		}))
+		defer server.Close()
+
+		ctx := context.Background()
+		sc, err := storage.NewClient(ctx, option.WithoutAuthentication())
+		assert.NilError(t, err)
+		defer func() { _ = sc.Close() }()
+
+		c := gcs.NewClient(sc, option.WithEndpoint(server.URL), option.WithHTTPClient(server.Client()), option.WithoutAuthentication())
+
+		meta, err := c.GetProjectMetadata(ctx, "my-test-project")
+		assert.NilError(t, err)
+		assert.Equal(t, meta.ProjectID, "my-test-project")
+		assert.Equal(t, meta.Name, "My Test Project")
+		assert.Equal(t, meta.ProjectNumber, int64(1234567890))
+		assert.Equal(t, meta.ParentType, "folder")
+		assert.Equal(t, meta.ParentID, "98765")
+		assert.Equal(t, meta.Labels["env"], "test")
+		assert.Assert(t, !meta.CreateTime.IsZero())
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		defer server.Close()
+
+		ctx := context.Background()
+		sc, err := storage.NewClient(ctx, option.WithoutAuthentication())
+		assert.NilError(t, err)
+		defer func() { _ = sc.Close() }()
+
+		c := gcs.NewClient(sc, option.WithEndpoint(server.URL), option.WithHTTPClient(server.Client()), option.WithoutAuthentication())
+
+		_, err = c.GetProjectMetadata(ctx, "my-test-project")
+		assert.ErrorContains(t, err, "failed to fetch project metadata")
+	})
+}
+
 func TestClient_PermissionDenied(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

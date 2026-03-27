@@ -78,12 +78,13 @@ type Model struct {
 	jobProgress             map[int]*JobProgress
 
 	// Buckets View
-	projects            []gcs.ProjectBuckets
-	collapsedProjects   map[string]struct{}
-	cursor              int // used for buckets or objects depending on state
-	bucketCursor        int // stores the cursor position in the bucket list
-	cursorVersion       int // used for debouncing preview requests
-	bucketMetadataCache *LRUCache[string, bucketMetadataCacheEntry]
+	projects             []gcs.ProjectBuckets
+	collapsedProjects    map[string]struct{}
+	cursor               int // used for buckets or objects depending on state
+	bucketCursor         int // stores the cursor position in the bucket list
+	cursorVersion        int // used for debouncing preview requests
+	bucketMetadataCache  *LRUCache[string, bucketMetadataCacheEntry]
+	projectMetadataCache *LRUCache[string, projectMetadataCacheEntry]
 
 	// Objects View
 	currentBucket             string
@@ -132,6 +133,12 @@ type contentCacheEntry struct {
 
 type metadataCacheEntry struct {
 	Metadata  *gcs.ObjectMetadata
+	ExpiresAt time.Time
+}
+
+type projectMetadataCacheEntry struct {
+	Metadata  *gcs.ProjectMetadata
+	Err       error
 	ExpiresAt time.Time
 }
 
@@ -193,7 +200,8 @@ func NewModelWithSender(projectIDs []string, client GCSClient, downloadDir strin
 		activeDestinations:    make(map[string]bool),
 		selected:              make(map[string]struct{}),
 		collapsedProjects:     make(map[string]struct{}),
-		bucketMetadataCache:   NewLRUCache[string, bucketMetadataCacheEntry](256),
+		bucketMetadataCache:   NewLRUCache[string, bucketMetadataCacheEntry](100),
+		projectMetadataCache:  NewLRUCache[string, projectMetadataCacheEntry](20),
 		help:                  help.New(),
 		spinner:               s,
 		previewRegistry:       reg,

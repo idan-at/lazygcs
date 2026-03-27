@@ -13,12 +13,27 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 // Client ...
 type Client struct {
 	storageClient *storage.Client
+	crmService    *cloudresourcemanager.Service
+	crmErr        error
+}
+
+// ProjectMetadata holds metadata for a Google Cloud Project.
+type ProjectMetadata struct {
+	ProjectID     string
+	Name          string
+	ProjectNumber int64
+	CreateTime    time.Time
+	Labels        map[string]string
+	ParentType    string
+	ParentID      string
 }
 
 // ObjectMetadata holds metadata for a GCS object.
@@ -69,10 +84,58 @@ type ObjectList struct {
 }
 
 // NewClient initializes a new GCS Client with the provided storage client.
-func NewClient(storageClient *storage.Client) *Client {
+func NewClient(storageClient *storage.Client, crmOpts ...option.ClientOption) *Client {
+	ctx := context.Background()
+	crmService, err := cloudresourcemanager.NewService(ctx, crmOpts...)
+	var crmErr error
+	if err != nil {
+		// Store the error, CRM service might not be available or permissions missing.
+		crmService = nil
+		crmErr = err
+	}
 	return &Client{
 		storageClient: storageClient,
+		crmService:    crmService,
+		crmErr:        crmErr,
 	}
+}
+
+// GetProjectMetadata retrieves metadata for a specific Google Cloud project.
+func (c *Client) GetProjectMetadata(ctx context.Context, projectID string) (*ProjectMetadata, error) {
+	if c.crmService == nil {
+		if c.crmErr != nil {
+			return nil, fmt.Errorf("cloud resource manager service is not initialized: %w", c.crmErr)
+		}
+		return nil, fmt.Errorf("cloud resource manager service is not initialized")
+	}
+
+	proj, err := c.crmService.Projects.Get(projectID).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch project metadata: %w", err)
+	}
+
+	var created time.Time
+	if proj.CreateTime != "" {
+		created, _ = time.Parse(time.RFC3339Nano, proj.CreateTime)
+		if created.IsZero() {
+			created, _ = time.Parse(time.RFC3339, proj.CreateTime)
+		}
+	}
+
+	meta := &ProjectMetadata{
+		ProjectID:     proj.ProjectId,
+		Name:          proj.Name,
+		ProjectNumber: proj.ProjectNumber,
+		CreateTime:    created,
+		Labels:        proj.Labels,
+	}
+
+	if proj.Parent != nil {
+		meta.ParentType = proj.Parent.Type
+		meta.ParentID = proj.Parent.Id
+	}
+
+	return meta, nil
 }
 
 // ProgressFunc is a callback for tracking download progress.

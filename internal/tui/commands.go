@@ -89,6 +89,17 @@ func (m *Model) fetchBucketMetadata(bucketName string) tea.Cmd {
 	}
 }
 
+// fetchProjectMetadata gets project attributes like name, number, labels, etc.
+func (m *Model) fetchProjectMetadata(projectID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		metadata, err := m.client.GetProjectMetadata(ctx, projectID)
+		return ProjectMetadataMsg{ProjectID: projectID, Metadata: metadata, Err: err}
+	}
+}
+
 func (m *Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd {
 	bucket := m.currentBucket
 	prefix := m.currentPrefix

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mime"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -381,14 +382,64 @@ func (m *Model) previewView(width int) string {
 			}
 		}
 	case viewBuckets:
+		filtered := m.filteredBuckets()
+		isProject := false
+		if m.cursor < len(filtered) && filtered[m.cursor].IsProject {
+			isProject = true
+		}
+
 		title := "Bucket Information"
+		if isProject {
+			title = "Project Information"
+		}
 		s.WriteString(bucketInfoTitleStyle.Render(title) + "\n\n")
 
-		filtered := m.filteredBuckets()
 		if m.cursor < len(filtered) {
 			item := filtered[m.cursor]
 			if item.IsProject {
-				s.WriteString(bucketInfoProjectStyle.Render("Project: ") + item.ProjectID + "\n")
+				s.WriteString(bucketInfoProjectStyle.Render("Project: ") + item.ProjectID + "\n\n")
+
+				if m.previewContent == "Loading project info..." || m.previewContent == clearImagesEsc+"Loading project info..." {
+					fmt.Fprintf(&s, "\n%s Loading project info...\n", m.renderSpinner())
+				} else if strings.HasPrefix(m.previewContent, "Error:") {
+					fmt.Fprintf(&s, "\n%s\n", bucketInfoErrorStyle.Render(m.previewContent))
+				} else {
+					// Find the project to get the bucket count
+					for _, p := range m.projects {
+						if p.ProjectID == item.ProjectID {
+							if cacheEntry, ok := m.projectMetadataCache.Get(item.ProjectID); ok && cacheEntry.Metadata != nil {
+								meta := cacheEntry.Metadata
+								if meta.Name != "" && meta.Name != item.ProjectID {
+									fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Project Name:"), bucketInfoValStyle.Render(meta.Name))
+								}
+								if meta.ProjectNumber > 0 {
+									fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Project Number:"), bucketInfoValStyle.Render(fmt.Sprintf("%d", meta.ProjectNumber)))
+								}
+								if !meta.CreateTime.IsZero() {
+									fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Created:"), bucketInfoValStyle.Render(meta.CreateTime.Format("2006-01-02 15:04:05")))
+								}
+								if meta.ParentType != "" {
+									fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Parent:"), bucketInfoValStyle.Render(fmt.Sprintf("%s (%s)", meta.ParentType, meta.ParentID)))
+								}
+								if len(meta.Labels) > 0 {
+									s.WriteString("\n" + bucketInfoLabelsStyle.Render("Labels:") + "\n")
+									// Sort labels
+									keys := make([]string, 0, len(meta.Labels))
+									for k := range meta.Labels {
+										keys = append(keys, k)
+									}
+									sort.Strings(keys)
+									for _, k := range keys {
+										fmt.Fprintf(&s, "  %s %s\n", bucketInfoKeyStyle.Render(k+":"), bucketInfoValStyle.Render(truncate(meta.Labels[k], width-len(k)-6)))
+									}
+								}
+							}
+
+							fmt.Fprintf(&s, "\n%s %s\n", bucketInfoKeyStyle.Render("Total Buckets:"), bucketInfoValStyle.Render(fmt.Sprintf("%d", len(p.Buckets))))
+							break
+						}
+					}
+				}
 			} else {
 				fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Bucket:"), bucketInfoValStyle.Render(truncate(item.BucketName, width-10)))
 

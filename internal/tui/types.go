@@ -16,7 +16,8 @@ type GCSClient interface {
 	// GetBucketMetadata gets metadata for a bucket.
 	GetBucketMetadata(ctx context.Context, bucketName string) (*gcs.BucketMetadata, error)
 	// ListBucketsPage retrieves a specific page of buckets for a given project.
-	ListBucketsPage(ctx context.Context, projectID, pageToken string, pageSize int) ([]string, string, error)
+	GetProjectMetadata(ctx context.Context, projectID string) (*gcs.ProjectMetadata, error)
+	ListBucketsPage(ctx context.Context, projectID string, pageToken string, pageSize int) ([]string, string, error)
 	// CreateBucket creates a new GCS bucket.
 	CreateBucket(ctx context.Context, projectID, bucketName string) error
 	// ListObjects returns names of objects and common prefixes (folders) in a bucket.
@@ -82,6 +83,13 @@ type MetadataMsg struct {
 	PrefixIndex int
 	Metadata    *gcs.ObjectMetadata
 	Err         error
+}
+
+// ProjectMetadataMsg is sent when project metadata fetching completes.
+type ProjectMetadataMsg struct {
+	ProjectID string
+	Metadata  *gcs.ProjectMetadata
+	Err       error
 }
 
 // BucketMetadataMsg is sent when bucket metadata fetching completes.

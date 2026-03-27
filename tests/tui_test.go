@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,10 +14,13 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
+	"github.com/muesli/termenv"
 
 	"github.com/idan-at/lazygcs/internal/config"
+	"github.com/idan-at/lazygcs/internal/gcs"
 	"github.com/idan-at/lazygcs/internal/testutil"
 	"github.com/idan-at/lazygcs/internal/tui"
 	"gotest.tools/v3/assert"
@@ -207,6 +211,148 @@ func TestDownloadObject_MultiSelect(t *testing.T) {
 	assert.Assert(t, foundFile2, "file2.txt should be in the zip")
 }
 
+type mockProjectGCSClient struct {
+	*gcs.Client
+	projects map[string]*gcs.ProjectMetadata
+}
+
+func (m *mockProjectGCSClient) GetProjectMetadata(_ context.Context, projectID string) (*gcs.ProjectMetadata, error) {
+	if p, ok := m.projects[projectID]; ok {
+		return p, nil
+	}
+	return nil, fmt.Errorf("project not found")
+}
+
+func TestProjectInformationPreview(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
+	}
+
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	lipgloss.SetHasDarkBackground(true)
+
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: objects,
+		Host:           "127.0.0.1",
+		Scheme:         "http",
+	})
+	assert.NilError(t, err)
+	t.Cleanup(server.Stop)
+
+	cfgPath := testutil.CreateConfigFile(t, []string{"test-project-1"}, t.TempDir())
+	cfg, _ := config.Load(cfgPath)
+
+	realClient := gcs.NewClient(server.Client())
+	mockClient := &mockProjectGCSClient{
+		Client: realClient,
+		projects: map[string]*gcs.ProjectMetadata{
+			"test-project-1": {
+				ProjectID:     "test-project-1",
+				Name:          "Test Project",
+				ProjectNumber: 123456789,
+				CreateTime:    time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+				Labels:        map[string]string{"env": "prod"},
+				ParentType:    "organization",
+				ParentID:      "987654321",
+			},
+		},
+	}
+
+	m := tui.NewModel(cfg.Projects, mockClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
+	m.SetDeterministicSpinner(true)
+
+	tm := teatest.NewTestModel(t, &m)
+	m.SetSendMsg(tm.Send)
+	t.Cleanup(func() {
+		_ = tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
+
+	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		return strings.Contains(s, "test-bucket-1") && strings.Contains(s, "test-bucket-2")
+	}, teatest.WithDuration(5*time.Second))
+
+	// Force cursor move to trigger project metadata fetch
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyUp})
+
+	// Force a full redraw
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
+
+	// Check if Project Information is displayed correctly
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		hasTitle := strings.Contains(s, "Project Information")
+		hasProject := strings.Contains(s, "Project: test-project-1")
+		hasName := strings.Contains(s, "Project Name: Test Project")
+		hasNumber := strings.Contains(s, "Project Number: 123456789")
+		hasCreated := strings.Contains(s, "Created: 2023-01-01 12:00:00")
+		hasParent := strings.Contains(s, "Parent: organization (987654321)")
+		hasLabel := strings.Contains(s, "env: prod")
+		hasTotal := strings.Contains(s, "Total Buckets: 2")
+		return hasTitle && hasProject && hasName && hasNumber && hasCreated && hasParent && hasLabel && hasTotal
+	}, teatest.WithDuration(5*time.Second))
+}
+
+func TestProjectInformationPreview_Error(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
+	}
+
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	lipgloss.SetHasDarkBackground(true)
+
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: objects,
+		Host:           "127.0.0.1",
+		Scheme:         "http",
+	})
+	assert.NilError(t, err)
+	t.Cleanup(server.Stop)
+
+	cfgPath := testutil.CreateConfigFile(t, []string{"error-project"}, t.TempDir())
+	cfg, _ := config.Load(cfgPath)
+
+	realClient := gcs.NewClient(server.Client())
+	mockClient := &mockProjectGCSClient{
+		Client:   realClient,
+		projects: map[string]*gcs.ProjectMetadata{}, // Empty to trigger error
+	}
+
+	m := tui.NewModel(cfg.Projects, mockClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
+	m.SetDeterministicSpinner(true)
+
+	tm := teatest.NewTestModel(t, &m)
+	m.SetSendMsg(tm.Send)
+	t.Cleanup(func() {
+		_ = tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
+
+	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
+
+	// Wait for buckets view
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		return strings.Contains(s, "error-project")
+	}, teatest.WithDuration(5*time.Second))
+
+	// Force cursor move to trigger project metadata fetch
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyUp})
+
+	// Check if Error is displayed in preview
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		return strings.Contains(s, "Error: project not found")
+	}, teatest.WithDuration(5*time.Second))
+}
+
 func TestSearch(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
@@ -235,11 +381,12 @@ func TestSearch(t *testing.T) {
 	// Verify only test-bucket-1 is visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := ansiRegexp.ReplaceAllString(string(bts), "")
-		parts := strings.Split(s, "Buckets")
-		if len(parts) == 0 {
+		parts := strings.Split(s, "q quit")
+		if len(parts) < 2 {
 			return false
 		}
-		lastFrame := parts[len(parts)-1]
+		// The last complete frame is in the second to last part
+		lastFrame := parts[len(parts)-2]
 		return strings.Contains(lastFrame, "FILTER: bucket-1") && strings.Contains(lastFrame, "test-bucket-1") && !strings.Contains(lastFrame, "test-bucket-2")
 	}, teatest.WithDuration(5*time.Second))
 }
@@ -632,4 +779,76 @@ func TestEditorFinishedMsg(t *testing.T) {
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		return strings.Contains(string(bts), "editor failed")
 	}, teatest.WithDuration(3*time.Second))
+}
+
+func TestProjectLabelsSorted(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
+	}
+
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	lipgloss.SetHasDarkBackground(true)
+
+	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
+		InitialObjects: objects,
+		Host:           "127.0.0.1",
+		Scheme:         "http",
+	})
+	assert.NilError(t, err)
+	t.Cleanup(server.Stop)
+
+	cfgPath := testutil.CreateConfigFile(t, []string{"test-project-1"}, t.TempDir())
+	cfg, _ := config.Load(cfgPath)
+
+	realClient := gcs.NewClient(server.Client())
+	mockClient := &mockProjectGCSClient{
+		Client: realClient,
+		projects: map[string]*gcs.ProjectMetadata{
+			"test-project-1": {
+				ProjectID: "test-project-1",
+				Name:      "Test Project",
+				Labels: map[string]string{
+					"zebra": "final",
+					"apple": "first",
+					"mango": "middle",
+				},
+			},
+		},
+	}
+
+	m := tui.NewModel(cfg.Projects, mockClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
+	m.SetDeterministicSpinner(true)
+
+	tm := teatest.NewTestModel(t, &m)
+	m.SetSendMsg(tm.Send)
+	t.Cleanup(func() {
+		_ = tm.Quit()
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+	})
+
+	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		return strings.Contains(s, "test-bucket-1")
+	}, teatest.WithDuration(5*time.Second))
+
+	// Force cursor move to trigger project metadata fetch
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyUp})
+
+	// Force a full redraw
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
+
+	// Check if Labels are sorted: apple, mango, zebra
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		appleIdx := strings.Index(s, "apple:")
+		mangoIdx := strings.Index(s, "mango:")
+		zebraIdx := strings.Index(s, "zebra:")
+
+		return appleIdx != -1 && mangoIdx != -1 && zebraIdx != -1 &&
+			appleIdx < mangoIdx && mangoIdx < zebraIdx
+	}, teatest.WithDuration(5*time.Second))
 }

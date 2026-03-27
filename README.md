@@ -9,6 +9,7 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 ## ✨ Features
 
 *   **Miller Column Navigation:** Instantly see your buckets (grouped by project), the current directory's contents, and a preview of the selected file all at once.
+*   **Project & Bucket Insights:** Get detailed information for every resource. View project IDs, names, and labels, as well as bucket locations, storage classes, and versioning status. Expand and collapse project headers to navigate multiple GCP projects seamlessly.
 *   **Lightning Fast:** Keyboard-centric workflow means your hands never have to leave the home row.
 *   **Rich File Previews:** Instantly peek at file contents and metadata. Supports styled Markdown rendering and even lets you peek inside archives (ZIP, TAR, JAR) without downloading them! For ZIPs, `lazygcs` reads only the central directory, listing files instantly even for multi-GB archives.
 *   **Inline Search:** Instantly filter your buckets or objects. Supports exact matching or configurable **fuzzy search**.

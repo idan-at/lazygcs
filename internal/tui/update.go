@@ -25,6 +25,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleObjectsPageMsg(msg)
 	case MetadataMsg:
 		return m.handleMetadataMsg(msg)
+	case ProjectMetadataMsg:
+		return m.handleProjectMetadataMsg(msg)
 	case BucketMetadataMsg:
 		return m.handleBucketMetadataMsg(msg)
 	case ContentMsg:
@@ -310,6 +312,34 @@ func (m *Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 	}
 	m.listCache[cacheKey] = listCacheEntry{List: fullList, ExpiresAt: time.Now().Add(5 * time.Minute)}
 
+	return m, cmd
+}
+
+func (m *Model) handleProjectMetadataMsg(msg ProjectMetadataMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	if msg.Err != nil {
+		cmd = m.AddMessage(LevelError, fmt.Sprintf("Failed to load metadata for project %s: %v", msg.ProjectID, msg.Err), 0, "")
+	}
+
+	m.projectMetadataCache.Add(msg.ProjectID, projectMetadataCacheEntry{
+		Metadata:  msg.Metadata,
+		Err:       msg.Err,
+		ExpiresAt: time.Now().Add(5 * time.Minute),
+	})
+
+	if m.state == viewBuckets {
+		filtered := m.filteredBuckets()
+		if m.cursor < len(filtered) {
+			item := filtered[m.cursor]
+			if item.IsProject && item.ProjectID == msg.ProjectID {
+				if msg.Err != nil {
+					m.previewContent = fmt.Sprintf("Error: %v", msg.Err)
+				} else {
+					m.previewContent = clearImagesEsc
+				}
+			}
+		}
+	}
 	return m, cmd
 }
 
@@ -902,6 +932,17 @@ func (m *Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 				m.previewContent = clearImagesEsc + "Loading..."
 				return m.triggerDebounces(m.fetchBucketMetadata(item.BucketName), item.BucketName, "")
 			}
+
+			if cacheEntry, ok := m.projectMetadataCache.Get(item.ProjectID); ok && time.Now().Before(cacheEntry.ExpiresAt) {
+				if cacheEntry.Err != nil {
+					m.previewContent = fmt.Sprintf("Error: %v", cacheEntry.Err)
+				} else {
+					m.previewContent = clearImagesEsc
+				}
+				return m.triggerDebounces(nil, "", "")
+			}
+			m.previewContent = clearImagesEsc + "Loading project info..."
+			return m.triggerDebounces(m.fetchProjectMetadata(item.ProjectID), "", "")
 		}
 	}
 	return m, nil
