@@ -95,6 +95,37 @@ func (m *Model) fetchPrefixMetadataByName(name string, originalIdx int) tea.Cmd 
 	}
 }
 
+func (m *Model) fetchObjectVersions(bucket, object string) tea.Cmd {
+	cachedEnabled, hasCache := m.bucketVersioningCache[bucket]
+
+	return func() tea.Msg {
+		var enabled bool
+		var err error
+
+		if hasCache {
+			enabled = cachedEnabled
+		} else {
+			enabled, err = m.client.IsVersioningEnabled(context.Background(), bucket)
+			if err != nil {
+				return ObjectVersionsMsg{Bucket: bucket, ObjectName: object, Err: err}
+			}
+		}
+
+		if !enabled {
+			return ObjectVersionsMsg{Bucket: bucket, ObjectName: object, VersioningEnabled: false}
+		}
+
+		versions, err := m.client.ListObjectVersions(context.Background(), bucket, object)
+		return ObjectVersionsMsg{
+			Bucket:            bucket,
+			ObjectName:        object,
+			Versions:          versions,
+			VersioningEnabled: true,
+			Err:               err,
+		}
+	}
+}
+
 func (m *Model) fetchDownload(bucketName, objectName, dest, taskID string, jobNum int, isPrefix bool) tea.Cmd {
 	return func() tea.Msg {
 		var lastUpdate time.Time

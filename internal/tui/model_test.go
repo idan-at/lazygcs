@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -41,6 +42,9 @@ type mockGCSClient struct {
 		ProjectID string
 		Bucket    string
 	}
+
+	versioningDisabled bool
+	mockVersions       []gcs.ObjectMetadata
 }
 
 func (f *mockGCSClient) ListBucketsPage(_ context.Context, projectID, _ string, _ int) ([]string, string, error) {
@@ -128,6 +132,20 @@ func (f *mockGCSClient) NewReader(_ context.Context, _, objectName string) (io.R
 
 func (f *mockGCSClient) NewReaderAt(_ context.Context, _, objectName string) io.ReaderAt {
 	return strings.NewReader(fmt.Sprintf("content of %s", objectName))
+}
+
+func (f *mockGCSClient) ListObjectVersions(_ context.Context, bucketName, objectName string) ([]gcs.ObjectMetadata, error) {
+	if f.mockVersions != nil {
+		return f.mockVersions, nil
+	}
+	return []gcs.ObjectMetadata{
+		{Name: objectName, Bucket: bucketName, Generation: 1, Size: 10, Updated: time.Now()},
+		{Name: objectName, Bucket: bucketName, Generation: 2, Size: 20, Updated: time.Now().Add(time.Hour)},
+	}, nil
+}
+
+func (f *mockGCSClient) IsVersioningEnabled(_ context.Context, _ string) (bool, error) {
+	return !f.versioningDisabled, nil
 }
 
 // Helper to create simple object list from names
@@ -377,7 +395,7 @@ func TestModel_LayoutIntegrity(t *testing.T) {
 	}
 	mModel := tui.NewModel([]string{"p1"}, client, "/tmp", false, false)
 	m := &mModel
-	width := 100
+	width := 120
 	height := 20
 	m, _ = updateModel(m, tea.WindowSizeMsg{Width: width, Height: height})
 

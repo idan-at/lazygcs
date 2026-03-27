@@ -51,6 +51,7 @@ type Model struct {
 	previewContent string
 	showHelp       bool
 	showMetadata   bool
+	showVersions   bool
 
 	// Search State
 	searchMode        bool
@@ -84,12 +85,15 @@ type Model struct {
 	cursorVersion     int // used for debouncing preview requests
 
 	// Objects View
-	currentBucket      string
-	currentPrefix      string
-	targetPrefixCursor string
-	objects            []gcs.ObjectMetadata
-	prefixes           []gcs.PrefixMetadata
-	selected           map[string]struct{}
+	currentBucket             string
+	currentPrefix             string
+	targetPrefixCursor        string
+	objects                   []gcs.ObjectMetadata
+	prefixes                  []gcs.PrefixMetadata
+	selected                  map[string]struct{}
+	objectVersions            []gcs.ObjectMetadata
+	isBucketVersioningEnabled bool
+	versioningChecked         bool
 
 	loading         bool
 	loadingProjects map[string]bool
@@ -109,9 +113,10 @@ type Model struct {
 	deterministicSpinner bool
 
 	// Caches
-	listCache     map[string]listCacheEntry
-	contentCache  map[string]contentCacheEntry
-	metadataCache map[string]metadataCacheEntry
+	listCache             map[string]listCacheEntry
+	contentCache          map[string]contentCacheEntry
+	metadataCache         map[string]metadataCacheEntry
+	bucketVersioningCache map[string]bool
 }
 
 type listCacheEntry struct {
@@ -156,33 +161,34 @@ func NewModelWithSender(projectIDs []string, client GCSClient, downloadDir strin
 	reg := preview.NewDefaultRegistry()
 
 	return Model{
-		projectIDs:           projectIDs,
-		client:               client,
-		downloadDir:          downloadDir,
-		fuzzySearch:          fuzzySearch,
-		showNerdIcons:        showNerdIcons,
-		width:                120,
-		height:               40,
-		state:                viewBuckets,
-		loading:              true,
-		loadingProjects:      loadingProjects,
-		bgJobs:               len(projectIDs),
-		nextJobNum:           1,
-		jobProgress:          make(map[int]*JobProgress),
-		msgQueue:             NewMessageQueue(),
-		activeTasks:          make(map[string]Task),
-		activeDestinations:   make(map[string]bool),
-		selected:             make(map[string]struct{}),
-		collapsedProjects:    make(map[string]struct{}),
-		help:                 help.New(),
-		spinner:              s,
-		previewRegistry:      reg,
-		clipboard:            &RealClipboard{},
-		sendMsg:              sendMsg,
-		deterministicSpinner: false,
-		listCache:            make(map[string]listCacheEntry),
-		contentCache:         make(map[string]contentCacheEntry),
-		metadataCache:        make(map[string]metadataCacheEntry),
+		projectIDs:            projectIDs,
+		client:                client,
+		downloadDir:           downloadDir,
+		fuzzySearch:           fuzzySearch,
+		showNerdIcons:         showNerdIcons,
+		width:                 120,
+		height:                40,
+		state:                 viewBuckets,
+		loading:               true,
+		loadingProjects:       loadingProjects,
+		bgJobs:                len(projectIDs),
+		nextJobNum:            1,
+		jobProgress:           make(map[int]*JobProgress),
+		msgQueue:              NewMessageQueue(),
+		activeTasks:           make(map[string]Task),
+		activeDestinations:    make(map[string]bool),
+		selected:              make(map[string]struct{}),
+		collapsedProjects:     make(map[string]struct{}),
+		help:                  help.New(),
+		spinner:               s,
+		previewRegistry:       reg,
+		clipboard:             &RealClipboard{},
+		sendMsg:               sendMsg,
+		deterministicSpinner:  false,
+		listCache:             make(map[string]listCacheEntry),
+		contentCache:          make(map[string]contentCacheEntry),
+		metadataCache:         make(map[string]metadataCacheEntry),
+		bucketVersioningCache: make(map[string]bool),
 	}
 }
 
@@ -234,6 +240,21 @@ func (m *Model) HideStatusPill() bool {
 // ShowMessages returns whether the messages view is currently shown.
 func (m *Model) ShowMessages() bool {
 	return m.showMessages
+}
+
+// ShowVersions returns whether the versions view is currently shown.
+func (m *Model) ShowVersions() bool {
+	return m.showVersions
+}
+
+// ShowMetadata returns whether the metadata view is currently shown.
+func (m *Model) ShowMetadata() bool {
+	return m.showMetadata
+}
+
+// ObjectVersions returns the list of versions for the current object.
+func (m *Model) ObjectVersions() []gcs.ObjectMetadata {
+	return m.objectVersions
 }
 
 // ActiveTasks returns the current active background tasks.

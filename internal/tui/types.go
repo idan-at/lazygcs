@@ -37,6 +37,10 @@ type GCSClient interface {
 	NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error)
 	// NewReaderAt returns an io.ReaderAt for an object.
 	NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt
+	// ListObjectVersions retrieves all versions of a specific object.
+	ListObjectVersions(ctx context.Context, bucketName, objectName string) ([]gcs.ObjectMetadata, error)
+	// IsVersioningEnabled checks if versioning is enabled for a specific bucket.
+	IsVersioningEnabled(ctx context.Context, bucketName string) (bool, error)
 }
 
 // ClipboardWriter defines the interface for writing to the system clipboard.
@@ -76,6 +80,15 @@ type MetadataMsg struct {
 	PrefixIndex int
 	Metadata    *gcs.ObjectMetadata
 	Err         error
+}
+
+// ObjectVersionsMsg is sent when object versions fetching completes.
+type ObjectVersionsMsg struct {
+	Bucket            string
+	ObjectName        string
+	Versions          []gcs.ObjectMetadata
+	VersioningEnabled bool
+	Err               error
 }
 
 // ContentMsg is sent when on-demand content fetching completes.

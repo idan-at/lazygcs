@@ -88,9 +88,94 @@ func (m *Model) renderScrollbar(totalItems, activeIdx int) string {
 	return s.String()
 }
 
+func (m *Model) renderVersionsView(width int) string {
+	var s strings.Builder
+	s.WriteString(lipgloss.NewStyle().Bold(true).Render("Object Versions") + "\n\n")
+
+	if !m.versioningChecked {
+		fmt.Fprintf(&s, "\n%s Loading versions...\n", m.renderSpinner())
+		return s.String()
+	}
+
+	if !m.isBucketVersioningEnabled {
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#F38BA8")).Render(truncate("Versioning is not enabled for this bucket.", width)))
+		return s.String()
+	}
+
+	if len(m.objectVersions) == 0 {
+		s.WriteString(truncate("No previous versions found.", width))
+		return s.String()
+	}
+
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8CAAEE")).Bold(true)
+	cellStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CDD6F4"))
+	liveStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A6E3A1")).Bold(true)
+
+	// Column widths
+	// Increase widths to use more of the available column space.
+	// We'll use absolute values first, then scale down if the column is too narrow.
+	genWidth := 25
+	sizeWidth := 12
+	// Space needed for Generation + spaces + Size + spaces + some space for Updated.
+	// 25 + 2 + 12 + 2 + 16 (for YYYY-MM-DD HH:MM) = 57.
+	if width < 60 {
+		genWidth = int(float64(width) * 0.4)
+		sizeWidth = int(float64(width) * 0.2)
+	}
+
+	// Ensure at least some minimum widths
+	if genWidth < 4 {
+		genWidth = 4
+	}
+	if sizeWidth < 4 {
+		sizeWidth = 4
+	}
+
+	// Column headers
+	fmt.Fprintf(&s, "%s  %s  %s\n", headerStyle.Width(genWidth).Render("Generation"), headerStyle.Width(sizeWidth).Render("Size"), headerStyle.Render("Updated"))
+	s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#414559")).Render(strings.Repeat("─", width)) + "\n")
+
+	// Max versions to show
+	maxLines := m.maxItemsVisible() - 4
+	if maxLines < 1 {
+		maxLines = 1
+	}
+
+	displayVersions := m.objectVersions
+	if len(displayVersions) > maxLines {
+		displayVersions = displayVersions[:maxLines]
+	}
+
+	for i, v := range displayVersions {
+		sizeStr := humanizeSize(v.Size)
+		updatedStr := v.Updated.Format("2006-01-02 15:04")
+
+		genStr := fmt.Sprintf("%d", v.Generation)
+		var styledGen string
+		if i == 0 { // Latest is first
+			styledGen = liveStyle.Width(genWidth).Render(truncate(genStr, genWidth))
+		} else {
+			styledGen = cellStyle.Width(genWidth).Render(truncate(genStr, genWidth))
+		}
+
+		fmt.Fprintf(&s, "%s  %s  %s\n", styledGen, cellStyle.Width(sizeWidth).Render(truncate(sizeStr, sizeWidth)), cellStyle.Render(truncate(updatedStr, width-genWidth-sizeWidth-4)))
+	}
+
+	if len(m.objectVersions) > maxLines {
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Render(truncate(fmt.Sprintf("\n... and %d more", len(m.objectVersions)-maxLines), width)))
+	}
+
+	return s.String()
+}
+
 func (m *Model) previewView(width int) string {
 	var s strings.Builder
 	if m.state == viewObjects || m.state == viewDownloadConfirm {
+		if m.showVersions {
+			s.WriteString(m.renderVersionsView(width))
+			return s.String()
+		}
+
 		title := "Preview"
 		if m.showMetadata {
 			title = "Metadata"

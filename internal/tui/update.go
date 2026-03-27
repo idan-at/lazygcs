@@ -42,6 +42,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEditorFinishedMsg(msg)
 	case UploadMsg:
 		return m.handleUploadMsg(msg)
+	case ObjectVersionsMsg:
+		return m.handleObjectVersionsMsg(msg)
 	case CreateMsg:
 		return m.handleCreateMsg(msg)
 	case DebouncePreviewMsg:
@@ -385,6 +387,42 @@ func (m *Model) buildCompletionCmd(jobNum int, progress *JobProgress, singlePath
 	}
 }
 
+func (m *Model) handleObjectVersionsMsg(msg ObjectVersionsMsg) (tea.Model, tea.Cmd) {
+	if msg.Err == nil {
+		m.bucketVersioningCache[msg.Bucket] = msg.VersioningEnabled
+	}
+
+	if m.state != viewObjects || msg.Bucket != m.currentBucket {
+		return m, nil
+	}
+
+	// Check if the cursor is still on the same object
+	currentPrefixes, currentObjects, _ := m.filteredObjects()
+	if m.cursor < len(currentPrefixes) {
+		return m, nil // Not an object
+	}
+
+	idx := m.cursor - len(currentPrefixes)
+	if idx >= len(currentObjects) || currentObjects[idx].Name != msg.ObjectName {
+		return m, nil // Cursor moved
+	}
+
+	if msg.Err != nil {
+		m.previewContent = fmt.Sprintf("Error fetching versions: %v", msg.Err)
+		m.showVersions = false
+		m.versioningChecked = true
+		return m, nil
+	}
+
+	m.versioningChecked = true
+	m.isBucketVersioningEnabled = msg.VersioningEnabled
+	m.objectVersions = msg.Versions
+	sort.Slice(m.objectVersions, func(i, j int) bool {
+		return m.objectVersions[i].Updated.After(m.objectVersions[j].Updated)
+	})
+	return m, nil
+}
+
 func (m *Model) handleDownloadProgressMsg(msg DownloadProgressMsg) (tea.Model, tea.Cmd) {
 	if task, ok := m.activeTasks[msg.TaskID]; ok {
 		task.Current = msg.Current
@@ -521,6 +559,26 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Info):
 		if m.state == viewObjects || m.state == viewDownloadConfirm {
 			m.showMetadata = !m.showMetadata
+			if m.showMetadata {
+				m.showVersions = false
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.Versions):
+		if m.state == viewObjects {
+			m.showVersions = !m.showVersions
+			if m.showVersions {
+				m.showMetadata = false
+				currentPrefixes, currentObjects, _ := m.filteredObjects()
+				if m.cursor >= len(currentPrefixes) {
+					idx := m.cursor - len(currentPrefixes)
+					if idx < len(currentObjects) {
+						obj := currentObjects[idx]
+						return m.triggerDebounces(m.fetchObjectVersions(m.currentBucket, obj.Name), "", "")
+					}
+				}
+			}
 		}
 		return m, nil
 
@@ -757,6 +815,9 @@ func (m *Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 	}
 
 	m.previewContent = "\x1b_Ga=d,d=A\x1b\\" // Reset preview on move
+	m.objectVersions = nil                   // Reset versions on move
+	m.versioningChecked = false
+
 	switch m.state {
 	case viewObjects:
 		currentPrefixes, currentObjects, origIndices := m.filteredObjects()
@@ -771,6 +832,9 @@ func (m *Model) finalizeCursorMove(oldCursor int) (tea.Model, tea.Cmd) {
 			if idx < len(currentObjects) {
 				obj := currentObjects[idx]
 				m.previewContent = "\x1b_Ga=d,d=A\x1b\\Loading..."
+				if m.showVersions {
+					return m.triggerDebounces(m.fetchObjectVersions(m.currentBucket, obj.Name), "", "")
+				}
 				return m.triggerDebounces(m.fetchContent(obj), "", "")
 			}
 		}
@@ -1056,6 +1120,9 @@ func (m *Model) handleHomeKey() (tea.Model, tea.Cmd) {
 	m.objects = nil
 	m.prefixes = nil
 	m.previewContent = ""
+	m.showVersions = false
+	m.objectVersions = nil
+	m.versioningChecked = false
 	m.cursor = m.bucketCursor
 	return m, nil
 }
@@ -1087,6 +1154,9 @@ func (m *Model) handleRightKey() (tea.Model, tea.Cmd) {
 			m.state = viewObjects
 			m.searchMode = false
 			m.objectSearchQuery = ""
+			m.showVersions = false
+			m.objectVersions = nil
+			m.versioningChecked = false
 			m = m.resetObjectsState()
 			return m, m.fetchObjects()
 		}
@@ -1098,6 +1168,9 @@ func (m *Model) handleRightKey() (tea.Model, tea.Cmd) {
 			m.currentPrefix = currentPrefixes[m.cursor].Name
 			m.searchMode = false
 			m.objectSearchQuery = ""
+			m.showVersions = false
+			m.objectVersions = nil
+			m.versioningChecked = false
 			m = m.resetObjectsState()
 			return m, m.fetchObjects()
 		}
@@ -1128,6 +1201,9 @@ func (m *Model) handleLeftKey() (tea.Model, tea.Cmd) {
 		m.previewContent = "\x1b_Ga=d,d=A\x1b\\"
 		m.searchMode = false
 		m.objectSearchQuery = ""
+		m.showVersions = false
+		m.objectVersions = nil
+		m.versioningChecked = false
 		if m.currentPrefix == "" {
 			m.state = viewBuckets
 

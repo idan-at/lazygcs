@@ -23,7 +23,7 @@ This document provides a comprehensive list of all keybindings available in `laz
 *   `e`: Edit the highlighted file using `$EDITOR`. Changes are re-uploaded automatically. *Note: Does not support multi-selection.*
 *   `n`: Create a new item. If in the bucket list, it creates a new bucket. In the object list, it creates a new file (or a directory if the name ends with `/`).
 *   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.
-*   `x`: Delete the highlighted item (or all selected items). *Note: Requires confirmation.*
+*   `i`: Toggle Metadata view in the Preview Pane.
 *   `v`: Toggle Object Versions view in the Preview Pane.
 
 ## Filtering & Search
@@ -32,5 +32,6 @@ This document provides a comprehensive list of all keybindings available in `laz
 *   `Enter`: Accept the current filter and exit search mode.
 
 ## System
+*   `m`: Toggle the Messages/Log view overlay.
 *   `?`: Toggle the Help Menu overlay.
 *   `q` or `Ctrl+c`: Quit the application.

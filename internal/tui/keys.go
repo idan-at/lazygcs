@@ -27,12 +27,13 @@ type keyMap struct {
 	Help         key.Binding
 	Messages     key.Binding
 	Info         key.Binding
+	Versions     key.Binding
 	Quit         key.Binding
 }
 
 // ShortHelp returns keybindings to be shown in the mini help view.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Select, k.Download, k.Copy, k.Info, k.Help, k.Quit}
+	return []key.Binding{k.Search, k.Select, k.Download, k.Copy, k.Info, k.Versions, k.Help, k.Quit}
 }
 
 // OrderedHelp returns all keybindings ordered from most used to least used.
@@ -59,6 +60,7 @@ func (k keyMap) OrderedHelp() []key.Binding {
 		k.HalfPageDown,
 		k.Home,
 		k.Info,
+		k.Versions,
 		k.Messages,
 		k.Help,
 		k.Quit,
@@ -71,7 +73,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Left, k.Right, k.Home},                                       // Navigation
 		{k.Top, k.Bottom, k.PageUp, k.PageDown, k.HalfPageUp, k.HalfPageDown},         // Pagination
 		{k.Select, k.Download, k.Copy, k.Open, k.Edit, k.Create, k.Refresh, k.Search}, // Actions
-		{k.Esc, k.Info, k.Messages, k.Help, k.Quit},                                   // App
+		{k.Esc, k.Info, k.Versions, k.Messages, k.Help, k.Quit},                       // App
 	}
 }
 
@@ -163,6 +165,10 @@ var keys = keyMap{
 	Info: key.NewBinding(
 		key.WithKeys("i"),
 		key.WithHelp("i", "metadata"),
+	),
+	Versions: key.NewBinding(
+		key.WithKeys("v"),
+		key.WithHelp("v", "versions"),
 	),
 	Messages: key.NewBinding(
 		key.WithKeys("m"),

@@ -14,6 +14,7 @@ Tired of clicking through the slow Cloud Console? Want to navigate your buckets 
 *   **Inline Search:** Instantly filter your buckets or objects. Supports exact matching or configurable **fuzzy search**.
 *   **Multi-Select & Batch Downloads:** Select multiple files or entire directories and download them all concurrently. Directories are automatically packaged into `.zip` archives!
 *   **Easy Resource Management:** Create new buckets, directories, or empty files directly from the TUI with a single keypress.
+*   **Object Versions Support:** Toggle the view of all previous versions for any object with a single keypress (`v`).
 *   **Vim-like Keybindings:** `j`/`k` for vertical movement, `h`/`l` for entering and exiting directories, `Ctrl+u`/`Ctrl+d` for page scrolling.
 *   **Cross-Platform:** Works seamlessly on macOS, Linux, and Windows.
 

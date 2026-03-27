@@ -342,6 +342,65 @@ func (c *Client) GetObjectMetadata(ctx context.Context, bucketName, objectName s
 	}, nil
 }
 
+// ListObjectVersions retrieves all versions of a specific object, up to a maximum of 100.
+func (c *Client) ListObjectVersions(ctx context.Context, bucketName, objectName string) ([]ObjectMetadata, error) {
+	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
+		Prefix:   objectName,
+		Versions: true,
+	})
+
+	const maxVersions = 100
+	var versions []ObjectMetadata
+	for {
+		attrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list versions for %q in %q: %w", objectName, bucketName, err)
+		}
+
+		// The prefix query might return objects that start with objectName.
+		// We only want the specific object.
+		if attrs.Name != objectName {
+			continue
+		}
+
+		versions = append(versions, ObjectMetadata{
+			Name:            attrs.Name,
+			Bucket:          attrs.Bucket,
+			Size:            attrs.Size,
+			ContentType:     attrs.ContentType,
+			ContentEncoding: attrs.ContentEncoding,
+			CacheControl:    attrs.CacheControl,
+			StorageClass:    attrs.StorageClass,
+			Generation:      attrs.Generation,
+			Metageneration:  attrs.Metageneration,
+			ETag:            attrs.Etag,
+			MD5:             attrs.MD5,
+			CRC32C:          attrs.CRC32C,
+			Updated:         attrs.Updated,
+			Created:         attrs.Created,
+			Owner:           attrs.Owner,
+			Metadata:        attrs.Metadata,
+		})
+
+		if len(versions) >= maxVersions {
+			break
+		}
+	}
+	return versions, nil
+}
+
+// IsVersioningEnabled checks if versioning is enabled for a specific bucket.
+func (c *Client) IsVersioningEnabled(ctx context.Context, bucketName string) (bool, error) {
+	attrs, err := c.storageClient.Bucket(bucketName).Attrs(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get bucket attributes for %q: %w", bucketName, err)
+	}
+	return attrs.VersioningEnabled, nil
+}
+
 // ProjectBuckets holds the buckets for a specific project.
 type ProjectBuckets struct {
 	ProjectID string
