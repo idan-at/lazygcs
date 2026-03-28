@@ -16,24 +16,30 @@ Enter
 # Give it some time to load buckets
 Sleep 1.5s
 
-# j/k to navigate between the buckets.
-Type "j"
-Sleep 1s
-Type "j"
-Sleep 1s
-Type "j"
-Sleep 1s
-Type "k"
+# Show Project Information (demo-project is already selected)
+Type "i"
+Sleep 2s
+Type "i" # Toggle off
 Sleep 500ms
-Type "k"
+
+# Navigate to company-assets-prod
+Type "j"
 Sleep 1s
 
-# Navigate to the bucket and explore folders.
+# Show Bucket Information
+Type "i"
+Sleep 2s
+Type "i" # Toggle off
+Sleep 500ms
+
+# Enter the bucket and explore folders.
 Type "l"
 Sleep 1s
 
 # Cursor is on "config/". Enter it to see JSON.
 Type "l"
+Sleep 1s
+# Stand on settings.json and show preview
 Sleep 2s
 # Go back
 Type "h"
@@ -56,24 +62,54 @@ Sleep 500ms
 Type "l"
 Sleep 1s
 
-# Stand on a py file and show syntax highlight (script.py)
+# Stand on script.py and show Metadata
+Type "i"
+Sleep 2s
+Type "i" # Toggle off
+Sleep 500ms
+
+# Show preview of script.py
+Sleep 1.5s
+
+# Create a new file "config.yaml"
+Type "n"
+Sleep 500ms
+Type "config.yaml"
+Enter
+Sleep 1.5s
+
+# Edit the new file with vim to add YAML content
+Type "e"
+Sleep 1s
+Type "i"
+Type "server:"
+Enter
+Type "  port: 8080"
+Enter
+Type "  timeout: 30s"
+Enter
+Type "database:"
+Enter
+Type "  user: admin"
+Escape
+Sleep 1s
+Type ":wq"
+Enter
 Sleep 2s
 
-# Press j and stand on an sql, show syntax highlighting (schema.sql)
-Type "j"
-Sleep 2s
+# Stand on the newly created config.yaml to show syntax highlighting
+Sleep 3s
 
-# Go back
+# Go back from folder/
 Type "h"
 Sleep 500ms
 
 # Move to "lib/"
 Type "j"
 Sleep 500ms
-# Enter it
+# Enter it to see app.jar
 Type "l"
 Sleep 2s
-
 # Go back
 Type "h"
 Sleep 500ms
@@ -84,7 +120,7 @@ Sleep 500ms
 # Stand on it to show HTML preview
 Sleep 2s
 
-# Press H to go back to buckets list, next bucket
+# Press H to go back to buckets list
 Type "H"
 Sleep 1s
 

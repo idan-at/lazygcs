@@ -95,7 +95,14 @@ CREATE INDEX idx_users_email ON users(email);
 	server, err := fakestorage.NewServerWithOptions(fakestorage.Options{
 		InitialObjects: []fakestorage.Object{
 			// demo-project buckets
-			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "folder/script.py"}, Content: []byte("def hello_world():\n    print(\"Hello from lazygcs!\")\n\nif __name__ == '__main__':\n    hello_world()\n")},
+			{
+				ObjectAttrs: fakestorage.ObjectAttrs{
+					BucketName: "company-assets-prod",
+					Name:       "folder/script.py",
+					Metadata:   map[string]string{"environment": "production", "team": "assets"},
+				},
+				Content: []byte("def hello_world():\n    print(\"Hello from lazygcs!\")\n\nif __name__ == '__main__':\n    hello_world()\n"),
+			},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "folder/schema.sql"}, Content: sqlPreviewContent},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "config/settings.json"}, Content: []byte(`{"theme": "dark", "version": "1.0.0"}`)},
 			{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "company-assets-prod", Name: "css/styles.css"}, Content: []byte("body { background: #000; }")},

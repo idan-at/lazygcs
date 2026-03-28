@@ -102,6 +102,18 @@ func NewClient(storageClient *storage.Client, crmOpts ...option.ClientOption) *C
 
 // GetProjectMetadata retrieves metadata for a specific Google Cloud project.
 func (c *Client) GetProjectMetadata(ctx context.Context, projectID string) (*ProjectMetadata, error) {
+	// If running against an emulator, return mock metadata.
+	// This is useful for demos and local testing where the CRM API is not available.
+	if os.Getenv("STORAGE_EMULATOR_HOST") != "" {
+		return &ProjectMetadata{
+			ProjectID:     projectID,
+			Name:          "Demo Project (" + projectID + ")",
+			ProjectNumber: 123456789,
+			CreateTime:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+			Labels:        map[string]string{"env": "demo", "managed-by": "lazygcs"},
+		}, nil
+	}
+
 	if c.crmService == nil {
 		if c.crmErr != nil {
 			return nil, fmt.Errorf("cloud resource manager service is not initialized: %w", c.crmErr)
