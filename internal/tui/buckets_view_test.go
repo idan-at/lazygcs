@@ -53,7 +53,12 @@ func TestModel_AsyncLoading(t *testing.T) {
 
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "async-b1"))
-	assert.Assert(t, !strings.Contains(view, "Loading"))
+	assert.Assert(t, strings.Contains(view, "Loading"), "Should show loading project info after buckets load")
+
+	// Simulate metadata arrival
+	m, _ = updateModel(m, tui.ProjectMetadataMsg{ProjectID: "p1", Metadata: &gcs.ProjectMetadata{ProjectID: "p1"}})
+	viewAfterMetadata := m.View()
+	assert.Assert(t, !strings.Contains(viewAfterMetadata, "Loading"), "Should NOT show loading after metadata arrives")
 }
 
 func TestModel_Pagination_Buckets(t *testing.T) {
@@ -245,4 +250,57 @@ func TestModel_BucketMetadataDeterministicLabels(t *testing.T) {
 	assert.Assert(t, idxA != -1 && idxM != -1 && idxZ != -1, "All labels should be in view")
 	assert.Assert(t, idxA < idxM, "a-label should be before m-label")
 	assert.Assert(t, idxM < idxZ, "m-label should be before z-label")
+}
+
+func TestModel_Init_ShowsLoadingProjectInfo(t *testing.T) {
+	projectID := "test-project"
+	projects := []gcs.ProjectBuckets{{ProjectID: projectID, Buckets: []string{"bucket1"}}}
+
+	client := &mockGCSClient{
+		projects: projects,
+	}
+
+	// Create model
+	mModel := tui.NewModel([]string{projectID}, client, "/tmp", false, false)
+	m := &mModel
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20})
+
+	// Call Init and get commands
+	cmd := m.Init()
+
+	// Resolve commands
+	msgs := resolveAllFetchCmds(cmd)
+	var bucketsMsg tui.BucketsPageMsg
+	foundMetadataMsg := false
+	for _, msg := range msgs {
+		if bMsg, ok := msg.(tui.BucketsPageMsg); ok {
+			bucketsMsg = bMsg
+		}
+		if _, ok := msg.(tui.ProjectMetadataMsg); ok {
+			foundMetadataMsg = true
+		}
+	}
+
+	assert.Assert(t, foundMetadataMsg, "Expected to find ProjectMetadataMsg in Init commands")
+
+	// Handle BucketsPageMsg
+	m, _ = updateModel(m, bucketsMsg)
+
+	// Check if Loading project info is in the view
+	view := m.View()
+	assert.Assert(t, strings.Contains(view, "Loading project info..."), "View should contain 'Loading project info...' after buckets are loaded but metadata is still fetching. View: \n%s", view)
+
+	// Let's just simulate the ProjectMetadataMsg
+	m, _ = updateModel(m, tui.ProjectMetadataMsg{
+		ProjectID: projectID,
+		Metadata: &gcs.ProjectMetadata{
+			ProjectID: projectID,
+			Name:      "My Cool Project",
+		},
+	})
+
+	view = m.View()
+	assert.Assert(t, !strings.Contains(view, "Loading project info..."), "Loading project info should disappear after metadata arrives")
+	assert.Assert(t, strings.Contains(view, "Project Name:"), "Metadata should be visible")
+	assert.Assert(t, strings.Contains(view, "My Cool Project"), "Project name should be visible")
 }

@@ -335,21 +335,18 @@ func TestProjectInformationPreview_Error(t *testing.T) {
 	})
 
 	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 
-	// Wait for buckets view
+	// Add a slight delay for the message queue to process
+	time.Sleep(100 * time.Millisecond)
+
+	// Log the raw View() output
+	t.Logf("Direct m.View() output:\n%s\n", m.View())
+
+	// Wait for buckets view and ensure the project name and error are visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := ansiRegexp.ReplaceAllString(string(bts), "")
-		return strings.Contains(s, "error-project")
-	}, teatest.WithDuration(5*time.Second))
-
-	// Force cursor move to trigger project metadata fetch
-	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-	tm.Send(tea.KeyMsg{Type: tea.KeyUp})
-
-	// Check if Error is displayed in preview
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := ansiRegexp.ReplaceAllString(string(bts), "")
-		return strings.Contains(s, "Error: project not found")
+		return strings.Contains(s, "error-project") && strings.Contains(s, "Error: project not found")
 	}, teatest.WithDuration(5*time.Second))
 }
 

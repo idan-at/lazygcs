@@ -25,6 +25,12 @@ func (m *Model) Init() tea.Cmd {
 	for _, pID := range m.projectIDs {
 		cmds = append(cmds, m.fetchBucketsPage(pID, ""))
 	}
+
+	if len(m.projectIDs) > 0 && m.state == viewBuckets && m.cursor == 0 {
+		m.previewContent = "Loading project info..."
+		cmds = append(cmds, m.fetchProjectMetadata(m.projectIDs[0]))
+	}
+
 	return tea.Batch(cmds...)
 }
 
