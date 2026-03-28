@@ -164,6 +164,21 @@ func (m *Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 		if m.bgJobs < 0 {
 			m.bgJobs = 0
 		}
+		if m.bgJobs == 0 && (m.targetBucketCursor != "" || m.targetProjectCursor != "") {
+			filtered := m.filteredBuckets()
+			for i, item := range filtered {
+				if m.targetProjectCursor != "" && item.IsProject && item.ProjectID == m.targetProjectCursor {
+					m.cursor = i
+					break
+				}
+				if m.targetBucketCursor != "" && !item.IsProject && item.BucketName == m.targetBucketCursor {
+					m.cursor = i
+					break
+				}
+			}
+			m.targetBucketCursor = ""
+			m.targetProjectCursor = ""
+		}
 	}
 	// On first successful page, ensure loading screen hides
 	m.loading = false
@@ -1137,6 +1152,13 @@ func (m *Model) handleRefreshKey(silent bool) (tea.Model, tea.Cmd) {
 		if m.cursor < len(filtered) {
 			item := filtered[m.cursor]
 			selectedItem = &item
+			if item.IsProject {
+				m.targetProjectCursor = item.ProjectID
+				m.targetBucketCursor = ""
+			} else {
+				m.targetBucketCursor = item.BucketName
+				m.targetProjectCursor = ""
+			}
 		}
 
 		m.bgJobs = len(m.projectIDs)

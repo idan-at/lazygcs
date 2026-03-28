@@ -82,6 +82,8 @@ type Model struct {
 	collapsedProjects    map[string]struct{}
 	cursor               int // used for buckets or objects depending on state
 	bucketCursor         int // stores the cursor position in the bucket list
+	targetBucketCursor   string
+	targetProjectCursor  string
 	cursorVersion        int // used for debouncing preview requests
 	bucketMetadataCache  *LRUCache[string, bucketMetadataCacheEntry]
 	projectMetadataCache *LRUCache[string, projectMetadataCacheEntry]

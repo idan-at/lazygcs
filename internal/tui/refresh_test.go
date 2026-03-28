@@ -103,3 +103,32 @@ func TestModel_Actions_RefreshVersions(t *testing.T) {
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "Loading versions..."), "View should show 'Loading versions...'")
 }
+
+func TestModel_Actions_RefreshBucketsPreservesCursor(t *testing.T) {
+	projects := []gcs.ProjectBuckets{
+		{ProjectID: "p1", Buckets: []string{"b1", "b2"}},
+	}
+	objects := simpleObjectList(nil, nil)
+	m, _ := setupTestModel(projects, objects, "/tmp")
+
+	// 1. Initial load
+	// List: [p1, b1, b2]
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2"}})
+
+	// Select b2 (index 2)
+	m, _ = pressKey(m, 'j') // to b1
+	m, _ = pressKey(m, 'j') // to b2
+	assert.Equal(t, m.Cursor(), 2)
+
+	// 2. Press 'R' to refresh
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+
+	// 3. Simulate receipt of refreshed buckets with a new bucket 'b0' added before b1
+	// New list for p1: [b0, b1, b2]
+	// Expected full list: [p1, b0, b1, b2]
+	// b2 should now be at index 3.
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b0", "b1", "b2"}})
+
+	// Cursor should be restored to 3 (b2)
+	assert.Equal(t, m.Cursor(), 3, "Cursor should follow the bucket name 'b2', not the index")
+}
