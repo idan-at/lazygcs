@@ -1,4 +1,4 @@
-# lazygcs ☁️🦥
+# lazygcs ☁️🪣
 
 A fast, keyboard-driven Terminal User Interface (TUI) for exploring and managing Google Cloud Storage (GCS).
 
