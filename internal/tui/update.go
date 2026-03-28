@@ -103,7 +103,12 @@ func (m *Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 	found := false
 	for i, p := range m.projects {
 		if p.ProjectID == msg.ProjectID {
-			m.projects[i].Buckets = append(m.projects[i].Buckets, msg.Buckets...)
+			if m.loadingProjects[msg.ProjectID] && msg.Buckets != nil {
+				// This is the first page of a refresh for this project
+				m.projects[i].Buckets = msg.Buckets
+			} else {
+				m.projects[i].Buckets = append(m.projects[i].Buckets, msg.Buckets...)
+			}
 			sort.Strings(m.projects[i].Buckets)
 			found = true
 			break
@@ -155,21 +160,14 @@ func (m *Model) handleBucketsPageMsg(msg BucketsPageMsg) (tea.Model, tea.Cmd) {
 	if msg.NextToken != "" {
 		cmd = m.fetchBucketsPage(msg.ProjectID, msg.NextToken)
 	} else {
-		// Only stop loading if all projects are fully loaded?
-		// For a lazy UI, we can turn off loading immediately,
-		// or maintain a map of loading projects.
-		// For simplicity, let's turn it off when we get any page
-		// so the UI feels fast, or wait until all are done.
-		// Let's just turn it off immediately so buckets appear ASAP.
-		m.loading = false
 		m.bgJobs--
 		if m.bgJobs < 0 {
 			m.bgJobs = 0
 		}
-		delete(m.loadingProjects, msg.ProjectID)
 	}
 	// On first successful page, ensure loading screen hides
 	m.loading = false
+	delete(m.loadingProjects, msg.ProjectID)
 	return m, cmd
 }
 
@@ -230,8 +228,13 @@ func (m *Model) handleObjectsMsg(msg ObjectsMsg) (tea.Model, tea.Cmd) {
 		// Fetch metadata for the current cursor (either 0 or restored)
 		m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 	} else if m.cursor-len(m.prefixes) < len(m.objects) {
+		obj := m.objects[m.cursor-len(m.prefixes)]
 		m.previewContent = clearImagesEsc + "Loading..."
-		m, cmd = m.triggerDebounces(m.fetchContent(m.objects[m.cursor-len(m.prefixes)]), "", "")
+		if m.showVersions {
+			m, cmd = m.triggerDebounces(m.fetchObjectVersions(m.currentBucket, obj.Name), "", "")
+		} else {
+			m, cmd = m.triggerDebounces(m.fetchContent(obj), "", "")
+		}
 	}
 	return m, cmd
 }
@@ -284,8 +287,13 @@ func (m *Model) handleObjectsPageMsg(msg ObjectsPageMsg) (tea.Model, tea.Cmd) {
 			// Fetch metadata for the current cursor (either 0 or restored)
 			m, cmd = m.triggerDebounces(m.fetchPrefixMetadataByName(m.prefixes[m.cursor].Name, m.cursor), m.currentBucket, m.prefixes[m.cursor].Name)
 		} else if len(m.objects) > 0 {
+			obj := m.objects[0]
 			m.previewContent = clearImagesEsc + "Loading..."
-			m, cmd = m.triggerDebounces(m.fetchContent(m.objects[0]), "", "")
+			if m.showVersions {
+				m, cmd = m.triggerDebounces(m.fetchObjectVersions(m.currentBucket, obj.Name), "", "")
+			} else {
+				m, cmd = m.triggerDebounces(m.fetchContent(obj), "", "")
+			}
 		}
 	}
 
@@ -1124,10 +1132,17 @@ func (m *Model) handleRefreshKey(silent bool) (tea.Model, tea.Cmd) {
 
 	switch m.state {
 	case viewBuckets:
-		m.projects = nil
+		filtered := m.filteredBuckets()
+		var selectedItem *BucketListItem
+		if m.cursor < len(filtered) {
+			item := filtered[m.cursor]
+			selectedItem = &item
+		}
+
 		m.bgJobs = len(m.projectIDs)
 		m.loadingProjects = make(map[string]bool)
 		m.bucketMetadataCache = NewLRUCache[string, bucketMetadataCacheEntry](256)
+		m.projectMetadataCache = NewLRUCache[string, projectMetadataCacheEntry](256)
 		for _, id := range m.projectIDs {
 			m.loadingProjects[id] = true
 		}
@@ -1136,8 +1151,28 @@ func (m *Model) handleRefreshKey(silent bool) (tea.Model, tea.Cmd) {
 		for _, pID := range m.projectIDs {
 			cmds = append(cmds, m.fetchBucketsPage(pID, ""))
 		}
+
+		if selectedItem != nil {
+			if selectedItem.IsProject {
+				cmds = append(cmds, m.fetchProjectMetadata(selectedItem.ProjectID))
+				m.previewContent = "Loading project info..."
+			} else {
+				cmds = append(cmds, m.fetchBucketMetadata(selectedItem.BucketName))
+				m.previewContent = "Loading..."
+			}
+		}
+
 		return m, tea.Batch(cmds...)
 	case viewObjects:
+		currentPrefixes, currentObjects, _ := m.filteredObjects()
+		var selectedItemName string
+		if m.cursor < len(currentPrefixes) {
+			selectedItemName = currentPrefixes[m.cursor].Name
+		} else if m.cursor-len(currentPrefixes) < len(currentObjects) {
+			selectedItemName = currentObjects[m.cursor-len(currentPrefixes)].Name
+		}
+		m.targetPrefixCursor = selectedItemName
+
 		m.loading = true
 		m.bgJobs++
 		m.objects = nil
@@ -1145,6 +1180,18 @@ func (m *Model) handleRefreshKey(silent bool) (tea.Model, tea.Cmd) {
 		// Invalidate cache for current prefix
 		cacheKey := m.currentBucket + "::" + m.currentPrefix
 		delete(m.listCache, cacheKey)
+
+		if selectedItemName != "" {
+			itemCacheKey := m.currentBucket + "::" + selectedItemName
+			delete(m.metadataCache, itemCacheKey)
+			delete(m.contentCache, itemCacheKey)
+		}
+
+		if m.showVersions {
+			delete(m.bucketVersioningCache, m.currentBucket)
+			m.versioningChecked = false
+		}
+
 		return m, tea.Batch(cmd, m.fetchObjects())
 	}
 	return m, cmd
