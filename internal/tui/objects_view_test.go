@@ -2,6 +2,7 @@ package tui_test
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -251,6 +252,9 @@ func TestModel_SelectObject(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "obj1"))
 	assert.Assert(t, strings.Contains(view, "1.0 KB"))
 	assert.Assert(t, strings.Contains(view, "text/plain"))
+	assert.Assert(t, strings.Contains(view, "Console Link:"), "Console Link should be visible")
+	assert.Assert(t, strings.Contains(view, "https://console.cloud.google.com/storage/browser/_details/b1/obj1?project=p1"), "Object Console URL should be correct")
+	assert.Assert(t, strings.Contains(view, "Link"), "Link text should be visible")
 }
 
 func TestModel_SelectPrefix(t *testing.T) {
@@ -289,6 +293,9 @@ func TestModel_SelectPrefix(t *testing.T) {
 	assert.Assert(t, strings.Contains(view, "folder1/"))
 	assert.Assert(t, strings.Contains(view, "Folder"))
 	assert.Assert(t, strings.Contains(view, "test-user"))
+	assert.Assert(t, strings.Contains(view, "Console Link:"), "Console Link should be visible")
+	assert.Assert(t, strings.Contains(view, "https://console.cloud.google.com/storage/browser/b/folder1;tab=objects?project=p1"), "Folder Console URL should be correct")
+	assert.Assert(t, strings.Contains(view, "Link"), "Link text should be visible")
 }
 
 func TestModel_Pagination_Objects(t *testing.T) {
@@ -343,6 +350,13 @@ func TestModel_StaleObjectsMsg(t *testing.T) {
 	}
 }
 
+func stripLinks(s string) string {
+	re := regexp.MustCompile(`\x1b]8;;.*?\x1b\\`)
+	s = re.ReplaceAllString(s, "")
+	re2 := regexp.MustCompile(`\x1b]8;;\x1b\\`)
+	return re2.ReplaceAllString(s, "")
+}
+
 func TestModel_Truncation(t *testing.T) {
 	longName := "this_is_a_very_long_object_name_that_should_be_truncated_to_fit_in_the_column"
 	client := &mockGCSClient{
@@ -360,7 +374,7 @@ func TestModel_Truncation(t *testing.T) {
 	m, _ = pressKey(m, 'j')
 
 	view := m.View()
-	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long bucket name")
+	assert.Assert(t, !strings.Contains(stripLinks(view), longName), "View should NOT contain the full long bucket name")
 
 	// 2. Check Object truncation
 	m, _ = pressKeyType(m, tea.KeyEnter)
@@ -368,7 +382,7 @@ func TestModel_Truncation(t *testing.T) {
 
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "..."), "View should contain ellipsis for truncated object name")
-	assert.Assert(t, !strings.Contains(view, longName), "View should NOT contain the full long object name")
+	assert.Assert(t, !strings.Contains(stripLinks(view), longName), "View should NOT contain the full long object name")
 }
 
 func TestModel_PreviewBinaryContent(t *testing.T) {

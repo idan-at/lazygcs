@@ -80,6 +80,7 @@ type Model struct {
 	// Buckets View
 	projects             []gcs.ProjectBuckets
 	collapsedProjects    map[string]struct{}
+	currentProjectID     string
 	cursor               int // used for buckets or objects depending on state
 	bucketCursor         int // stores the cursor position in the bucket list
 	targetBucketCursor   string

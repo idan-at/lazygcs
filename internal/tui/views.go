@@ -19,6 +19,7 @@ var (
 	bucketInfoValStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#CDD6F4"))
 	bucketInfoErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#F28FAD"))
 	bucketInfoLabelsStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5C2E7"))
+	bucketInfoLinkStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#89B4FA")).Underline(true)
 )
 
 func (m *Model) renderSpinner() string {
@@ -207,6 +208,9 @@ func (m *Model) previewView(width int) string {
 
 			displayName := getDisplayName(prefix.Name, m.currentPrefix)
 			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
+			folderURL := fmt.Sprintf("https://console.cloud.google.com/storage/browser/%s/%s;tab=objects?project=%s", m.currentBucket, strings.TrimSuffix(prefix.Name, "/"), m.currentProjectID)
+			fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Console Link:"), valStyle.Render(terminalHyperlink(folderURL, bucketInfoLinkStyle.Render("Link"))))
+
 			if !prefix.Fetched {
 				fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Type:"), valStyle.Render("Folder"))
 				fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.renderSpinner())
@@ -239,6 +243,9 @@ func (m *Model) previewView(width int) string {
 				if m.showMetadata {
 					// Detailed Metadata View
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(obj.Name, width-10)))
+					objectURL := fmt.Sprintf("https://console.cloud.google.com/storage/browser/_details/%s/%s?project=%s", m.currentBucket, obj.Name, m.currentProjectID)
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Console Link:"), valStyle.Render(terminalHyperlink(objectURL, bucketInfoLinkStyle.Render("Link"))))
+
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Bucket:"), valStyle.Render(truncate(obj.Bucket, width-12)))
 					s.WriteString("\n")
 
@@ -295,6 +302,9 @@ func (m *Model) previewView(width int) string {
 					// Standard Preview
 					displayName := getDisplayName(obj.Name, m.currentPrefix)
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Name:"), valStyle.Render(truncate(displayName, width-10)))
+					objectURL := fmt.Sprintf("https://console.cloud.google.com/storage/browser/_details/%s/%s?project=%s", m.currentBucket, obj.Name, m.currentProjectID)
+					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Console Link:"), valStyle.Render(terminalHyperlink(objectURL, bucketInfoLinkStyle.Render("Link"))))
+
 					fmt.Fprintf(&s, "%s %s\n", keyStyle.Render("Size:"), valStyle.Render(humanizeSize(obj.Size)))
 
 					contentType := obj.ContentType
@@ -404,7 +414,9 @@ func (m *Model) previewView(width int) string {
 		if m.cursor < len(filtered) {
 			item := filtered[m.cursor]
 			if item.IsProject {
-				s.WriteString(bucketInfoProjectStyle.Render("Project: ") + item.ProjectID + "\n\n")
+				s.WriteString(bucketInfoProjectStyle.Render("Project: ") + item.ProjectID + "\n")
+				projectURL := fmt.Sprintf("https://console.cloud.google.com/welcome?project=%s", item.ProjectID)
+				fmt.Fprintf(&s, "%s %s\n\n", bucketInfoKeyStyle.Render("Console Link:"), bucketInfoValStyle.Render(terminalHyperlink(projectURL, bucketInfoLinkStyle.Render("Link"))))
 
 				if m.previewContent == "Loading project info..." || m.previewContent == clearImagesEsc+"Loading project info..." {
 					fmt.Fprintf(&s, "\n%s Loading project info...\n", m.renderSpinner())
@@ -449,6 +461,8 @@ func (m *Model) previewView(width int) string {
 				}
 			} else {
 				fmt.Fprintf(&s, "%s %s\n", bucketInfoKeyStyle.Render("Bucket:"), bucketInfoValStyle.Render(truncate(item.BucketName, width-10)))
+				bucketURL := fmt.Sprintf("https://console.cloud.google.com/storage/browser/%s?project=%s", item.BucketName, item.ProjectID)
+				fmt.Fprintf(&s, "%s %s\n\n", bucketInfoKeyStyle.Render("Console Link:"), bucketInfoValStyle.Render(terminalHyperlink(bucketURL, bucketInfoLinkStyle.Render("Link"))))
 
 				if m.previewContent == "Loading..." || m.previewContent == clearImagesEsc+"Loading..." {
 					fmt.Fprintf(&s, "\n%s Loading metadata...\n", m.renderSpinner())

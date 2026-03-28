@@ -219,6 +219,7 @@ func TestModel_BucketMetadataDeterministicLabels(t *testing.T) {
 	client := &mockGCSClient{}
 	mModel := tui.NewModel([]string{"test-project-1"}, client, "/tmp", false, false)
 	m := &mModel
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 200, Height: 50})
 
 	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "test-project-1", Buckets: []string{"test-bucket"}})
 
@@ -242,6 +243,9 @@ func TestModel_BucketMetadataDeterministicLabels(t *testing.T) {
 	view1 := m.View()
 
 	assert.Assert(t, strings.Contains(view1, "a-label:"), "Should show a-label")
+	assert.Assert(t, strings.Contains(view1, "Console Link:"), "Console Link should be visible")
+	assert.Assert(t, strings.Contains(view1, "https://console.cloud.google.com/storage/browser/test-bucket?project=test-project-1"), "Bucket Console URL should be correct")
+	assert.Assert(t, strings.Contains(view1, "Link"), "Link text should be visible")
 
 	idxA := strings.Index(view1, "a-label")
 	idxM := strings.Index(view1, "m-label")
@@ -263,7 +267,7 @@ func TestModel_Init_ShowsLoadingProjectInfo(t *testing.T) {
 	// Create model
 	mModel := tui.NewModel([]string{projectID}, client, "/tmp", false, false)
 	m := &mModel
-	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 100, Height: 20})
+	m, _ = updateModel(m, tea.WindowSizeMsg{Width: 200, Height: 20})
 
 	// Call Init and get commands
 	cmd := m.Init()
@@ -303,4 +307,7 @@ func TestModel_Init_ShowsLoadingProjectInfo(t *testing.T) {
 	assert.Assert(t, !strings.Contains(view, "Loading project info..."), "Loading project info should disappear after metadata arrives")
 	assert.Assert(t, strings.Contains(view, "Project Name:"), "Metadata should be visible")
 	assert.Assert(t, strings.Contains(view, "My Cool Project"), "Project name should be visible")
+	assert.Assert(t, strings.Contains(view, "Console Link:"), "Console Link should be visible")
+	assert.Assert(t, strings.Contains(view, "https://console.cloud.google.com/welcome?project=test-project"), "Project Console URL should be correct")
+	assert.Assert(t, strings.Contains(view, "Link"), "Link text should be visible")
 }

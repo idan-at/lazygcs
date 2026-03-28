@@ -1314,6 +1314,7 @@ func (m *Model) handleRightKey() (tea.Model, tea.Cmd) {
 			}
 
 			m.currentBucket = item.BucketName
+			m.currentProjectID = item.ProjectID
 
 			// Save the index in the filtered list to restore later.
 			m.bucketCursor = m.cursor

@@ -147,6 +147,10 @@ func humanizeSize(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
+func terminalHyperlink(url, text string) string {
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, text)
+}
+
 var (
 	fallbackExactIcons = map[string]string{
 		"dockerfile":          "🐳 ",
