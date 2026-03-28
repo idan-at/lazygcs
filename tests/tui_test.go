@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -211,18 +210,6 @@ func TestDownloadObject_MultiSelect(t *testing.T) {
 	assert.Assert(t, foundFile2, "file2.txt should be in the zip")
 }
 
-type mockProjectGCSClient struct {
-	*gcs.Client
-	projects map[string]*gcs.ProjectMetadata
-}
-
-func (m *mockProjectGCSClient) GetProjectMetadata(_ context.Context, projectID string) (*gcs.ProjectMetadata, error) {
-	if p, ok := m.projects[projectID]; ok {
-		return p, nil
-	}
-	return nil, fmt.Errorf("project not found")
-}
-
 func TestProjectInformationPreview(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
@@ -244,9 +231,9 @@ func TestProjectInformationPreview(t *testing.T) {
 	cfg, _ := config.Load(cfgPath)
 
 	realClient := gcs.NewClient(server.Client())
-	mockClient := &mockProjectGCSClient{
-		Client: realClient,
-		projects: map[string]*gcs.ProjectMetadata{
+	mockClient := &testutil.MockProjectGCSClient{
+		GCSClient: realClient,
+		Projects: map[string]*gcs.ProjectMetadata{
 			"test-project-1": {
 				ProjectID:     "test-project-1",
 				Name:          "Test Project",
@@ -319,9 +306,9 @@ func TestProjectInformationPreview_Error(t *testing.T) {
 	cfg, _ := config.Load(cfgPath)
 
 	realClient := gcs.NewClient(server.Client())
-	mockClient := &mockProjectGCSClient{
-		Client:   realClient,
-		projects: map[string]*gcs.ProjectMetadata{}, // Empty to trigger error
+	mockClient := &testutil.MockProjectGCSClient{
+		GCSClient:    realClient,
+		ProjectError: fmt.Errorf("project not found"),
 	}
 
 	m := tui.NewModel(cfg.Projects, mockClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
@@ -798,9 +785,9 @@ func TestProjectLabelsSorted(t *testing.T) {
 	cfg, _ := config.Load(cfgPath)
 
 	realClient := gcs.NewClient(server.Client())
-	mockClient := &mockProjectGCSClient{
-		Client: realClient,
-		projects: map[string]*gcs.ProjectMetadata{
+	mockClient := &testutil.MockProjectGCSClient{
+		GCSClient: realClient,
+		Projects: map[string]*gcs.ProjectMetadata{
 			"test-project-1": {
 				ProjectID: "test-project-1",
 				Name:      "Test Project",

@@ -5,6 +5,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,6 +39,28 @@ func SetupGCSMock(t *testing.T, initialObjects []fakestorage.Object, port uint16
 
 	gcsClient := gcs.NewClient(server.Client())
 	return server, gcsClient
+}
+
+// MockProjectGCSClient wraps a real GCS client but mocks the project metadata calls.
+type MockProjectGCSClient struct {
+	tui.GCSClient
+	Projects     map[string]*gcs.ProjectMetadata
+	ProjectError error
+}
+
+// GetProjectMetadata returns mocked project metadata or a default if not found.
+func (m *MockProjectGCSClient) GetProjectMetadata(_ context.Context, projectID string) (*gcs.ProjectMetadata, error) {
+	if m.ProjectError != nil {
+		return nil, m.ProjectError
+	}
+	if p, ok := m.Projects[projectID]; ok {
+		return p, nil
+	}
+	// Return a default mock to avoid CRM service initialization errors in tests.
+	return &gcs.ProjectMetadata{
+		ProjectID: projectID,
+		Name:      "Mock Project " + projectID,
+	}, nil
 }
 
 // CreateConfigFile creates a temporary config file for tests.
@@ -77,7 +100,8 @@ func SetupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16
 	assert.NilError(t, err)
 
 	gcsClient := gcs.NewClient(server.Client())
-	m := tui.NewModel(cfg.Projects, gcsClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
+	mockClient := &MockProjectGCSClient{GCSClient: gcsClient}
+	m := tui.NewModel(cfg.Projects, mockClient, cfg.DownloadDir, cfg.FuzzySearch, cfg.NerdIcons)
 	m.SetDeterministicSpinner(true)
 
 	tm := teatest.NewTestModel(t, &m)
