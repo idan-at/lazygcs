@@ -167,12 +167,70 @@ func TestHelpView_ClearsKittyImages(t *testing.T) {
 
 	view := m.View()
 	// CLEAR code: \x1b_Ga=d,d=A\x1b\\
-	assert.Assert(t, strings.HasPrefix(view, "\x1b_Ga=d,d=A\x1b\\"), "View should start with CLEAR code when help is shown")
+	assert.Assert(t, strings.Count(view, "\x1b_Ga=d,d=A\x1b\\") >= 2, "CLEAR code should be embedded in the view to trigger diff renderer")
 
 	// Verify that DRAW code is absent in the rest of the view
 	contentAfterClear := view[len("\x1b_Ga=d,d=A\x1b\\"):]
 	assert.Assert(t, !strings.Contains(contentAfterClear, "\x1b_Ga=T"), "View should NOT contain DRAW code after the initial CLEAR code")
 	assert.Assert(t, strings.Contains(view, "(image preview hidden)"), "Placeholder text should be present when help is visible")
+}
+
+func TestMetadataView_ClearsKittyImages(t *testing.T) {
+	m, client := setupTestModel(
+		[]gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		simpleObjectList([]string{"obj1"}, nil),
+		"/tmp",
+	)
+
+	// Navigate to object to set preview content
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Simulate receiving a kitty image for the object preview
+	m, _ = updateModel(m, tui.ContentMsg{
+		ObjectName: "obj1",
+		Content:    "\x1b_Ga=T,f=100;AAAA\x1b\\",
+	})
+
+	// Show metadata
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+
+	view := m.View()
+	// CLEAR code: \x1b_Ga=d,d=A\x1b\\
+	assert.Assert(t, strings.Count(view, "\x1b_Ga=d,d=A\x1b\\") >= 2, "CLEAR code should be embedded in the view to trigger diff renderer")
+
+	// Verify that DRAW code is absent in the rest of the view
+	contentAfterClear := view[len("\x1b_Ga=d,d=A\x1b\\"):]
+	assert.Assert(t, !strings.Contains(contentAfterClear, "\x1b_Ga=T"), "View should NOT contain DRAW code after the initial CLEAR code")
+	assert.Assert(t, strings.Contains(view, "Storage Class:"), "Metadata should be visible")
+}
+
+func TestVersionsView_ClearsKittyImages(t *testing.T) {
+	m, client := setupTestModel(
+		[]gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}},
+		simpleObjectList([]string{"obj1"}, nil),
+		"/tmp",
+	)
+
+	// Navigate to object to set preview content
+	m = enterBucket(m, []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}, "b1", client.objects)
+
+	// Simulate receiving a kitty image for the object preview
+	m, _ = updateModel(m, tui.ContentMsg{
+		ObjectName: "obj1",
+		Content:    "\x1b_Ga=T,f=100;AAAA\x1b\\",
+	})
+
+	// Show versions
+	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+
+	view := m.View()
+	// CLEAR code: \x1b_Ga=d,d=A\x1b\\
+	assert.Assert(t, strings.Count(view, "\x1b_Ga=d,d=A\x1b\\") >= 2, "CLEAR code should be embedded in the view to trigger diff renderer")
+
+	// Verify that DRAW code is absent in the rest of the view
+	contentAfterClear := view[len("\x1b_Ga=d,d=A\x1b\\"):]
+	assert.Assert(t, !strings.Contains(contentAfterClear, "\x1b_Ga=T"), "View should NOT contain DRAW code after the initial CLEAR code")
+	assert.Assert(t, strings.Contains(view, "Object Versions"), "Versions view should be visible")
 }
 
 func TestFooterView_HideHelpOnMessage(t *testing.T) {

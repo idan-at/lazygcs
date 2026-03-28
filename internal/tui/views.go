@@ -184,6 +184,9 @@ func (m *Model) previewView(width int) string {
 	case viewObjects, viewDownloadConfirm:
 		if m.showVersions {
 			s.WriteString(m.renderVersionsView(width))
+			if strings.HasPrefix(m.previewContent, "\x1b_G") {
+				s.WriteString(clearImagesEsc)
+			}
 			return s.String()
 		}
 
@@ -283,6 +286,10 @@ func (m *Model) previewView(width int) string {
 						for k, v := range obj.Metadata {
 							fmt.Fprintf(&s, "  %s %s\n", keyStyle.Render(k+":"), valStyle.Render(truncate(v, width-len(k)-6)))
 						}
+					}
+
+					if strings.HasPrefix(m.previewContent, "\x1b_G") {
+						s.WriteString(clearImagesEsc)
 					}
 				} else {
 					// Standard Preview
