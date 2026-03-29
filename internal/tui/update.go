@@ -50,6 +50,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleObjectVersionsMsg(msg)
 	case CreateMsg:
 		return m.handleCreateMsg(msg)
+	case DeleteMsg:
+		return m.handleDeleteMsg(msg)
 	case DebouncePreviewMsg:
 		if msg.CursorVersion == m.cursorVersion {
 			return m, msg.FetchCmd
@@ -652,6 +654,10 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleDownloadConfirmKey(msg)
 	}
 
+	if m.state == viewDeleteConfirm {
+		return m.handleDeleteConfirmKey(msg)
+	}
+
 	switch {
 	case key.Matches(msg, keys.Help):
 		m.showHelp = true
@@ -701,6 +707,9 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Create):
 		return m.handleCreateKey()
+
+	case key.Matches(msg, keys.Delete):
+		return m.handleDeleteKey()
 
 	case key.Matches(msg, keys.Select):
 		return m.handleSelectKey()
@@ -1639,6 +1648,90 @@ func (m *Model) handleCreateMsg(msg CreateMsg) (tea.Model, tea.Cmd) {
 	}
 
 	statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Created %s", msg.Name), 0, "")
+	nm, refreshCmd := m.handleRefreshKey(true)
+	return nm, tea.Batch(statusCmd, refreshCmd)
+}
+
+func (m *Model) handleDeleteKey() (tea.Model, tea.Cmd) {
+	switch m.state {
+	case viewBuckets:
+		filtered := m.filteredBuckets()
+		if m.cursor < 0 || m.cursor >= len(filtered) {
+			return m, nil
+		}
+		item := filtered[m.cursor]
+		if item.IsProject {
+			return m, nil // Cannot delete projects
+		}
+		m.pendingDeleteBucket = item.BucketName
+		m.pendingDeleteIsBucket = true
+		m.state = viewDeleteConfirm
+		return m, nil
+
+	case viewObjects:
+		if len(m.selected) > 1 {
+			return m, m.AddMessage(LevelError, "Multi-delete not supported yet", 0, "")
+		}
+
+		currentPrefixes, currentObjects, _ := m.filteredObjects()
+		if m.cursor < 0 || m.cursor >= len(currentPrefixes)+len(currentObjects) {
+			return m, nil
+		}
+
+		m.pendingDeleteBucket = m.currentBucket
+		m.pendingDeleteIsBucket = false
+		if m.cursor < len(currentPrefixes) {
+			m.pendingDeletePrefix = currentPrefixes[m.cursor].Name
+			m.pendingDeleteObject = ""
+		} else {
+			m.pendingDeleteObject = currentObjects[m.cursor-len(currentPrefixes)].Name
+			m.pendingDeletePrefix = ""
+		}
+		m.state = viewDeleteConfirm
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *Model) handleDeleteConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		var cmd tea.Cmd
+		if m.pendingDeleteIsBucket {
+			cmd = m.deleteBucket(m.pendingDeleteBucket)
+		} else if m.pendingDeletePrefix != "" {
+			cmd = m.deletePrefix(m.pendingDeleteBucket, m.pendingDeletePrefix)
+		} else {
+			cmd = m.deleteObject(m.pendingDeleteBucket, m.pendingDeleteObject)
+		}
+		m.state = viewObjects
+		if m.pendingDeleteIsBucket {
+			m.state = viewBuckets
+		}
+		m.pendingDeleteBucket = ""
+		m.pendingDeleteObject = ""
+		m.pendingDeletePrefix = ""
+		return m, cmd
+	default:
+		if m.pendingDeleteIsBucket {
+			m.state = viewBuckets
+		} else {
+			m.state = viewObjects
+		}
+		m.pendingDeleteBucket = ""
+		m.pendingDeleteObject = ""
+		m.pendingDeletePrefix = ""
+		return m, nil
+	}
+}
+
+func (m *Model) handleDeleteMsg(msg DeleteMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		statusCmd := m.AddMessage(LevelError, fmt.Sprintf("Deletion failed: %v", msg.Err), 0, "")
+		return m, statusCmd
+	}
+
+	statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Deleted %s", msg.Name), 0, "")
 	nm, refreshCmd := m.handleRefreshKey(true)
 	return nm, tea.Batch(statusCmd, refreshCmd)
 }

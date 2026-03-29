@@ -79,7 +79,7 @@ func CreateConfigFile(t *testing.T, projects []string, downloadDir string) strin
 }
 
 // SetupTestApp initializes the full TUI application using a fake GCS server.
-func SetupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16, projectIDs []string, downloadDir string) *teatest.TestModel {
+func SetupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16, projectIDs []string, downloadDir string) (*teatest.TestModel, *fakestorage.Server) {
 	t.Helper()
 
 	// Ensure tests produce deterministic colored output regardless of environment
@@ -112,7 +112,7 @@ func SetupTestApp(t *testing.T, initialObjects []fakestorage.Object, port uint16
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
 	})
 
-	return tm
+	return tm, server
 }
 
 // CreateMockTar creates a tar archive in memory with the given files map (name -> content).

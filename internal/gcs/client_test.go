@@ -681,3 +681,72 @@ func TestClient_DownloadPrefixAsZip_ErrorsAndProgress(t *testing.T) {
 		assert.Equal(t, currentProgress, totalProgress)
 	})
 }
+
+func TestClient_DeleteBucket(t *testing.T) {
+	bucketName := "delete-bucket"
+	server, client := setupTestServer(t, []fakestorage.Object{})
+	server.CreateBucketWithOpts(fakestorage.CreateBucketOpts{Name: bucketName})
+
+	t.Run("Success", func(t *testing.T) {
+		err := client.DeleteBucket(context.Background(), bucketName)
+		assert.NilError(t, err)
+
+		_, err = client.GetBucketMetadata(context.Background(), bucketName)
+		assert.Assert(t, err != nil)
+	})
+
+	t.Run("Non-existent bucket", func(t *testing.T) {
+		err := client.DeleteBucket(context.Background(), "no-bucket")
+		assert.Assert(t, err != nil)
+	})
+}
+
+func TestClient_DeleteObject(t *testing.T) {
+	bucketName := "obj-delete-bucket"
+	objectName := "delete-me.txt"
+	_, client := setupTestServer(t, []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: objectName}},
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		err := client.DeleteObject(context.Background(), bucketName, objectName)
+		assert.NilError(t, err)
+
+		_, err = client.GetObjectMetadata(context.Background(), bucketName, objectName)
+		assert.Assert(t, err != nil)
+	})
+
+	t.Run("Non-existent object", func(t *testing.T) {
+		err := client.DeleteObject(context.Background(), bucketName, "no-obj")
+		assert.Assert(t, err != nil)
+	})
+}
+
+func TestClient_DeletePrefix(t *testing.T) {
+	bucketName := "prefix-delete-bucket"
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "folder/file1.txt"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "folder/sub/file2.txt"}},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: bucketName, Name: "other.txt"}},
+	}
+	server, client := setupTestServer(t, objects)
+
+	t.Run("Success", func(t *testing.T) {
+		err := client.DeletePrefix(context.Background(), bucketName, "folder/")
+		assert.NilError(t, err)
+
+		// folder objects should be gone
+		it := server.Client().Bucket(bucketName).Objects(context.Background(), nil)
+		count := 0
+		for {
+			attrs, err := it.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			assert.NilError(t, err)
+			assert.Assert(t, attrs.Name == "other.txt")
+			count++
+		}
+		assert.Equal(t, count, 1)
+	})
+}

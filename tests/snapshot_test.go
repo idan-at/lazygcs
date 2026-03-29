@@ -25,7 +25,7 @@ func TestSnapshot_InitialBucketsView(t *testing.T) {
 		},
 	}
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load and appear on screen
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -67,7 +67,7 @@ func TestSnapshot_ObjectsAndPreview(t *testing.T) {
 		},
 	}
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -108,7 +108,7 @@ func TestSnapshot_HelpMenu(t *testing.T) {
 		},
 	}
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -140,7 +140,7 @@ func TestSnapshot_SearchView(t *testing.T) {
 		},
 	}
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -197,7 +197,7 @@ func TestSnapshot_MultiSelectionView(t *testing.T) {
 		},
 	}
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -254,7 +254,7 @@ func TestSnapshot_MessagesView(t *testing.T) {
 		},
 	}
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {

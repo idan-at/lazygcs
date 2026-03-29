@@ -994,7 +994,7 @@ func (m *Model) View() string {
 	leftCol := leftStyle.Width(leftWidth - 2).Render(m.bucketsView(leftWidth - 4))
 
 	midStyle := inactiveStyle
-	if m.state == viewObjects || m.state == viewDownloadConfirm {
+	if m.state == viewObjects || m.state == viewDownloadConfirm || m.state == viewDeleteConfirm {
 		midStyle = activeStyle
 	}
 	midCol := midStyle.Width(midWidth - 2).Render(m.objectsView(midWidth - 4))
@@ -1009,6 +1009,8 @@ func (m *Model) View() string {
 		view = m.headerView() + "\n\n" + mainContent + "\n" + lipgloss.PlaceHorizontal(m.width, lipgloss.Center, m.messagesView())
 	} else if m.showHelp {
 		view = m.headerView() + "\n\n" + mainContent + "\n" + lipgloss.PlaceHorizontal(m.width, lipgloss.Center, m.helpView())
+	} else if m.state == viewDeleteConfirm {
+		view = m.headerView() + "\n\n" + mainContent + "\n" + lipgloss.PlaceHorizontal(m.width, lipgloss.Center, m.deleteConfirmView())
 	} else {
 		view = m.headerView() + "\n\n" + mainContent + m.footerView()
 	}
@@ -1164,4 +1166,31 @@ func (m *Model) messagesView() string {
 		Render(s.String())
 
 	return box
+}
+
+func (m *Model) deleteConfirmView() string {
+	var s strings.Builder
+	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F38BA8")).Render("DELETE CONFIRMATION")
+	s.WriteString(title + "\n\n")
+
+	var target string
+	if m.pendingDeleteIsBucket {
+		target = fmt.Sprintf("bucket: %s", m.pendingDeleteBucket)
+	} else if m.pendingDeletePrefix != "" {
+		target = fmt.Sprintf("directory: %s recursively", m.pendingDeletePrefix)
+	} else {
+		target = fmt.Sprintf("object: %s", m.pendingDeleteObject)
+	}
+
+	fmt.Fprintf(&s, "Are you sure you want to delete %s?\n", lipgloss.NewStyle().Bold(true).Render(target))
+	s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#F38BA8")).Render("This action cannot be undone.") + "\n\n")
+
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Bold(true)
+	fmt.Fprintf(&s, "%s delete    %s cancel", keyStyle.Render("y"), keyStyle.Render("n/esc"))
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#F38BA8")).
+		Padding(1, 2).
+		Render(s.String())
 }

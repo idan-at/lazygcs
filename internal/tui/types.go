@@ -40,6 +40,12 @@ type GCSClient interface {
 	NewReader(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error)
 	// NewReaderAt returns an io.ReaderAt for an object.
 	NewReaderAt(ctx context.Context, bucketName, objectName string) io.ReaderAt
+	// DeleteBucket deletes a GCS bucket.
+	DeleteBucket(ctx context.Context, bucketName string) error
+	// DeleteObject deletes a specific GCS object.
+	DeleteObject(ctx context.Context, bucketName, objectName string) error
+	// DeletePrefix deletes all objects under a prefix.
+	DeletePrefix(ctx context.Context, bucketName, prefix string) error
 	// ListObjectVersions retrieves all versions of a specific object.
 	ListObjectVersions(ctx context.Context, bucketName, objectName string) ([]gcs.ObjectMetadata, error)
 	// IsVersioningEnabled checks if versioning is enabled for a specific bucket.
@@ -150,6 +156,12 @@ type UploadMsg struct {
 
 // CreateMsg is sent when a creation operation (bucket/object) completes.
 type CreateMsg struct {
+	Name string
+	Err  error
+}
+
+// DeleteMsg is sent when a deletion operation completes.
+type DeleteMsg struct {
 	Name string
 	Err  error
 }

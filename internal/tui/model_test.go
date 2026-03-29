@@ -130,6 +130,18 @@ func (m *mockGCSClient) UploadObject(_ context.Context, bucket, object, src stri
 	return nil
 }
 
+func (m *mockGCSClient) DeleteBucket(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockGCSClient) DeleteObject(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (m *mockGCSClient) DeletePrefix(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func (m *mockGCSClient) DownloadPrefixAsZip(_ context.Context, _, _, _ string, _ gcs.ProgressFunc) error {
 	return nil
 }

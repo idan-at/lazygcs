@@ -19,6 +19,7 @@ const (
 	viewBuckets viewState = iota
 	viewObjects
 	viewDownloadConfirm
+	viewDeleteConfirm
 )
 
 type downloadTask struct {
@@ -76,6 +77,12 @@ type Model struct {
 	pendingDownloadJobNum   int
 	downloadQueue           []downloadTask
 	jobProgress             map[int]*JobProgress
+
+	// Deletion State
+	pendingDeleteBucket   string
+	pendingDeleteObject   string
+	pendingDeletePrefix   string
+	pendingDeleteIsBucket bool
 
 	// Buckets View
 	projects             []gcs.ProjectBuckets

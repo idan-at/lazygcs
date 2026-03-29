@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,7 +36,7 @@ func TestListBuckets(t *testing.T) {
 			Content: []byte("hi"),
 		},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
 
 	teatest.WaitFor(
 		t,
@@ -56,7 +57,7 @@ func TestBucketMetadataPreview(t *testing.T) {
 			},
 		},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
 
 	// Wait for the bucket to appear in the list
 	teatest.WaitFor(
@@ -97,7 +98,7 @@ func TestDownloadObject(t *testing.T) {
 		},
 	}
 	downloadDir := t.TempDir()
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, downloadDir)
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, downloadDir)
 
 	// Wait for bucket
 	teatest.WaitFor(
@@ -160,7 +161,7 @@ func TestDownloadObject_MultiSelect(t *testing.T) {
 		},
 	}
 	downloadDir := t.TempDir()
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, downloadDir)
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, downloadDir)
 
 	// Wait for bucket
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "test-bucket-1") }, teatest.WithDuration(3*time.Second))
@@ -342,7 +343,7 @@ func TestSearch(t *testing.T) {
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-1", Name: "init"}, Content: []byte("hi")},
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
 
 	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
 
@@ -379,7 +380,7 @@ func TestNavigationUp(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/file1.txt"}, Content: []byte("hi")},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -418,7 +419,7 @@ func TestDownloadOverwrite(t *testing.T) {
 	err := os.WriteFile(filePath, []byte("old content"), 0600)
 	assert.NilError(t, err)
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, downloadDir)
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, downloadDir)
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -459,7 +460,7 @@ func TestHelpMenu(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	// Toggle help
 	tm.Type("?")
@@ -478,7 +479,7 @@ func TestJumpTopBottom(t *testing.T) {
 			Content:     []byte("hi"),
 		})
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -508,7 +509,7 @@ func TestFastEscape(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "folder1/folder2/folder3/file1.txt"}, Content: []byte("hi")},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -547,7 +548,7 @@ func TestDownloadAbortRename(t *testing.T) {
 	err := os.WriteFile(filePath, []byte("old"), 0600)
 	assert.NilError(t, err)
 
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, downloadDir)
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, downloadDir)
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -585,7 +586,7 @@ func TestOpen(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file1.txt"}, Content: []byte("content")},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -673,7 +674,7 @@ func TestPaging(t *testing.T) {
 			Content:     []byte("hi"),
 		})
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	// Wait for b1
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
@@ -717,7 +718,7 @@ func TestResizePreview(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file.txt"}, Content: []byte(longText)},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
 	tm.Type("j")
@@ -740,7 +741,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 	objects := []fakestorage.Object{
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "file.txt"}, Content: []byte("content")},
 	}
-	tm := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
 
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "b1") }, teatest.WithDuration(3*time.Second))
 	tm.Type("j")
@@ -835,4 +836,128 @@ func TestProjectLabelsSorted(t *testing.T) {
 		return appleIdx != -1 && mangoIdx != -1 && zebraIdx != -1 &&
 			appleIdx < mangoIdx && mangoIdx < zebraIdx
 	}, teatest.WithDuration(5*time.Second))
+}
+
+func TestDeleteObject(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "delete-bucket",
+				Name:       "file_to_delete.txt",
+			},
+			Content: []byte("delete me"),
+		},
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "delete-bucket",
+				Name:       "keep_me.txt",
+			},
+			Content: []byte("keep me"),
+		},
+	}
+	tm, server := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
+
+	// Wait for bucket
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "delete-bucket")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
+
+	// Wait for objects
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "file_to_delete.txt")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Delete object
+	tm.Type("x")
+
+	// Wait for confirmation prompt
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "DELETE CONFIRMATION") &&
+			strings.Contains(string(bts), "file_to_delete.txt")
+	}, teatest.WithDuration(2*time.Second))
+
+	// Confirm deletion
+	tm.Type("y")
+
+	// Wait for "Deleted" message OR for the object to disappear from the list
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+
+		deletedMsg := strings.Contains(s, "Deleted file_to_delete.txt")
+		notInList := !strings.Contains(s, "📄 file_to_delete.txt")
+
+		return (deletedMsg || notInList) && strings.Contains(s, "keep_me.txt")
+	}, teatest.WithDuration(10*time.Second))
+
+	// Double check with server
+	it := server.Client().Bucket("delete-bucket").Objects(context.Background(), nil)
+	attrs, err := it.Next()
+	assert.NilError(t, err)
+	assert.Equal(t, attrs.Name, "keep_me.txt")
+}
+
+func TestDeleteBucket(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "keep-bucket",
+				Name:       "init",
+			},
+		},
+	}
+	tm, server := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
+
+	// Create an empty bucket directly on the server
+	server.CreateBucketWithOpts(fakestorage.CreateBucketOpts{Name: "bucket-to-delete"})
+
+	// Wait for buckets
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "bucket-to-delete") &&
+			strings.Contains(string(bts), "keep-bucket")
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
+
+	// Wait for stable state
+	time.Sleep(200 * time.Millisecond)
+
+	// Move to bucket-to-delete (it's the first bucket, after the project header)
+	// Project is at 0, first bucket at 1
+	tm.Type("j")
+
+	// Wait to ensure cursor moved
+	time.Sleep(100 * time.Millisecond)
+
+	// Delete bucket
+	tm.Type("x")
+
+	// Wait for confirmation prompt
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "DELETE CONFIRMATION") &&
+			strings.Contains(string(bts), "bucket: bucket-to-delete")
+	}, teatest.WithDuration(2*time.Second))
+
+	// Confirm deletion
+	tm.Type("y")
+
+	// Wait for "Deleted" message OR for the bucket to disappear from the list
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		// It might show "Deleted bucket-to-delete" OR it might have already refreshed and shows an error that it's gone
+		// OR it simply doesn't contain "bucket-to-delete" in the bucket list anymore.
+
+		deletedMsg := strings.Contains(s, "Deleted bucket-to-delete")
+		notInList := !strings.Contains(s, "📦 bucket-to-delete")
+
+		return (deletedMsg || notInList) && strings.Contains(s, "keep-bucket")
+	}, teatest.WithDuration(10*time.Second))
+
+	// Double check with server
+	_, err := server.Client().Bucket("bucket-to-delete").Attrs(context.Background())
+	assert.Assert(t, err != nil)
 }

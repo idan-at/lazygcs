@@ -254,6 +254,27 @@ func (m *Model) createObject(bucketName, objectName string) tea.Cmd {
 	}
 }
 
+func (m *Model) deleteBucket(bucketName string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.client.DeleteBucket(context.Background(), bucketName)
+		return DeleteMsg{Name: bucketName, Err: err}
+	}
+}
+
+func (m *Model) deleteObject(bucketName, objectName string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.client.DeleteObject(context.Background(), bucketName, objectName)
+		return DeleteMsg{Name: objectName, Err: err}
+	}
+}
+
+func (m *Model) deletePrefix(bucketName, prefix string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.client.DeletePrefix(context.Background(), bucketName, prefix)
+		return DeleteMsg{Name: prefix, Err: err}
+	}
+}
+
 func (m *Model) startDownloadTaskDirectly(task downloadTask) (*Model, tea.Cmd) {
 	jobNum := task.jobNum
 	m.activeDownloads++

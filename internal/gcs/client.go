@@ -539,6 +539,41 @@ func (c *Client) ListBucketsPage(ctx context.Context, projectID string, pageToke
 	return buckets, nextToken, nil
 }
 
+// DeleteBucket deletes a GCS bucket.
+func (c *Client) DeleteBucket(ctx context.Context, bucketName string) error {
+	if err := c.storageClient.Bucket(bucketName).Delete(ctx); err != nil {
+		return fmt.Errorf("failed to delete bucket %q: %w", bucketName, err)
+	}
+	return nil
+}
+
+// DeleteObject deletes a specific GCS object.
+func (c *Client) DeleteObject(ctx context.Context, bucketName, objectName string) error {
+	if err := c.storageClient.Bucket(bucketName).Object(objectName).Delete(ctx); err != nil {
+		return fmt.Errorf("failed to delete object %q in %q: %w", objectName, bucketName, err)
+	}
+	return nil
+}
+
+// DeletePrefix deletes all objects under a prefix.
+func (c *Client) DeletePrefix(ctx context.Context, bucketName, prefix string) error {
+	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{Prefix: prefix})
+	for {
+		attrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to list objects for prefix %q in %q: %w", prefix, bucketName, err)
+		}
+
+		if err := c.storageClient.Bucket(bucketName).Object(attrs.Name).Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete object %q in %q: %w", attrs.Name, bucketName, err)
+		}
+	}
+	return nil
+}
+
 // ListObjectsPage retrieves a specific page of object names and common prefixes (folders).
 func (c *Client) ListObjectsPage(ctx context.Context, bucketName, prefix, pageToken string, pageSize int) (*ObjectList, string, error) {
 	it := c.storageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
