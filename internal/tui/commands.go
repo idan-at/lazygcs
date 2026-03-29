@@ -261,17 +261,17 @@ func (m *Model) deleteBucket(bucketName string) tea.Cmd {
 	}
 }
 
-func (m *Model) deleteObject(bucketName, objectName string) tea.Cmd {
+func (m *Model) deleteObject(bucketName, objectName string, goBack bool) tea.Cmd {
 	return func() tea.Msg {
 		err := m.client.DeleteObject(context.Background(), bucketName, objectName)
-		return DeleteMsg{Name: objectName, Err: err}
+		return DeleteMsg{Name: objectName, Err: err, GoBack: goBack}
 	}
 }
 
-func (m *Model) deletePrefix(bucketName, prefix string) tea.Cmd {
+func (m *Model) deletePrefix(bucketName, prefix string, goBack bool) tea.Cmd {
 	return func() tea.Msg {
 		err := m.client.DeletePrefix(context.Background(), bucketName, prefix)
-		return DeleteMsg{Name: prefix, Err: err}
+		return DeleteMsg{Name: prefix, Err: err, GoBack: goBack}
 	}
 }
 

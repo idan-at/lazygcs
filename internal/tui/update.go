@@ -1699,10 +1699,13 @@ func (m *Model) handleDeleteConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		if m.pendingDeleteIsBucket {
 			cmd = m.deleteBucket(m.pendingDeleteBucket)
-		} else if m.pendingDeletePrefix != "" {
-			cmd = m.deletePrefix(m.pendingDeleteBucket, m.pendingDeletePrefix)
 		} else {
-			cmd = m.deleteObject(m.pendingDeleteBucket, m.pendingDeleteObject)
+			goBack := m.currentPrefix != "" && (len(m.objects)+len(m.prefixes) == 1)
+			if m.pendingDeletePrefix != "" {
+				cmd = m.deletePrefix(m.pendingDeleteBucket, m.pendingDeletePrefix, goBack)
+			} else {
+				cmd = m.deleteObject(m.pendingDeleteBucket, m.pendingDeleteObject, goBack)
+			}
 		}
 		m.state = viewObjects
 		if m.pendingDeleteIsBucket {
@@ -1732,6 +1735,12 @@ func (m *Model) handleDeleteMsg(msg DeleteMsg) (tea.Model, tea.Cmd) {
 	}
 
 	statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Deleted %s", msg.Name), 0, "")
+
+	if msg.GoBack {
+		nm, backCmd := m.handleLeftKey()
+		return nm, tea.Batch(statusCmd, backCmd)
+	}
+
 	nm, refreshCmd := m.handleRefreshKey(true)
 	return nm, tea.Batch(statusCmd, refreshCmd)
 }
