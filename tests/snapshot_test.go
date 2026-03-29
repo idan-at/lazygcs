@@ -281,3 +281,49 @@ func TestSnapshot_MessagesView(t *testing.T) {
 
 	teatest.RequireEqualOutput(t, []byte(tm.FinalModel(t).View()))
 }
+
+func TestSnapshot_DeleteConfirmation(t *testing.T) {
+	objects := []fakestorage.Object{
+		{
+			ObjectAttrs: fakestorage.ObjectAttrs{
+				BucketName: "assets",
+				Name:       "file_to_delete.txt",
+			},
+			Content: []byte("delete me"),
+		},
+	}
+
+	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"prod-project"}, t.TempDir())
+
+	// Wait for buckets to load
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "assets")
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// Enter bucket 'assets'
+	tm.Type("j")
+	tm.Type("l")
+
+	// Wait for file_to_delete.txt to appear
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "file_to_delete.txt")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Move to file_to_delete.txt
+	tm.Type("j")
+
+	// Press 'x' to delete
+	tm.Type("x")
+
+	// Wait for confirmation prompt
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "DELETE CONFIRMATION")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Trigger quit
+	_ = tm.Quit()
+
+	teatest.RequireEqualOutput(t, []byte(tm.FinalModel(t).View()))
+}

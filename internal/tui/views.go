@@ -1175,11 +1175,11 @@ func (m *Model) deleteConfirmView() string {
 
 	var target string
 	if m.pendingDeleteIsBucket {
-		target = fmt.Sprintf("bucket: %s", m.pendingDeleteBucket)
+		target = fmt.Sprintf("gs://%s", m.pendingDeleteBucket)
 	} else if m.pendingDeletePrefix != "" {
-		target = fmt.Sprintf("directory: %s recursively", m.pendingDeletePrefix)
+		target = fmt.Sprintf("gs://%s/%s", m.pendingDeleteBucket, m.pendingDeletePrefix)
 	} else {
-		target = fmt.Sprintf("object: %s", m.pendingDeleteObject)
+		target = fmt.Sprintf("gs://%s/%s", m.pendingDeleteBucket, m.pendingDeleteObject)
 	}
 
 	fmt.Fprintf(&s, "Are you sure you want to delete %s?\n", lipgloss.NewStyle().Bold(true).Render(target))
@@ -1188,9 +1188,18 @@ func (m *Model) deleteConfirmView() string {
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Bold(true)
 	fmt.Fprintf(&s, "%s delete    %s cancel", keyStyle.Render("y"), keyStyle.Render("n/esc"))
 
+	modalWidth := m.width - 20
+	if modalWidth < 60 {
+		modalWidth = 60
+	}
+	if modalWidth > 120 {
+		modalWidth = 120
+	}
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#F38BA8")).
-		Padding(1, 2).
+		Padding(1, 4).
+		Width(modalWidth).
 		Render(s.String())
 }

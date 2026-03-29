@@ -878,7 +878,7 @@ func TestDeleteObject(t *testing.T) {
 	// Wait for confirmation prompt
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		return strings.Contains(string(bts), "DELETE CONFIRMATION") &&
-			strings.Contains(string(bts), "file_to_delete.txt")
+			strings.Contains(string(bts), "gs://delete-bucket/file_to_delete.txt")
 	}, teatest.WithDuration(2*time.Second))
 
 	// Confirm deletion
@@ -939,7 +939,7 @@ func TestDeleteBucket(t *testing.T) {
 	// Wait for confirmation prompt
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		return strings.Contains(string(bts), "DELETE CONFIRMATION") &&
-			strings.Contains(string(bts), "bucket: bucket-to-delete")
+			strings.Contains(string(bts), "gs://bucket-to-delete")
 	}, teatest.WithDuration(2*time.Second))
 
 	// Confirm deletion
