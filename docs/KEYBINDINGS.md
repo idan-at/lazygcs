@@ -22,6 +22,7 @@ This document provides a comprehensive list of all keybindings available in `laz
 *   `o`: Open the highlighted file using the system's default application. *Note: Does not support multi-selection.*
 *   `e`: Edit the highlighted file using `$EDITOR`. Changes are re-uploaded automatically. *Note: Does not support multi-selection.*
 *   `n`: Create a new item. If in the bucket list, it creates a new bucket. In the object list, it creates a new file (or a directory if the name ends with `/`).
+*   `x`: Delete the currently highlighted item. Requires confirmation.
 *   `d`: Download the currently highlighted item (or all selected items). Directories are downloaded as `.zip` files.
 *   `i`: Toggle Metadata view in the Preview Pane.
 *   `v`: Toggle Object Versions view in the Preview Pane.
