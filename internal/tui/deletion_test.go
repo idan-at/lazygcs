@@ -1,6 +1,7 @@
 package tui_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -150,4 +151,38 @@ func TestModel_Deletion_ConfirmLogic_NestedWithSiblings(t *testing.T) {
 	delMsg, ok := msg.(tui.DeleteMsg)
 	assert.Assert(t, ok)
 	assert.Equal(t, delMsg.GoBack, false, "Should NOT have set GoBack to true when siblings exist")
+}
+
+func TestModel_BucketDeletion_NoMetadataErrorAfterDelete(t *testing.T) {
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1", "b2"}}}
+	m, client := setupTestModel(projects, nil, "/tmp")
+
+	// 1. Initial bucket list load
+	m, _ = updateModel(m, tui.BucketsPageMsg{ProjectID: "p1", Buckets: []string{"b1", "b2"}})
+
+	// Hover b1 (it should be at index 1 because index 0 is the project header)
+	m, _ = pressKey(m, 'j')
+	assert.Equal(t, m.FullPath(), "gs://b1/")
+
+	// 2. Mock client to return 404 for b1 now (simulating it's deleted)
+	client.bucketMetadataError = fmt.Errorf("googleapi: Error 404: Not Found")
+
+	// 3. Send DeleteMsg for b1
+	// In the real app, this is triggered by handleDeleteConfirmKey -> deleteBucket -> handleDeleteMsg
+	m, cmd := updateModel(m, tui.DeleteMsg{Name: "b1", IsBucket: true})
+
+	// 4. Resolve the refresh commands triggered by handleDeleteMsg -> handleRefreshKey
+	// We use resolveAllFetchCmds here which we might need to define or ensure it exists
+	msgs := resolveAllFetchCmds(cmd)
+	for _, msg := range msgs {
+		m, _ = updateModel(m, msg)
+	}
+
+	// 5. Check if error message exists.
+	// The test FAILS if the error message is found (meaning the bug is present).
+	for _, msg := range m.Messages() {
+		if strings.Contains(msg.Text, "Failed to load metadata for b1") {
+			t.Fatalf("Found error message for deleted bucket: %s", msg.Text)
+		}
+	}
 }

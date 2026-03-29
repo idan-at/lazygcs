@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -1735,6 +1736,16 @@ func (m *Model) handleDeleteMsg(msg DeleteMsg) (tea.Model, tea.Cmd) {
 	}
 
 	statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Deleted %s", msg.Name), 0, "")
+
+	if msg.IsBucket {
+		// Update local state to avoid fetching metadata for the deleted bucket during refresh
+		m.bucketMetadataCache.Remove(msg.Name)
+		for i := range m.projects {
+			m.projects[i].Buckets = slices.DeleteFunc(m.projects[i].Buckets, func(b string) bool {
+				return b == msg.Name
+			})
+		}
+	}
 
 	if msg.GoBack {
 		nm, backCmd := m.handleLeftKey()

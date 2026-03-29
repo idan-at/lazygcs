@@ -43,8 +43,9 @@ type mockGCSClient struct {
 		Object string
 	}
 
-	versioningDisabled bool
-	mockVersions       []gcs.ObjectMetadata
+	versioningDisabled  bool
+	mockVersions        []gcs.ObjectMetadata
+	bucketMetadataError error
 }
 
 func (m *mockGCSClient) GetProjectMetadata(_ context.Context, projectID string) (*gcs.ProjectMetadata, error) {
@@ -75,6 +76,9 @@ func (m *mockGCSClient) ListObjectsPage(_ context.Context, _, _, _ string, _ int
 }
 
 func (m *mockGCSClient) GetBucketMetadata(_ context.Context, bucketName string) (*gcs.BucketMetadata, error) {
+	if m.bucketMetadataError != nil {
+		return nil, m.bucketMetadataError
+	}
 	return &gcs.BucketMetadata{Name: bucketName, Location: "US", StorageClass: "STANDARD"}, nil
 }
 

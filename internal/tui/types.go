@@ -162,9 +162,10 @@ type CreateMsg struct {
 
 // DeleteMsg is sent when a deletion operation completes.
 type DeleteMsg struct {
-	Name   string
-	Err    error
-	GoBack bool
+	Name     string
+	Err      error
+	GoBack   bool
+	IsBucket bool
 }
 
 // ClearStatusMsg is sent to clear the status bar.

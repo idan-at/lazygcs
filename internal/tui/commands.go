@@ -257,7 +257,7 @@ func (m *Model) createObject(bucketName, objectName string) tea.Cmd {
 func (m *Model) deleteBucket(bucketName string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.client.DeleteBucket(context.Background(), bucketName)
-		return DeleteMsg{Name: bucketName, Err: err}
+		return DeleteMsg{Name: bucketName, Err: err, IsBucket: true}
 	}
 }
 
