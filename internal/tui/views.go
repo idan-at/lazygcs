@@ -711,8 +711,8 @@ func (m *Model) footerView() string {
 
 func (m *Model) maxItemsVisible() int {
 	v := m.height - 10
-	if m.showMessages || m.showHelp {
-		v -= 19 // Space for either help or messages view
+	if m.showMessages || m.showHelp || m.state == viewDeleteConfirm {
+		v -= 19 // Space for either help, messages, or delete confirm view
 	}
 	if v < 1 {
 		v = 1
@@ -1066,6 +1066,7 @@ func (m *Model) helpView() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#CBA6F7")).
 		Padding(1, 2).
+		Height(15).
 		Render(content)
 
 	return box
@@ -1201,5 +1202,6 @@ func (m *Model) deleteConfirmView() string {
 		BorderForeground(lipgloss.Color("#F38BA8")).
 		Padding(1, 4).
 		Width(modalWidth).
+		Height(15).
 		Render(s.String())
 }
