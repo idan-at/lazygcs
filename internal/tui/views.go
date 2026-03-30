@@ -20,6 +20,11 @@ var (
 	bucketInfoErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#F28FAD"))
 	bucketInfoLabelsStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5C2E7"))
 	bucketInfoLinkStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#89B4FA")).Underline(true)
+
+	focusedStyle = lipgloss.NewStyle().
+			Bold(true).
+			Background(lipgloss.AdaptiveColor{Light: "#89B4FA", Dark: "#313244"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "#1E1E2E", Dark: "#CDD6F4"})
 )
 
 func (m *Model) renderSpinner() string {
@@ -806,11 +811,6 @@ func (m *Model) objectsView(width int) string {
 			_, isSelected = m.selected[originalName]
 		}
 
-		selectionIndicator := " "
-		if isSelected {
-			selectionIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5C2E7")).Render("✓")
-		}
-
 		displayItem := getDisplayName(originalName, targetPrefix)
 		icon := getIcon(displayItem, isFolder, false, m.showNerdIcons)
 		iconColor := getIconColor(displayItem, isFolder, false)
@@ -818,11 +818,16 @@ func (m *Model) objectsView(width int) string {
 		textStyle := lipgloss.NewStyle()
 		isFocused := (m.state != viewBuckets) && (objCursor == i)
 		if isFocused {
-			textStyle = textStyle.Background(lipgloss.Color("#313244")).Foreground(lipgloss.Color("#CDD6F4")).Bold(true)
+			textStyle = focusedStyle
 		} else if isSelected {
 			textStyle = textStyle.Foreground(lipgloss.Color("#F5C2E7")).Bold(true)
 		} else {
 			textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
+		}
+
+		selectionIndicator := textStyle.Render(" ")
+		if isSelected {
+			selectionIndicator = textStyle.Foreground(lipgloss.Color("#F5C2E7")).Render("✓")
 		}
 
 		iconStyle := textStyle.Foreground(lipgloss.Color(iconColor))
@@ -832,7 +837,10 @@ func (m *Model) objectsView(width int) string {
 		truncatedItem := truncate(displayItem, truncateLen)
 		highlightedItem := highlightMatch(truncatedItem, m.objectSearchQuery, m.fuzzySearch)
 
-		itemContent := fmt.Sprintf("%s %s%s", selectionIndicator, styledIcon, highlightedItem)
+		styledSpace := textStyle.Render(" ")
+		styledHighlightedItem := textStyle.Render(highlightedItem)
+
+		itemContent := selectionIndicator + styledSpace + styledIcon + styledHighlightedItem
 		content := textStyle.Width(listWidth).Render(itemContent)
 		listBuilder.WriteString(content + "\n")
 	}
@@ -884,21 +892,23 @@ func (m *Model) bucketsView(width int) string {
 	for i := start; i < end; i++ {
 		item := filtered[i]
 
-		indicator := " "
-		if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
-			indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Render("●")
-		}
-
 		textStyle := lipgloss.NewStyle()
 		isFocused := m.state == viewBuckets && m.cursor == i
 		isActiveBucket := m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket
 
 		if isFocused {
-			textStyle = textStyle.Background(lipgloss.Color("#313244")).Foreground(lipgloss.Color("#CDD6F4")).Bold(true)
+			textStyle = focusedStyle
 		} else if isActiveBucket {
 			textStyle = textStyle.Foreground(lipgloss.Color("#CBA6F7"))
 		} else {
 			textStyle = textStyle.Foreground(lipgloss.Color("#A6ADC8"))
+		}
+
+		var indicator string
+		if m.state != viewBuckets && !item.IsProject && item.BucketName == m.currentBucket {
+			indicator = textStyle.Foreground(lipgloss.Color("#CBA6F7")).Render("●")
+		} else {
+			indicator = textStyle.Render(" ")
 		}
 
 		if item.IsProject {
@@ -914,15 +924,18 @@ func (m *Model) bucketsView(width int) string {
 				projectStyle = projectStyle.Foreground(lipgloss.Color("#BAC2DE")).Bold(true)
 			}
 
+			styledIcon := projectStyle.Render(icon)
+
 			truncateLen := listWidth - 2 // ▼ + space = 2
 			if m.loadingProjects[item.ProjectID] {
 				truncateLen -= 2 // space + spinner
 			}
 			truncatedProject := truncate(item.ProjectID, truncateLen)
+			styledProject := projectStyle.Render(truncatedProject)
 
-			itemContent := fmt.Sprintf("%s%s", icon, truncatedProject)
+			itemContent := styledIcon + styledProject
 			if m.loadingProjects[item.ProjectID] {
-				itemContent += " " + m.renderSpinner()
+				itemContent += projectStyle.Render(" " + m.renderSpinner())
 			}
 			content := projectStyle.Width(listWidth).Render(itemContent)
 			listBuilder.WriteString(content + "\n")
@@ -940,7 +953,10 @@ func (m *Model) bucketsView(width int) string {
 			truncatedBucket := truncate(item.BucketName, truncateLen)
 			highlightedBucket := highlightMatch(truncatedBucket, m.bucketSearchQuery, m.fuzzySearch)
 
-			itemContent := fmt.Sprintf("%s %s%s", indicator, styledIcon, highlightedBucket)
+			styledSpace := textStyle.Render(" ")
+			styledHighlightedBucket := textStyle.Render(highlightedBucket)
+
+			itemContent := indicator + styledSpace + styledIcon + styledHighlightedBucket
 			content := textStyle.Width(listWidth).Render(itemContent)
 			listBuilder.WriteString(content + "\n")
 		}
