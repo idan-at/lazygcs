@@ -373,7 +373,7 @@ func TestSearch(t *testing.T) {
 	// Verify only test-bucket-1 is visible
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		s := ansiRegexp.ReplaceAllString(string(bts), "")
-		parts := strings.Split(s, "q quit")
+		parts := strings.Split(s, "q:quit")
 		if len(parts) < 2 {
 			return false
 		}

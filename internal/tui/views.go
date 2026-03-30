@@ -630,14 +630,9 @@ func (m *Model) footerView() string {
 
 	hasMessage := m.state == viewDownloadConfirm || (len(m.msgQueue.Messages()) > 0 && !m.msgQueue.HideStatusPill)
 
-	// Right side: Help hints
 	var helpView string
 	if !hasMessage {
-		m.help.ShowAll = false
-		m.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(lipgloss.Color("#BAC2DE"))
-		m.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))
-		m.help.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#414559"))
-		helpView = m.help.View(keys)
+		helpView = lipgloss.NewStyle().PaddingRight(1).Render(m.renderContextualHints())
 	}
 
 	// Calculate available width for msgPill
@@ -1017,6 +1012,74 @@ func (m *Model) bucketsView(width int) string {
 	}
 
 	return title + "\n\n" + content
+}
+
+func (m *Model) renderContextualHints() string {
+	var hints []string
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CBA6F7")).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))
+
+	addHint := func(k, desc string) {
+		hints = append(hints, keyStyle.Render(k)+descStyle.Render(":"+desc))
+	}
+
+	if m.showMessages || m.showHelp {
+		addHint("esc", "back")
+	} else if m.showMetadata || m.showVersions {
+		addHint("esc", "back")
+	} else if len(m.selected) > 1 {
+		addHint("d", "download")
+		addHint("x", "delete")
+		addHint("space", "unselect")
+	} else {
+		switch m.state {
+		case viewBuckets:
+			filtered := m.filteredBuckets()
+			if m.cursor < len(filtered) {
+				item := filtered[m.cursor]
+				if item.IsProject {
+					addHint("l", "toggle")
+					addHint("/", "filter")
+					addHint("n", "new")
+					addHint("R", "refresh")
+				} else {
+					addHint("l", "browse")
+					addHint("/", "filter")
+					addHint("n", "new")
+					addHint("y", "copy")
+					addHint("x", "delete")
+					addHint("R", "refresh")
+				}
+			}
+		case viewObjects, viewDownloadConfirm:
+			currentPrefixes, currentObjects, _ := m.filteredObjects()
+			if m.cursor < len(currentPrefixes) {
+				addHint("l", "enter")
+				addHint("/", "filter")
+				addHint("n", "new")
+				addHint("y", "copy")
+				addHint("i", "metadata")
+				addHint("x", "delete")
+			} else if m.cursor >= len(currentPrefixes) && len(currentObjects) > 0 {
+				idx := m.cursor - len(currentPrefixes)
+				if idx < len(currentObjects) {
+					addHint("o", "open")
+					addHint("v", "versions")
+					addHint("d", "download")
+					addHint("y", "copy")
+					addHint("i", "metadata")
+					addHint("e", "edit")
+					addHint("x", "delete")
+					addHint("/", "filter")
+				}
+			}
+		}
+	}
+
+	addHint("?", "help")
+	addHint("q", "quit")
+
+	return strings.Join(hints, "  ")
 }
 
 // View renders the current state of the application as a string.

@@ -245,7 +245,7 @@ func TestFooterView_HideHelpOnMessage(t *testing.T) {
 	// Initially, help should be visible in footerView (NORMAL state)
 	view := m.View()
 	assert.Assert(t, strings.Contains(view, "filter"), "Help hints should be visible initially")
-	assert.Assert(t, strings.Contains(view, "select"), "Help hints should be visible initially")
+	assert.Assert(t, strings.Contains(view, "toggle"), "Help hints should be visible initially")
 
 	// Add a message
 	_ = m.AddMessage(tui.LevelInfo, "test message", 0, "")
@@ -254,7 +254,7 @@ func TestFooterView_HideHelpOnMessage(t *testing.T) {
 	view = m.View()
 	assert.Assert(t, strings.Contains(view, "test message"), "Message should be visible")
 	assert.Assert(t, !strings.Contains(view, "filter"), "Help hints should be hidden when a message is shown")
-	assert.Assert(t, !strings.Contains(view, "select"), "Help hints should be hidden when a message is shown")
+	assert.Assert(t, !strings.Contains(view, "toggle"), "Help hints should be hidden when a message is shown")
 }
 
 func TestFooterView_HideHelpOnDownloadConfirm(t *testing.T) {
