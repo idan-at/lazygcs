@@ -27,6 +27,26 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+var ansiRegexp = regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
+
+func getLastFrame(bts []byte) string {
+	s := ansiRegexp.ReplaceAllString(string(bts), "")
+	// Frames start with the header "gs://".
+	// We look for the last occurrence of this to isolate the latest frame.
+	idx := strings.LastIndex(s, "gs://")
+	if idx != -1 {
+		return s[idx:]
+	}
+
+	// Fallback to "Buckets" if "gs://" is somehow missing
+	idx = strings.LastIndex(s, "Buckets")
+	if idx != -1 {
+		return s[idx:]
+	}
+
+	return s
+}
+
 func TestListBuckets(t *testing.T) {
 	objects := []fakestorage.Object{
 		{
@@ -253,12 +273,6 @@ func TestProjectInformationPreview(t *testing.T) {
 
 	tm := teatest.NewTestModel(t, &m)
 	m.SetSendMsg(tm.Send)
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
-
-	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -318,12 +332,6 @@ func TestProjectInformationPreview_Error(t *testing.T) {
 
 	tm := teatest.NewTestModel(t, &m)
 	m.SetSendMsg(tm.Send)
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
-
-	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
 	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 
 	// Add a slight delay for the message queue to process
@@ -345,8 +353,6 @@ func TestSearch(t *testing.T) {
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "test-bucket-2", Name: "init"}, Content: []byte("hi")},
 	}
 	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"test-project-1"}, t.TempDir())
-
-	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
 
 	// Wait for buckets
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -462,6 +468,7 @@ func TestHelpMenu(t *testing.T) {
 		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "b1", Name: "init"}, Content: []byte("hi")},
 	}
 	tm, _ := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
 
 	// Toggle help
 	tm.Type("?")
@@ -469,7 +476,10 @@ func TestHelpMenu(t *testing.T) {
 
 	// Toggle help off
 	tm.Type("?")
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return !strings.Contains(string(bts), "HELP") }, teatest.WithDuration(3*time.Second))
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		lastFrame := getLastFrame(bts)
+		return !strings.Contains(lastFrame, "HELP")
+	}, teatest.WithDuration(3*time.Second))
 }
 
 func TestJumpTopBottom(t *testing.T) {
@@ -733,8 +743,8 @@ func TestResizePreview(t *testing.T) {
 
 	tm.Send(tea.WindowSizeMsg{Width: 50, Height: 20})
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := string(bts)
-		return !strings.Contains(s, strings.Repeat("A", 100)) && strings.Contains(s, "A")
+		lastFrame := getLastFrame(bts)
+		return !strings.Contains(lastFrame, strings.Repeat("A", 100)) && strings.Contains(lastFrame, "A")
 	}, teatest.WithDuration(3*time.Second))
 }
 
@@ -807,12 +817,6 @@ func TestProjectLabelsSorted(t *testing.T) {
 
 	tm := teatest.NewTestModel(t, &m)
 	m.SetSendMsg(tm.Send)
-	t.Cleanup(func() {
-		_ = tm.Quit()
-		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	})
-
-	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
 
 	// Wait for buckets to load
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -887,12 +891,12 @@ func TestDeleteObject(t *testing.T) {
 
 	// Wait for "Deleted" message OR for the object to disappear from the list
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := string(bts)
+		lastFrame := getLastFrame(bts)
 
-		deletedMsg := strings.Contains(s, "Deleted file_to_delete.txt")
-		notInList := !strings.Contains(s, "📄 file_to_delete.txt")
+		deletedMsg := strings.Contains(lastFrame, "Deleted file_to_delete.txt")
+		notInList := !strings.Contains(lastFrame, "📄 file_to_delete.txt")
 
-		return (deletedMsg || notInList) && strings.Contains(s, "keep_me.txt")
+		return (deletedMsg || notInList) && strings.Contains(lastFrame, "keep_me.txt")
 	}, teatest.WithDuration(10*time.Second))
 
 	// Double check with server
@@ -948,14 +952,12 @@ func TestDeleteBucket(t *testing.T) {
 
 	// Wait for "Deleted" message OR for the bucket to disappear from the list
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := string(bts)
-		// It might show "Deleted bucket-to-delete" OR it might have already refreshed and shows an error that it's gone
-		// OR it simply doesn't contain "bucket-to-delete" in the bucket list anymore.
+		lastFrame := getLastFrame(bts)
 
-		deletedMsg := strings.Contains(s, "Deleted bucket-to-delete")
-		notInList := !strings.Contains(s, "📦 bucket-to-delete")
+		deletedMsg := strings.Contains(lastFrame, "Deleted bucket-to-delete")
+		notInList := !strings.Contains(lastFrame, "📦 bucket-to-delete")
 
-		return (deletedMsg || notInList) && strings.Contains(s, "keep-bucket")
+		return (deletedMsg || notInList) && strings.Contains(lastFrame, "keep-bucket")
 	}, teatest.WithDuration(10*time.Second))
 
 	// Double check with server
@@ -1007,15 +1009,14 @@ func TestDeleteMultiSelect(t *testing.T) {
 	tm.Type("y")
 	time.Sleep(500 * time.Millisecond)
 
-	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
-
 	// Wait for objects to disappear
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		s := ansiRegexp.ReplaceAllString(string(bts), "")
-		// Specifically look for the list items being gone
-		hasFile1 := strings.Contains(s, "file1.txt")
-		hasFile2 := strings.Contains(s, "file2.txt")
-		hasKeep := strings.Contains(s, "keep.txt")
+		lastFrame := getLastFrame(bts)
+
+		// Specifically look for the list items being gone in the LATEST frame
+		hasFile1 := strings.Contains(lastFrame, "file1.txt")
+		hasFile2 := strings.Contains(lastFrame, "file2.txt")
+		hasKeep := strings.Contains(lastFrame, "keep.txt")
 		return !hasFile1 && !hasFile2 && hasKeep
 	}, teatest.WithDuration(10*time.Second))
 
