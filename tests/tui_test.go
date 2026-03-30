@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 	"github.com/muesli/termenv"
+	"google.golang.org/api/iterator"
 
 	"github.com/idan-at/lazygcs/internal/config"
 	"github.com/idan-at/lazygcs/internal/gcs"
@@ -522,10 +523,10 @@ func TestFastEscape(t *testing.T) {
 	tm.Type("l") // Enter folder1/
 	// Wait for folder2/
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder2/") }, teatest.WithDuration(3*time.Second))
-	tm.Type("l") // Enter folder2/
+	tm.Type("l") // Enter folder1/
 	// Wait for folder3/
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "folder3/") }, teatest.WithDuration(3*time.Second))
-	tm.Type("l") // Enter folder3/
+	tm.Type("l") // Enter folder1/
 
 	// Wait for file1.txt
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool { return strings.Contains(string(bts), "file1.txt") }, teatest.WithDuration(3*time.Second))
@@ -960,4 +961,69 @@ func TestDeleteBucket(t *testing.T) {
 	// Double check with server
 	_, err := server.Client().Bucket("bucket-to-delete").Attrs(context.Background())
 	assert.Assert(t, err != nil)
+}
+
+func TestDeleteMultiSelect(t *testing.T) {
+	objects := []fakestorage.Object{
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "multi-delete-bucket", Name: "file1.txt"}, Content: []byte("c1")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "multi-delete-bucket", Name: "file2.txt"}, Content: []byte("c2")},
+		{ObjectAttrs: fakestorage.ObjectAttrs{BucketName: "multi-delete-bucket", Name: "keep.txt"}, Content: []byte("keep")},
+	}
+	tm, server := testutil.SetupTestApp(t, objects, 0, []string{"p1"}, t.TempDir())
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
+
+	// Wait for bucket
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "multi-delete-bucket")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Enter bucket
+	tm.Type("j")
+	time.Sleep(100 * time.Millisecond)
+	tm.Type("l")
+	tm.Send(tea.WindowSizeMsg{Width: 150, Height: 40})
+
+	// Wait for objects
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "file1.txt")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Select file1.txt
+	tm.Type(" ")
+	// Move to file2.txt and select it
+	tm.Type("j")
+	tm.Type(" ")
+
+	// Delete selected
+	tm.Type("x")
+
+	// Wait for confirmation prompt
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "DELETE CONFIRMATION") &&
+			strings.Contains(string(bts), "2 selected items")
+	}, teatest.WithDuration(2*time.Second))
+
+	// Confirm deletion
+	tm.Type("y")
+	time.Sleep(500 * time.Millisecond)
+
+	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
+
+	// Wait for objects to disappear
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := ansiRegexp.ReplaceAllString(string(bts), "")
+		// Specifically look for the list items being gone
+		hasFile1 := strings.Contains(s, "file1.txt")
+		hasFile2 := strings.Contains(s, "file2.txt")
+		hasKeep := strings.Contains(s, "keep.txt")
+		return !hasFile1 && !hasFile2 && hasKeep
+	}, teatest.WithDuration(10*time.Second))
+
+	// Verify on server
+	it := server.Client().Bucket("multi-delete-bucket").Objects(context.Background(), nil)
+	attrs, err := it.Next()
+	assert.NilError(t, err)
+	assert.Equal(t, attrs.Name, "keep.txt")
+	_, err = it.Next()
+	assert.Equal(t, err, iterator.Done)
 }

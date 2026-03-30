@@ -79,10 +79,15 @@ type Model struct {
 	jobProgress             map[int]*JobProgress
 
 	// Deletion State
-	pendingDeleteBucket   string
-	pendingDeleteObject   string
-	pendingDeletePrefix   string
-	pendingDeleteIsBucket bool
+	pendingDeleteBucket     string
+	pendingDeleteObject     string
+	pendingDeletePrefix     string
+	pendingDeleteIsBucket   bool
+	pendingDeleteItems      []string
+	shouldGoBackAfterDelete bool
+	pendingDeleteCount      int
+	pendingDeleteTotal      int
+	pendingDeleteSucceeded  int
 
 	// Buckets View
 	projects             []gcs.ProjectBuckets

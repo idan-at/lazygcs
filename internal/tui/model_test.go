@@ -285,22 +285,32 @@ func resolveAllFetchCmds(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil
 	}
-	msg := cmd()
 	var msgs []tea.Msg
 
-	var resolve func(tea.Msg)
-	resolve = func(m tea.Msg) {
+	var resolve func(tea.Cmd)
+	resolve = func(c tea.Cmd) {
+		if c == nil {
+			return
+		}
+		m := c()
 		if m == nil {
 			return
 		}
+
+		// If it's a batch, resolve each sub-command
 		if batchMsg, ok := m.(tea.BatchMsg); ok {
-			for _, c := range batchMsg {
-				if c != nil {
-					resolve(c())
-				}
+			for _, subCmd := range batchMsg {
+				resolve(subCmd)
 			}
 			return
 		}
+
+		// If it's another cmd, resolve it recursively
+		if nextCmd, ok := m.(tea.Cmd); ok {
+			resolve(nextCmd)
+			return
+		}
+
 		// Skip UI infrastructure messages
 		if _, ok := m.(tui.ClearStatusMsg); ok {
 			return
@@ -311,7 +321,7 @@ func resolveAllFetchCmds(cmd tea.Cmd) []tea.Msg {
 		msgs = append(msgs, m)
 	}
 
-	resolve(msg)
+	resolve(cmd)
 	return msgs
 }
 

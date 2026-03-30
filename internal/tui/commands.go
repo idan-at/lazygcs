@@ -255,6 +255,7 @@ func (m *Model) createObject(bucketName, objectName string) tea.Cmd {
 }
 
 func (m *Model) deleteBucket(bucketName string) tea.Cmd {
+	m.bgJobs++
 	return func() tea.Msg {
 		err := m.client.DeleteBucket(context.Background(), bucketName)
 		return DeleteMsg{Name: bucketName, Err: err, IsBucket: true}
@@ -262,6 +263,7 @@ func (m *Model) deleteBucket(bucketName string) tea.Cmd {
 }
 
 func (m *Model) deleteObject(bucketName, objectName string, goBack bool) tea.Cmd {
+	m.bgJobs++
 	return func() tea.Msg {
 		err := m.client.DeleteObject(context.Background(), bucketName, objectName)
 		return DeleteMsg{Name: objectName, Err: err, GoBack: goBack}
@@ -269,6 +271,7 @@ func (m *Model) deleteObject(bucketName, objectName string, goBack bool) tea.Cmd
 }
 
 func (m *Model) deletePrefix(bucketName, prefix string, goBack bool) tea.Cmd {
+	m.bgJobs++
 	return func() tea.Msg {
 		err := m.client.DeletePrefix(context.Background(), bucketName, prefix)
 		return DeleteMsg{Name: prefix, Err: err, GoBack: goBack}

@@ -1177,6 +1177,8 @@ func (m *Model) deleteConfirmView() string {
 	var target string
 	if m.pendingDeleteIsBucket {
 		target = fmt.Sprintf("gs://%s", m.pendingDeleteBucket)
+	} else if len(m.pendingDeleteItems) > 0 {
+		target = fmt.Sprintf("%d selected items", len(m.pendingDeleteItems))
 	} else if m.pendingDeletePrefix != "" {
 		target = fmt.Sprintf("gs://%s/%s", m.pendingDeleteBucket, m.pendingDeletePrefix)
 	} else {
