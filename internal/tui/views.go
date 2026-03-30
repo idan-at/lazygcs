@@ -764,10 +764,37 @@ func (m *Model) objectsView(width int) string {
 		return ""
 	}
 
-	title := lipgloss.NewStyle().Bold(true).Render(truncate(fmt.Sprintf("Objects in %s", targetBucket), width))
-	totalItems := len(currentPrefixes) + len(currentObjects)
+	filteredTotal := len(currentPrefixes) + len(currentObjects)
 
-	if m.loading && m.state != viewBuckets && totalItems == 0 {
+	var countStr string
+	if m.state == viewBuckets {
+		if filteredTotal > 0 {
+			countStr = fmt.Sprintf(" (1/%d)", filteredTotal)
+		} else {
+			countStr = " (0/0)"
+		}
+	} else {
+		pos := m.cursor + 1
+		if filteredTotal == 0 {
+			pos = 0
+		}
+		countStr = fmt.Sprintf(" (%d/%d)", pos, filteredTotal)
+	}
+
+	prefixStr := "Objects in "
+	availWidth := width - lipgloss.Width(countStr) - lipgloss.Width(prefixStr)
+	var titleStr string
+	if availWidth >= 4 { // Need at least enough for "a..."
+		titleStr = prefixStr + truncate(targetBucket, availWidth) + countStr
+	} else if width > lipgloss.Width(countStr) {
+		titleStr = truncate(prefixStr+targetBucket, width-lipgloss.Width(countStr)) + countStr
+	} else {
+		titleStr = truncate(prefixStr+targetBucket+countStr, width)
+	}
+
+	title := lipgloss.NewStyle().Bold(true).Render(titleStr)
+
+	if m.loading && m.state != viewBuckets && filteredTotal == 0 {
 		return title + "\n\n" + fmt.Sprintf("%s Loading...", m.renderSpinner())
 	}
 
@@ -785,13 +812,13 @@ func (m *Model) objectsView(width int) string {
 		startIdx = 0
 	}
 
-	scrollbar := m.renderScrollbar(totalItems, startIdx)
+	scrollbar := m.renderScrollbar(filteredTotal, startIdx)
 	listWidth := width
 	if scrollbar != "" {
 		listWidth -= 2
 	}
 
-	start, end := visibleRange(startIdx, totalItems, displayMaxVisible)
+	start, end := visibleRange(startIdx, filteredTotal, displayMaxVisible)
 	var listBuilder strings.Builder
 
 	for i := start; i < end; i++ {
@@ -847,7 +874,7 @@ func (m *Model) objectsView(width int) string {
 
 	if m.loading && m.state != viewBuckets {
 		fmt.Fprintf(&listBuilder, "%s Loading...", m.renderSpinner())
-	} else if totalItems == 0 {
+	} else if filteredTotal == 0 {
 		listBuilder.WriteString("(empty)")
 	}
 
@@ -863,9 +890,8 @@ func (m *Model) objectsView(width int) string {
 }
 
 func (m *Model) bucketsView(width int) string {
-	title := lipgloss.NewStyle().Bold(true).Render(truncate("Buckets", width))
-
 	filtered := m.filteredBuckets()
+	totalItems := len(filtered)
 
 	// Determine the active index for the buckets list
 	activeIdx := m.cursor
@@ -879,6 +905,26 @@ func (m *Model) bucketsView(width int) string {
 			}
 		}
 	}
+
+	pos := activeIdx + 1
+	if totalItems == 0 {
+		pos = 0
+	}
+
+	countStr := fmt.Sprintf(" (%d/%d)", pos, totalItems)
+	prefixStr := "Buckets"
+	availWidth := width - lipgloss.Width(countStr) - lipgloss.Width(prefixStr)
+	var titleStr string
+	if availWidth >= 0 {
+		// Even if width is enough, don't truncate the static prefixStr "Buckets" unless we absolutely must.
+		titleStr = prefixStr + countStr
+	} else if width > lipgloss.Width(countStr) {
+		titleStr = truncate(prefixStr, width-lipgloss.Width(countStr)) + countStr
+	} else {
+		titleStr = truncate(prefixStr+countStr, width)
+	}
+
+	title := lipgloss.NewStyle().Bold(true).Render(titleStr)
 
 	maxVisible := m.maxItemsVisible()
 	scrollbar := m.renderScrollbar(len(filtered), activeIdx)
