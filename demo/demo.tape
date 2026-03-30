@@ -41,6 +41,7 @@ Type "l"
 Sleep 1s
 # Stand on settings.json and show preview
 Sleep 2s
+Screenshot demo/screenshot.png
 # Go back
 Type "h"
 Sleep 500ms
