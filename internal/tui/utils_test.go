@@ -234,3 +234,40 @@ func TestModel_RenderScrollbar(t *testing.T) {
 	assert.Assert(t, strings.Contains(lines[2], "┃"))
 	assert.Assert(t, strings.Contains(lines[3], "│"))
 }
+
+func TestSafeJoin(t *testing.T) {
+	tmpDir := t.TempDir()
+	bucketName := "test-bucket"
+	base := filepath.Join(tmpDir, "lazygcs", bucketName)
+
+	tests := []struct {
+		name       string
+		objectName string
+		wantErr    bool
+	}{
+		{"Normal file", "foo.txt", false},
+		{"Subdirectory", "path/to/obj.txt", false},
+		{"Absolute-like path", "/abs/path", false},
+		{"One level up", "../pwned.txt", true},
+		{"Two levels up", "../../pwned.txt", true},
+		{"Deeply nested traversal", "sub/../../../pwned.txt", true},
+		{"Self", ".", false},
+		{"Empty", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := safeJoin(base, tt.objectName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("safeJoin() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil {
+				absBase := filepath.Clean(base)
+				if !strings.HasPrefix(got, absBase) {
+					t.Errorf("safeJoin() = %q, not under %q", got, absBase)
+				}
+			}
+		})
+	}
+}

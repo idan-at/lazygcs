@@ -1418,18 +1418,27 @@ func (m *Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 
 		var toDownload []downloadTask
 		jobNum := m.nextJobNum
+		var skipCount int
 
 		if len(m.selected) > 0 {
 			// Download all selected objects and prefixes
 			for _, p := range m.prefixes {
 				if _, ok := m.selected[p.Name]; ok {
-					dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(p.Name), "/")+".zip")
+					dest, err := safeJoin(m.downloadDir, strings.TrimSuffix(filepath.Base(p.Name), "/")+".zip")
+					if err != nil {
+						skipCount++
+						continue
+					}
 					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: p.Name, dest: dest, isPrefix: true, jobNum: jobNum})
 				}
 			}
 			for _, obj := range m.objects {
 				if _, ok := m.selected[obj.Name]; ok {
-					dest := filepath.Join(m.downloadDir, filepath.Base(obj.Name))
+					dest, err := safeJoin(m.downloadDir, filepath.Base(obj.Name))
+					if err != nil {
+						skipCount++
+						continue
+					}
 					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: obj.Name, dest: dest, isPrefix: false, jobNum: jobNum})
 				}
 			}
@@ -1437,16 +1446,33 @@ func (m *Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 			// Fallback to downloading the currently highlighted item
 			if m.cursor < len(currentPrefixes) {
 				name := currentPrefixes[m.cursor].Name
-				dest := filepath.Join(m.downloadDir, strings.TrimSuffix(filepath.Base(name), "/")+".zip")
-				toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: true, jobNum: jobNum})
+				dest, err := safeJoin(m.downloadDir, strings.TrimSuffix(filepath.Base(name), "/")+".zip")
+				if err == nil {
+					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: true, jobNum: jobNum})
+				} else {
+					skipCount++
+				}
 			} else if m.cursor >= len(currentPrefixes) {
 				idx := m.cursor - len(currentPrefixes)
 				if idx < len(currentObjects) {
 					name := currentObjects[idx].Name
-					dest := filepath.Join(m.downloadDir, filepath.Base(name))
-					toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: false, jobNum: jobNum})
+					dest, err := safeJoin(m.downloadDir, filepath.Base(name))
+					if err == nil {
+						toDownload = append(toDownload, downloadTask{bucket: m.currentBucket, object: name, dest: dest, isPrefix: false, jobNum: jobNum})
+					} else {
+						skipCount++
+					}
 				}
 			}
+		}
+
+		var skipCmd tea.Cmd
+		if skipCount > 0 {
+			msg := "Skipped 1 item due to invalid path"
+			if skipCount > 1 {
+				msg = fmt.Sprintf("Skipped %d items due to invalid paths", skipCount)
+			}
+			skipCmd = m.AddMessage(LevelWarn, msg, 0, "")
 		}
 
 		if len(toDownload) > 0 {
@@ -1461,8 +1487,13 @@ func (m *Model) handleDownloadKey() (tea.Model, tea.Cmd) {
 			// Clear selection after triggering download
 			m.selected = make(map[string]struct{})
 
-			m, cmd := m.processDownloadQueue()
-			return m, cmd
+			nm, cmd := m.processDownloadQueue()
+			if skipCmd != nil {
+				return nm, tea.Batch(cmd, skipCmd)
+			}
+			return nm, cmd
+		} else if skipCmd != nil {
+			return m, skipCmd
 		}
 	}
 	return m, nil

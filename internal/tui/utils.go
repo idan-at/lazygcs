@@ -18,6 +18,19 @@ func parentPrefix(p string) string {
 	return ""
 }
 
+func safeJoin(base, p string) (string, error) {
+	// GCS objects always use forward slashes, so convert to platform-specific path
+	res := filepath.Join(base, filepath.FromSlash(p))
+	absBase := filepath.Clean(base)
+	absRes := filepath.Clean(res)
+
+	// Ensure absRes is within absBase
+	if !strings.HasPrefix(absRes, absBase+string(os.PathSeparator)) && absRes != absBase {
+		return "", fmt.Errorf("invalid path traversal: %s", p)
+	}
+	return absRes, nil
+}
+
 func autoRename(path string, activeDestinations map[string]bool) (string, error) {
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)

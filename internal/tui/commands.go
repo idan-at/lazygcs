@@ -180,8 +180,12 @@ func (m *Model) fetchDownload(bucketName, objectName, dest, taskID string, jobNu
 func (m *Model) openFile(bucketName, objectName string) tea.Cmd {
 	return func() tea.Msg {
 		tmpDir := os.TempDir()
-		dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
-		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
+		dest, err := safeJoin(filepath.Join(tmpDir, "lazygcs", bucketName), objectName)
+		if err != nil {
+			return FileOpenedMsg{Err: err}
+		}
+
+		err = m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
 		if err != nil {
 			return FileOpenedMsg{Err: err}
 		}
@@ -203,7 +207,10 @@ func (m *Model) openFile(bucketName, objectName string) tea.Cmd {
 
 func (m *Model) editFile(bucketName, objectName string) tea.Cmd {
 	tmpDir := os.TempDir()
-	dest := filepath.Join(tmpDir, "lazygcs", bucketName, objectName)
+	dest, err := safeJoin(filepath.Join(tmpDir, "lazygcs", bucketName), objectName)
+	if err != nil {
+		return func() tea.Msg { return EditorFinishedMsg{Err: err} }
+	}
 
 	return func() tea.Msg {
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
