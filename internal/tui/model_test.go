@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/idan-at/lazygcs/internal/util"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,6 +47,7 @@ type mockGCSClient struct {
 	versioningDisabled  bool
 	mockVersions        []gcs.ObjectMetadata
 	bucketMetadataError error
+	downloadObjectFn    func(context.Context, string, string, string, gcs.ProgressFunc) error
 }
 
 func (m *mockGCSClient) GetProjectMetadata(_ context.Context, projectID string) (*gcs.ProjectMetadata, error) {
@@ -114,10 +116,13 @@ func (m *mockGCSClient) GetObjectContent(_ context.Context, _, objectName string
 	return "", fmt.Errorf("not found")
 }
 
-func (m *mockGCSClient) DownloadObject(_ context.Context, bucket, object, dest string, _ gcs.ProgressFunc) error {
+func (m *mockGCSClient) DownloadObject(ctx context.Context, bucket, object, dest string, prog gcs.ProgressFunc) error {
 	m.lastDownload.Bucket = bucket
 	m.lastDownload.Object = object
 	m.lastDownload.Dest = dest
+	if m.downloadObjectFn != nil {
+		return m.downloadObjectFn(ctx, bucket, object, dest, prog)
+	}
 	return nil
 }
 
@@ -475,8 +480,6 @@ func TestModel_UI_Wrapping_Bug_Detected(t *testing.T) {
 	assert.Assert(t, len(lines) <= 20, "View height %d exceeded terminal height 20. Wrapping likely occurred!", len(lines))
 }
 
-var ansiRegexp = regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
-
 func stripAnsi(s string) string {
-	return ansiRegexp.ReplaceAllString(s, "")
+	return util.StripANSI(s)
 }

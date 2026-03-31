@@ -53,10 +53,6 @@ func autoRename(path string, activeDestinations map[string]bool) (string, error)
 	return "", fmt.Errorf("failed to find a free name for %q after 100 attempts", base)
 }
 
-func isBinary(s string) bool {
-	return strings.ContainsRune(s, '\x00')
-}
-
 func fuzzyMatch(query, target string) bool {
 	if len(query) == 0 {
 		return true

@@ -9,6 +9,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/idan-at/lazygcs/internal/util"
+
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
@@ -68,7 +70,7 @@ func (p *CodePreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 	}
 	content := string(buf)
 
-	if IsBinary(content) {
+	if util.IsBinary(content) {
 		return "(binary content)", nil
 	}
 

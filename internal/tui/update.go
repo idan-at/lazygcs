@@ -1580,12 +1580,14 @@ func (m *Model) handleEditKey() (tea.Model, tea.Cmd) {
 
 func (m *Model) handleEditorFinishedMsg(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
+		_ = os.RemoveAll(filepath.Dir(msg.TempPath))
 		statusCmd := m.AddMessage(LevelInfo, fmt.Sprintf("Editor error: %v", msg.Err), 0, "")
 		return m, statusCmd
 	}
 
 	info, err := os.Stat(msg.TempPath)
 	if err != nil {
+		_ = os.RemoveAll(filepath.Dir(msg.TempPath))
 		statusCmd := m.AddMessage(LevelError, fmt.Sprintf("Error checking file: %v", err), 0, "")
 		return m, statusCmd
 	}
@@ -1593,9 +1595,10 @@ func (m *Model) handleEditorFinishedMsg(msg EditorFinishedMsg) (tea.Model, tea.C
 	if info.ModTime().After(msg.OriginalModTime) {
 		cmd := m.AddMessage(LevelInfo, fmt.Sprintf("Uploading changes to %s...", filepath.Base(msg.TempPath)), 0, "")
 		// m.targetPrefixCursor stores the object name from handleEditKey
-		return m, tea.Batch(cmd, m.uploadFile(m.currentBucket, m.targetPrefixCursor, msg.TempPath))
+		return m, tea.Batch(cmd, m.uploadFile(m.currentBucket, m.targetPrefixCursor, msg.TempPath, filepath.Dir(msg.TempPath)))
 	}
 
+	_ = os.RemoveAll(filepath.Dir(msg.TempPath))
 	statusCmd := m.AddMessage(LevelInfo, "No changes made", 0, "")
 	return m, statusCmd
 }

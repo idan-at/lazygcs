@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/idan-at/lazygcs/internal/util"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/idan-at/lazygcs/internal/gcs"
 )
@@ -359,7 +361,7 @@ func (m *Model) previewView(width int) string {
 
 						if m.previewContent == "Loading..." || m.previewContent == clearImagesEsc+"Loading..." {
 							fmt.Fprintf(&s, "\n%s Loading preview...\n", m.renderSpinner())
-						} else if isBinary(m.previewContent) {
+						} else if util.IsBinary(m.previewContent) {
 							s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A6ADC8")).Italic(true).Render("(binary content)"))
 						} else {
 							// Calculate how many lines we can actually show
@@ -454,7 +456,7 @@ func (m *Model) previewView(width int) string {
 									}
 									sort.Strings(keys)
 									for _, k := range keys {
-										fmt.Fprintf(&s, "  %s %s\n", bucketInfoKeyStyle.Render(k+":"), bucketInfoValStyle.Render(truncate(meta.Labels[k], width-len(k)-6)))
+										fmt.Fprintf(&s, "  %s %s\n", bucketInfoKeyStyle.Render(util.StripANSI(k)+":"), bucketInfoValStyle.Render(truncate(util.StripANSI(meta.Labels[k]), width-len(util.StripANSI(k))-6)))
 									}
 								}
 							}

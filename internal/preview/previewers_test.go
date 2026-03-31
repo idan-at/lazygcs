@@ -254,3 +254,46 @@ func TestPreviewers(t *testing.T) {
 		})
 	}
 }
+
+func TestZipPreviewer_LargeFile(t *testing.T) {
+	p := &preview.ZipPreviewer{}
+	ctx := context.Background()
+
+	// Create a dummy object with Size > 100MB
+	obj := preview.Object{
+		Name: "huge.zip",
+		Size: 101 * 1024 * 1024,
+	}
+
+	out, err := p.Preview(ctx, nil, obj)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expected := "(zip archive too large to preview)"
+	if out != expected {
+		t.Errorf("expected %q, got %q", expected, out)
+	}
+}
+
+func TestTextPreviewer_StripANSI(t *testing.T) {
+	client := &mockPreviewGCSClient{
+		content: []byte("\x1b[31mRed Text\x1b[0m\x1b]8;;http://example.com\x1b\\Link\x1b]8;;\x1b\\"),
+	}
+
+	p := &preview.TextPreviewer{}
+	obj := preview.Object{
+		Name: "test.txt",
+		Size: 100,
+	}
+
+	out, err := p.Preview(context.Background(), client, obj)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expected := "Red TextLink"
+	if out != expected {
+		t.Errorf("expected %q, got %q", expected, out)
+	}
+}

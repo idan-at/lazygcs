@@ -2,6 +2,8 @@ package preview
 
 import (
 	"context"
+
+	"github.com/idan-at/lazygcs/internal/util"
 )
 
 // TextPreviewer ...
@@ -22,11 +24,11 @@ func (p *TextPreviewer) Preview(ctx context.Context, client GCSClient, obj Objec
 		return "", err
 	}
 
-	if IsBinary(content) {
+	if util.IsBinary(content) {
 		return "(binary content)", nil
 	}
 
-	return content, nil
+	return util.StripANSI(content), nil
 }
 
 // SetWidth ...

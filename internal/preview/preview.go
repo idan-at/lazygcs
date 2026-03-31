@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"sort"
-	"strings"
 )
 
 // GCSClient defines the methods required from the GCS client for previewing.
@@ -94,9 +93,4 @@ func (r *Registry) GetPreview(ctx context.Context, client GCSClient, obj Object)
 		return "", lastErr
 	}
 	return "(no preview available)", nil
-}
-
-// IsBinary ...
-func IsBinary(s string) bool {
-	return strings.ContainsRune(s, '\x00')
 }

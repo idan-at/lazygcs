@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -179,11 +180,11 @@ func (m *Model) fetchDownload(bucketName, objectName, dest, taskID string, jobNu
 
 func (m *Model) openFile(bucketName, objectName string) tea.Cmd {
 	return func() tea.Msg {
-		tmpDir := os.TempDir()
-		dest, err := safeJoin(filepath.Join(tmpDir, "lazygcs", bucketName), objectName)
+		tmpDir, err := os.MkdirTemp("", "lazygcs-*")
 		if err != nil {
 			return FileOpenedMsg{Err: err}
 		}
+		dest := filepath.Join(tmpDir, filepath.Base(objectName))
 
 		err = m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
 		if err != nil {
@@ -206,11 +207,11 @@ func (m *Model) openFile(bucketName, objectName string) tea.Cmd {
 }
 
 func (m *Model) editFile(bucketName, objectName string) tea.Cmd {
-	tmpDir := os.TempDir()
-	dest, err := safeJoin(filepath.Join(tmpDir, "lazygcs", bucketName), objectName)
+	tmpDir, err := os.MkdirTemp("", "lazygcs-*")
 	if err != nil {
 		return func() tea.Msg { return EditorFinishedMsg{Err: err} }
 	}
+	dest := filepath.Join(tmpDir, filepath.Base(objectName))
 
 	return func() tea.Msg {
 		err := m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
@@ -229,7 +230,14 @@ func (m *Model) editFile(bucketName, objectName string) tea.Cmd {
 			editor = "vim"
 		}
 
-		c := ExecCommand(editor, dest)
+		fields := strings.Fields(editor)
+		if len(fields) == 0 {
+			fields = []string{"vim"}
+		}
+		editorExe := fields[0]
+		editorArgs := append(fields[1:], dest)
+
+		c := ExecCommand(editorExe, editorArgs...)
 		return tea.ExecProcess(c, func(err error) tea.Msg {
 			return EditorFinishedMsg{
 				TempPath:        dest,
@@ -240,9 +248,12 @@ func (m *Model) editFile(bucketName, objectName string) tea.Cmd {
 	}
 }
 
-func (m *Model) uploadFile(bucketName, objectName, srcPath string) tea.Cmd {
+func (m *Model) uploadFile(bucketName, objectName, srcPath, tempDirToClean string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.client.UploadObject(context.Background(), bucketName, objectName, srcPath)
+		if tempDirToClean != "" {
+			_ = os.RemoveAll(tempDirToClean)
+		}
 		return UploadMsg{ObjectName: objectName, Err: err}
 	}
 }

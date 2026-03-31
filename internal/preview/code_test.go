@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/idan-at/lazygcs/internal/util"
 
 	"github.com/idan-at/lazygcs/internal/preview"
 	"gotest.tools/v3/assert"
@@ -18,8 +19,7 @@ func TestHighlight_LineNumbers(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Strip ANSI to verify content
-	ansiRegexp := regexp.MustCompile("[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))")
-	stripped := ansiRegexp.ReplaceAllString(out, "")
+	stripped := util.StripANSI(out)
 
 	// Check for expected line number format "  1 │ line one"
 	assert.Assert(t, strings.Contains(stripped, "  1 │ line one"))
@@ -29,7 +29,7 @@ func TestHighlight_LineNumbers(t *testing.T) {
 	// Verify it doesn't add an extra line for trailing newline
 	contentWithNewline := "line one\n"
 	out2, _ := preview.Highlight("test.txt", contentWithNewline)
-	stripped2 := ansiRegexp.ReplaceAllString(out2, "")
+	stripped2 := util.StripANSI(out2)
 	lines := strings.Split(strings.TrimSpace(stripped2), "\n")
 	assert.Equal(t, len(lines), 1, "Should only have 1 line even with trailing newline")
 }

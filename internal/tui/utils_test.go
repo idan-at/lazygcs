@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/idan-at/lazygcs/internal/util"
+
 	"github.com/charmbracelet/lipgloss"
 	"gotest.tools/v3/assert"
 )
@@ -267,6 +269,28 @@ func TestSafeJoin(t *testing.T) {
 				if !strings.HasPrefix(got, absBase) {
 					t.Errorf("safeJoin() = %q, not under %q", got, absBase)
 				}
+			}
+		})
+	}
+}
+
+func TestStripANSI(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"No ANSI", "Hello World", "Hello World"},
+		{"Color ANSI", "\x1b[31mRed Text\x1b[0m", "Red Text"},
+		{"OSC Sequence", "\x1b]8;;http://example.com\x1b\\Link\x1b]8;;\x1b\\", "Link"},
+		{"Mixed", "\x1b[1;32mGreen \x1b]8;;#\x1b\\Link\x1b[0m!", "Green Link!"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := util.StripANSI(tt.input)
+			if got != tt.expected {
+				t.Errorf("util.StripANSI() = %q, want %q", got, tt.expected)
 			}
 		})
 	}

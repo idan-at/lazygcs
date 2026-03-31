@@ -38,14 +38,18 @@ func (p *TarPreviewer) Preview(ctx context.Context, client GCSClient, obj Object
 
 	// Limit to 2MB of compressed stream to prevent massive layers from hanging the UI
 	var r io.Reader
-	r = io.LimitReader(rc, 2*1024*1024)
 	if strings.HasSuffix(obj.Name, ".tar.gz") || strings.HasSuffix(obj.Name, ".tgz") || obj.ContentType == "application/gzip" {
-		gr, err := gzip.NewReader(r)
+		cr := io.LimitReader(rc, 2*1024*1024)
+		gr, err := gzip.NewReader(cr)
 		if err != nil {
 			return "", fmt.Errorf("failed to open gzip: %w", err)
 		}
 		defer func() { _ = gr.Close() }()
-		r = gr
+		// Limit uncompressed data to 20MB to prevent gzip bomb CPU exhaustion
+		r = io.LimitReader(gr, 20*1024*1024)
+	} else {
+		// Limit uncompressed tar to 20MB as well
+		r = io.LimitReader(rc, 20*1024*1024)
 	}
 
 	tr := tar.NewReader(r)

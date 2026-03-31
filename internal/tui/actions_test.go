@@ -1,6 +1,7 @@
 package tui_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -1194,4 +1195,85 @@ func TestModel_Actions_CreateBucket(t *testing.T) {
 
 	assert.Equal(t, client.lastCreateBucket.ProjectID, "p1")
 	assert.Equal(t, client.lastCreateBucket.Bucket, "new-bucket")
+}
+
+func TestModel_Actions_EditEditorParsing(t *testing.T) {
+	oldExec := tui.ExecCommand
+	defer func() { tui.ExecCommand = oldExec }()
+
+	var capturedExe string
+	var capturedArgs []string
+	tui.ExecCommand = func(exe string, args ...string) *exec.Cmd {
+		capturedExe = exe
+		capturedArgs = args
+		return exec.Command("true")
+	}
+
+	_ = os.Setenv("EDITOR", "code --wait")
+	defer func() { _ = os.Unsetenv("EDITOR") }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+
+	client.downloadObjectFn = func(_ context.Context, _, _, dest string, _ gcs.ProgressFunc) error {
+		_ = os.MkdirAll(filepath.Dir(dest), 0750)
+		return os.WriteFile(dest, []byte("dummy"), 0600)
+	}
+
+	m = enterBucket(m, projects, "b1", objects)
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")}
+	newM, cmd := m.Update(msg)
+	_ = newM.(*tui.Model)
+
+	if cmd != nil {
+		res := cmd()
+		switch b := res.(type) {
+		case tea.BatchMsg:
+			for _, c := range b {
+				if c != nil {
+					_ = c()
+				}
+			}
+		}
+	}
+
+	assert.Equal(t, capturedExe, "code")
+	assert.Assert(t, len(capturedArgs) == 2, "Expected 2 args, got %d", len(capturedArgs))
+	assert.Equal(t, capturedArgs[0], "--wait")
+	assert.Assert(t, strings.HasSuffix(capturedArgs[1], "obj1"), "Expected arg to end with obj1, got %s", capturedArgs[1])
+}
+
+func TestModel_Actions_OpenTempDir(t *testing.T) {
+	// Verify that the destination path for openFile includes lazygcs- prefix (created by MkdirTemp)
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+	m, _ = pressKey(m, 'j') // hover obj1
+
+	// Press 'o' to open
+	_, cmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	assert.Assert(t, cmd != nil)
+
+	// Resolve the command
+	msg := cmd()
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batchMsg {
+			if c != nil {
+				c() // Execution
+			}
+		}
+	}
+
+	dest := client.lastDownload.Dest
+	assert.Assert(t, strings.Contains(dest, "lazygcs-"), "Expected destination to be a secure MkdirTemp directory (lazygcs-*), got %s", dest)
+	assert.Assert(t, strings.HasSuffix(dest, "obj1"), "Expected destination file to be obj1")
 }

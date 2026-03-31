@@ -24,6 +24,11 @@ func (p *ZipPreviewer) CanPreview(obj Object) bool {
 
 // Preview ...
 func (p *ZipPreviewer) Preview(ctx context.Context, client GCSClient, obj Object) (string, error) {
+	// Limit zip preview to 100MB to prevent excessive memory usage reading central directory
+	if obj.Size > 100*1024*1024 {
+		return "(zip archive too large to preview)", nil
+	}
+
 	ra := client.NewReaderAt(ctx, obj.Bucket, obj.Name)
 
 	zr, err := zip.NewReader(ra, obj.Size)

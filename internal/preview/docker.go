@@ -42,14 +42,18 @@ func (p *DockerArchivePreviewer) Preview(ctx context.Context, client GCSClient, 
 	// Prevent downloading huge layers to detect if it's a docker image
 	// 2MB of compressed stream should be enough to capture manifest.json and config.json
 	var r io.Reader
-	r = io.LimitReader(rc, 2*1024*1024)
 	if strings.HasSuffix(obj.Name, ".tar.gz") || strings.HasSuffix(obj.Name, ".tgz") || obj.ContentType == "application/gzip" {
-		gr, err := gzip.NewReader(r)
+		cr := io.LimitReader(rc, 2*1024*1024)
+		gr, err := gzip.NewReader(cr)
 		if err != nil {
 			return "", fmt.Errorf("failed to open gzip: %w", err)
 		}
 		defer func() { _ = gr.Close() }()
-		r = gr
+		// Limit uncompressed data to 20MB to prevent gzip bomb CPU exhaustion
+		r = io.LimitReader(gr, 20*1024*1024)
+	} else {
+		// Limit uncompressed tar to 20MB as well
+		r = io.LimitReader(rc, 20*1024*1024)
 	}
 
 	tr := tar.NewReader(r)
