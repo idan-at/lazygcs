@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -764,6 +765,15 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleRefreshKey(false)
 
 	case key.Matches(msg, keys.Quit):
+		var wg sync.WaitGroup
+		for _, dir := range m.tempDirsToCleanup {
+			wg.Add(1)
+			go func(d string) {
+				defer wg.Done()
+				_ = os.RemoveAll(d)
+			}(dir)
+		}
+		wg.Wait()
 		return m, tea.Quit
 	}
 	return m, nil

@@ -134,6 +134,9 @@ type Model struct {
 	contentCache          map[string]contentCacheEntry
 	metadataCache         map[string]metadataCacheEntry
 	bucketVersioningCache map[string]bool
+
+	// Cleanup
+	tempDirsToCleanup []string
 }
 
 type listCacheEntry struct {

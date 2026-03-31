@@ -185,6 +185,7 @@ func (m *Model) openFile(bucketName, objectName string) tea.Cmd {
 			return FileOpenedMsg{Err: err}
 		}
 		dest := filepath.Join(tmpDir, filepath.Base(objectName))
+		m.tempDirsToCleanup = append(m.tempDirsToCleanup, tmpDir)
 
 		err = m.client.DownloadObject(context.Background(), bucketName, objectName, dest, nil)
 		if err != nil {

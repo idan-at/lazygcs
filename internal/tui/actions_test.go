@@ -1277,3 +1277,62 @@ func TestModel_Actions_OpenTempDir(t *testing.T) {
 	assert.Assert(t, strings.Contains(dest, "lazygcs-"), "Expected destination to be a secure MkdirTemp directory (lazygcs-*), got %s", dest)
 	assert.Assert(t, strings.HasSuffix(dest, "obj1"), "Expected destination file to be obj1")
 }
+
+func TestModel_Actions_QuitCleanup(t *testing.T) {
+	// Mock ExecCommand so we don't actually open applications
+	oldExec := tui.ExecCommand
+	tui.ExecCommand = func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+	defer func() { tui.ExecCommand = oldExec }()
+
+	projects := []gcs.ProjectBuckets{{ProjectID: "p1", Buckets: []string{"b1"}}}
+	objects := simpleObjectList([]string{"obj1", "obj2"}, nil)
+	m, client := setupTestModel(projects, objects, "/tmp")
+	m = enterBucket(m, projects, "b1", objects)
+
+	executeOpenCmd := func(cmd tea.Cmd) {
+		msg := cmd()
+		if batchMsg, ok := msg.(tea.BatchMsg); ok {
+			for _, c := range batchMsg {
+				if c != nil {
+					c() // Execute the actual side-effects (os.MkdirTemp, download)
+				}
+			}
+		}
+	}
+
+	var tempDirs []string
+
+	// 1. Open first object
+	m, cmd1 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	assert.Assert(t, cmd1 != nil)
+	executeOpenCmd(cmd1)
+	dir1 := filepath.Dir(client.lastDownload.Dest)
+	tempDirs = append(tempDirs, dir1)
+
+	// 2. Move to second object and open
+	m, _ = pressKey(m, 'j')
+	m, cmd2 := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	assert.Assert(t, cmd2 != nil)
+	executeOpenCmd(cmd2)
+	dir2 := filepath.Dir(client.lastDownload.Dest)
+	tempDirs = append(tempDirs, dir2)
+
+	// Verify both directories exist
+	for _, d := range tempDirs {
+		info, err := os.Stat(d)
+		assert.NilError(t, err, "Temp directory should exist after open")
+		assert.Assert(t, info.IsDir(), "Path should be a directory")
+	}
+
+	// 3. Quit the application
+	_, quitCmd := updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	assert.Assert(t, quitCmd != nil, "Quit command should be returned")
+
+	// Verify both directories have been cleaned up by the parallel quit handler
+	for _, d := range tempDirs {
+		_, err := os.Stat(d)
+		assert.Assert(t, os.IsNotExist(err), "Temp directory should be deleted after quitting: %s", d)
+	}
+}
